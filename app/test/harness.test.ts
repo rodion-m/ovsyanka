@@ -118,6 +118,22 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     expect(call.input.message.content).toContain('Родион, Yogurt')
     expect(call.cwd).not.toBe(process.cwd()); expect(await readdir(fixture.tempDir)).toEqual([])
   })
+  it('maps a packed batch\'s segment times back onto the meeting clock of each part', async () => {
+    const fixture = await agyFixture(JSON.stringify({ language: 'ru', segments: [
+      { start: 0.25, end: 0.5, text: 'Начало первой части.' },
+      { start: 1.25, end: 1.75, text: 'Хвост второй части.' },
+    ] }))
+    const packed = { track: 'them' as const, startMs: 12_000, samples: new Float32Array(32_000),
+      parts: [
+        { atMs: 0, startMs: 12_000, durationMs: 1000 },
+        { atMs: 1000, startMs: 62_000, durationMs: 1000 },
+      ] }
+    const result = await fixture.harness.transcriber(callbacks())(packed)
+    expect(result).toEqual([
+      { track: 'them', startMs: 12_250, endMs: 12_500, text: 'Начало первой части.' },
+      { track: 'them', startMs: 62_250, endMs: 62_750, text: 'Хвост второй части.' },
+    ])
+  })
   it('does not make remote requests or even create staging files for partial chunks', async () => {
     const fixture = await agyFixture()
     expect(await fixture.harness.transcriber(callbacks())(chunk(), { partial: true })).toEqual([])

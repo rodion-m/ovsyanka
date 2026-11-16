@@ -4,6 +4,7 @@ import type { AiSettings } from '../../shared/ai'
 import type { Track } from '../capture'
 import { languageCode, languageName } from '../asr/appleSpeech'
 import { wavBytes, type Line, type Transcribe } from '../asr/transcribe'
+import { packedToMeeting } from '../asr/batch'
 import { assertRunning, HarnessError, inStage } from './process'
 
 export const TRANSCRIPT_SCHEMA: Record<string, unknown> = {
@@ -88,7 +89,10 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
     assertRunning(o.signal)
     const transcript = parseTranscript(response, duration)
     const lines: Line[] = transcript.segments.map(segment => ({
-      track: chunk.track, startMs: Math.round(chunk.startMs + segment.start * 1000), endMs: Math.round(chunk.startMs + segment.end * 1000), text: segment.text,
+      track: chunk.track,
+      startMs: Math.round(packedToMeeting(chunk.parts, segment.start * 1000, 'start', chunk.startMs)),
+      endMs: Math.round(packedToMeeting(chunk.parts, segment.end * 1000, 'end', chunk.startMs)),
+      text: segment.text,
     }))
     const text = lines.map(line => line.text).join(' ')
     const reported = language ?? transcript.language

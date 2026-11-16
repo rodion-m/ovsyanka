@@ -10,6 +10,8 @@ export type Chunk = {
   track: Track; /** meeting time of the first sample */ startMs: number; samples: Float32Array
   /** how much of it is clearly speech (well over the track's noise floor): under 300 ms is a faint sound, not someone talking */
   clearMs?: number
+  /** packed batches only (batch.ts): where each queued chunk landed inside `samples`, to map times back to the meeting clock */
+  parts?: Array<{ atMs: number; startMs: number; durationMs: number }>
 }
 
 const RATE = 16000

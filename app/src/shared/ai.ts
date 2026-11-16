@@ -31,7 +31,7 @@ export const DEFAULT_AI_SETTINGS: Readonly<AiSettings> = {
   transcriptionProfile: 'agy-gemini-3.8-flash',
   textProfile: 'agy-gemini-3.8-flash',
   outputLanguage: 'auto',
-  timeoutSeconds: 180,
+  timeoutSeconds: 600,
   contextTokens: 32_768,
 }
 

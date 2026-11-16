@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createPipeline } from '../src/main/asr/pipeline'
 import type { Chunk } from '../src/main/asr/chunker'
 import { createTranscriber, type Line } from '../src/main/asr/transcribe'
@@ -8,14 +8,14 @@ const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE)
 const quiet = (sec: number) => new Float32Array(Math.round(sec * RATE))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; maxQueuedMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string } = {}) {
+function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string } = {}) {
   const warns: string[] = []
   const saved: Array<{ track: string; text: string; speaker: string | null; meetingId: string }> = []
   const sent: string[] = []
   let inFlight = 0, maxInFlight = 0
   const p = createPipeline({
     meetingId: 'm1',
-    holdMs: opts.holdMs ?? 60, maxQueuedMs: opts.maxQueuedMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell,
+    holdMs: opts.holdMs ?? 60, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell,
     ...(opts.echo ? { echoForTests: { echo: true, correlatedAt: () => true } } : {}),
     transcribe: async (c) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); try { return await say(c) } finally { inFlight-- } },
     // hidden echo lines are saved too, but they are not what these tests look at
@@ -179,6 +179,62 @@ describe('pipeline when whisper falls behind', () => {
     s.speak('them', 0); s.speak('them', 3000); s.speak('me', 6000)
     await s.p.finish()
     expect(s.warns).toEqual(['transcribe-failed'])
+  })
+})
+
+describe('pipeline with long remote batches', () => {
+  it('sends nothing while the queued span is shorter than batchMs, then one packed request', async () => {
+    const calls: Chunk[] = []
+    const s = setup(async (c) => { calls.push(c); return [line(c, `words at ${c.startMs}`)] }, { batchMs: 12_000 })
+    s.speak('them', 0); s.speak('them', 5000); s.speak('them', 9000)
+    // newest audio is at 11000 ms and the oldest queued chunk starts at 0: 11 s < 12 s
+    expect(calls).toHaveLength(0)
+    s.speak('them', 14_000)
+    // the newest push takes the span past batchMs: the three queued chunks go as one packed batch
+    expect(calls).toHaveLength(1)
+    expect(calls[0].parts).toHaveLength(3)
+    await s.p.finish()
+    // the short remainder still waiting goes out at the end
+    expect(calls).toHaveLength(2)
+    expect(s.saved.map((x) => x.text)).toEqual(['words at 0', 'words at 14000'])
+  })
+
+  it('finish sends the short remainder of a batch', async () => {
+    const calls: Chunk[] = []
+    const s = setup(async (c) => { calls.push(c); return [line(c, 'end words')] }, { batchMs: 60_000 })
+    s.speak('them', 0); s.speak('them', 2000)
+    expect(calls).toHaveLength(0)
+    await s.p.finish()
+    expect(calls).toHaveLength(1)
+    expect(s.saved.map((x) => x.text)).toEqual(['end words'])
+  })
+
+  it('retries a failed batch once after 5 s, then delivers its lines', async () => {
+    vi.useFakeTimers()
+    try {
+      let n = 0
+      const s = setup((c) => { n++; if (n === 1) throw new Error('boom'); return [line(c, 'retried words')] }, { batchMs: 60_000 })
+      s.speak('them', 0); s.speak('them', 2000)
+      const done = s.p.finish()
+      await vi.advanceTimersByTimeAsync(5000)
+      await done
+      expect(n).toBe(2)
+      expect(s.saved.map((x) => x.text)).toEqual(['retried words'])
+      expect(s.warns).toEqual([])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('warns and drops the batch only after the retry fails too', async () => {
+    vi.useFakeTimers()
+    try {
+      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000 })
+      s.speak('them', 0)
+      const done = s.p.finish()
+      await vi.advanceTimersByTimeAsync(5000)
+      await done
+      expect(s.warns).toEqual(['transcribe-failed'])
+      expect(s.saved).toEqual([])
+    } finally { vi.useRealTimers() }
   })
 })
 

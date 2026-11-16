@@ -45,6 +45,7 @@ export function createPipeline(p: {
   const hold = p.holdMs ?? 2000
   const extraWait = p.extraWaitMs ?? EXTRA_WAIT_MS
   const maxQueued = ((p.maxQueuedMs ?? MAX_QUEUED_MS) * 16)
+  const batchMs = p.batchMs ?? 0
   const waiting: Record<Track, Chunk[]> = { me: [], them: [] }
   const running: Record<Track, boolean> = { me: false, them: false }
   const queued = (t: Track) => waiting[t].length + (running[t] ? 1 : 0)
@@ -143,17 +144,40 @@ export function createPipeline(p: {
     if (held.length && !timer && !closed) timer = setInterval(() => release(false), 200)
   }
 
+  /** meeting time of the newest audio pushed per track: a remote batch waits until it is batchMs past the oldest queued chunk */
+  const newest: Record<Track, number> = { me: -Infinity, them: -Infinity }
+  /** the meeting is ending: whatever is queued goes out without waiting for a full batch */
+  let ending = false
+  /** a failed remote batch is sent once more after this pause; the track stays busy so nothing overtakes it */
+  const RETRY_MS = 5000
+
+  /** a packed batch's meeting-time end: its last part's end (the packed length would miss the compressed pauses) */
+  const endMsOf = (c: Chunk) => c.parts?.length
+    ? c.parts.reduce((e, part) => Math.max(e, part.startMs + part.durationMs), -Infinity)
+    : c.startMs + c.samples.length / 16
+
   const pump = (t: Track) => {
     if (running[t]) return
-    const c = takeBatch(waiting[t], p.batchMs)
+    const q = waiting[t]
+    if (batchMs > 0 && !ending && q.length && newest[t] - q[0].startMs < batchMs) return
+    const c = takeBatch(q, p.batchMs)
     if (!c) { if (!queued('me') && !queued('them')) { const w = idle; idle = []; w.forEach((f) => f()) } return }
+    run(t, c, batchMs > 0 ? 1 : 0)
+  }
+
+  const run = (t: Track, c: Chunk, retries: number) => {
     running[t] = true
-    const chunkEnd = c.startMs + c.samples.length / 16
+    const chunkEnd = endMsOf(c)
+    let retrying = false
     p.transcribe(c)
       .then((lines) => onLines(t, lines, c.startMs, chunkEnd))
       // its quick reading goes too: nothing final will replace it
-      .catch((e) => { console.error(`transcribing a ${t} chunk failed`, e); warn('transcribe-failed'); settle(t, chunkEnd) })
-      .finally(() => { running[t] = false; pump(t) })
+      .catch((e) => {
+        console.error(`transcribing a ${t} chunk failed`, e)
+        if (retries > 0) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        warn('transcribe-failed'); settle(t, chunkEnd)
+      })
+      .finally(() => { if (!retrying) { running[t] = false; pump(t) } })
   }
 
   const queue = (c: Chunk) => {
@@ -205,13 +229,19 @@ export function createPipeline(p: {
     push(track: Track, ms: number, samples: Float32Array) {
       if (closed) return
       wallOffset = Date.now() - (ms + samples.length / 16)
+      newest[track] = Math.max(newest[track], ms + samples.length / 16)
       echo.push(track, ms, samples)
       cut.push(track, ms, samples)
+      // a full remote batch can be ready while its last chunk is still being collected
+      if (batchMs > 0) pump(track)
     },
     /** the meeting is over: what is left is transcribed, held lines are checked and saved now */
     finish(): Promise<void> {
       finishing ??= (async () => {
+        ending = true
         cut.flush()
+        // a track whose last chunk was already queued gets no new queue() call from the flush
+        pump('me'); pump('them')
         await new Promise<void>((r) => { if (!queued('me') && !queued('them')) r(); else idle.push(r) })
         closed = true
         release(true)
