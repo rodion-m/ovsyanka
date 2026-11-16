@@ -8,14 +8,14 @@ const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE)
 const quiet = (sec: number) => new Float32Array(Math.round(sec * RATE))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string } = {}) {
+function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string } = {}) {
   const warns: string[] = []
   const saved: Array<{ track: string; text: string; speaker: string | null; meetingId: string }> = []
   const sent: string[] = []
   let inFlight = 0, maxInFlight = 0
   const p = createPipeline({
     meetingId: 'm1',
-    holdMs: opts.holdMs ?? 60, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell,
+    holdMs: opts.holdMs ?? 60, extraWaitMs: opts.extraWaitMs, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell,
     ...(opts.echo ? { echoForTests: { echo: true, correlatedAt: () => true } } : {}),
     transcribe: async (c) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); try { return await say(c) } finally { inFlight-- } },
     // hidden echo lines are saved too, but they are not what these tests look at
@@ -121,6 +121,18 @@ describe('pipeline', () => {
     expect(s.saved.map((x) => x.text)).toEqual(['second chunk survives'])
   })
 
+  it('a transcriber that throws synchronously takes the failure path and finish still resolves', async () => {
+    const p = createPipeline({
+      meetingId: 'm1', holdMs: 0,
+      transcribe: () => { throw new Error('boom') },
+      save: () => {}, emit: () => {},
+    })
+    const all = Float32Array.from([...tone(1), ...quiet(1)])
+    for (let i = 0; i < all.length; i += 1600) p.push('them', i / 16, all.subarray(i, i + 1600))
+    await p.finish()
+    expect(p.busy()).toBe(false)
+  })
+
   it('finish releases held lines straight away and reports idle', async () => {
     const s = setup((c) => [line(c, 'last words before the end')], { holdMs: 60_000 })
     s.speak('me', 0)
@@ -190,6 +202,7 @@ describe('pipeline with long remote batches', () => {
     // newest audio is at 11000 ms and the oldest queued chunk starts at 0: 11 s < 12 s
     expect(calls).toHaveLength(0)
     s.speak('them', 14_000)
+    await wait(0) // the batch call is dispatched on a microtask past the push
     // the newest push takes the span past batchMs: the three queued chunks go as one packed batch
     expect(calls).toHaveLength(1)
     expect(calls[0].parts).toHaveLength(3)
@@ -235,6 +248,32 @@ describe('pipeline with long remote batches', () => {
       expect(s.warns).toEqual(['transcribe-failed'])
       expect(s.saved).toEqual([])
     } finally { vi.useRealTimers() }
+  })
+
+  it('does not retry an aborted batch', async () => {
+    vi.useFakeTimers()
+    try {
+      let n = 0
+      const s = setup((c) => { n++; const e = new Error('AI request cancelled'); e.name = 'AbortError'; throw e }, { batchMs: 60_000 })
+      s.speak('them', 0); s.speak('them', 2000)
+      const done = s.p.finish()
+      await vi.advanceTimersByTimeAsync(10_000)
+      await done
+      expect(n).toBe(1)
+    } finally { vi.useRealTimers() }
+  })
+
+  it('releases a me line after its hold without waiting for the other track\'s queued batch', async () => {
+    const s = setup((c) => [line(c, `${c.track} words at ${c.startMs}`)], { batchMs: 10_000, holdMs: 50, extraWaitMs: 5000 })
+    s.speak('them', 0)
+    s.speak('me', 0)
+    s.speak('me', 12_000)
+    await wait(1000)
+    // their chunk is still queued for a full batch; the me line was released after holdMs, not the extra wait
+    expect(s.saved.map((x) => x.text)).toContain('me words at 0')
+    expect(s.saved.map((x) => x.text)).not.toContain('them words at 0')
+    await s.p.finish()
+    expect(s.saved.map((x) => x.text)).toContain('them words at 0')
   })
 })
 

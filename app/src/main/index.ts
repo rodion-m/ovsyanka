@@ -541,7 +541,7 @@ app.whenReady().then(() => {
     refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
-    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, maxQueuedMs: 30 * 60_000 } : {}),
+    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, maxQueuedMs: 15 * 60_000 } : {}),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),
     // Apple's on-device speech for the live words (macOS 26, Apple Silicon); fake mode has a stand-in when a test asks

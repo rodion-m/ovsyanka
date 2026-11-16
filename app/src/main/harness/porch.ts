@@ -3,7 +3,7 @@ import { constants } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { AiSettings } from '../../shared/ai'
 import { assertRunning, executablePath, HarnessError, HarnessProcesses } from './process'
-import { TRANSCRIPT_SCHEMA } from './transcribe'
+import { MIN_AUDIO_TIMEOUT_SECONDS, TRANSCRIPT_SCHEMA } from './transcribe'
 
 /** Internal (not public semver) adapter contract audited against CodeAlive-AI/pragmatic-orchestration. */
 export const PORCH_CONTRACT = 'b0c5cf4d5d236677595a508ee3491d56ae1e0e8a'
@@ -125,7 +125,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
         args: [runner, '--mode', 'media', '--agent-id', profile, '--raw', '--prompt-file', file], cwd: directory,
         env: { ...environment(directory), PORCH_BIN_AGY: agy, AGY_MODEL: settings.transcriptionModel,
           AGY_EFFORT: settings.transcriptionEffort, PORCH_OUTPUT_SCHEMA: schema },
-        signal, timeoutMs: settings.timeoutSeconds * 1000, stdoutLimit: 2 * 1024 * 1024 })
+        signal, timeoutMs: Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) * 1000, stdoutLimit: 2 * 1024 * 1024 })
       if (!result.stdout.trim()) throw new HarnessError('Porch transcription returned an empty response.')
       return result.stdout
     },

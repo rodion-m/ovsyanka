@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AiSettings } from '../../shared/ai'
 import { assertRunning, executablePath, HarnessError, HarnessProcesses } from './process'
+import { MIN_AUDIO_TIMEOUT_SECONDS } from './transcribe'
 
 type Request = {
   prompt: string
@@ -65,7 +66,7 @@ export function createAgy(settings: AiSettings, processes: HarnessProcesses) {
     assertRunning(request.signal)
     const result = await processes.run({ label: 'agy', executable: binary, args, cwd: request.directory, env,
       input: `${JSON.stringify({ event: 'user', message: { content: request.prompt } })}\n`,
-      signal: request.signal, timeoutMs: settings.timeoutSeconds * 1000 })
+      signal: request.signal, timeoutMs: (request.audio ? Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) : settings.timeoutSeconds) * 1000 })
     return agyAnswer(result.stdout)
   }
 }

@@ -31,7 +31,7 @@ export function createPipeline(p: {
   holdMs?: number
   extraWaitMs?: number
   maxQueuedMs?: number
-  /** Combine queued speech up to this duration for a remote provider, preserving silent gaps. Local reads stay unchanged. */
+  /** Combine queued speech for a remote provider into packed batches of up to this much audio, sent once the oldest queued chunk is this old in meeting time or at the end. Local reads stay unchanged. */
   batchMs?: number
   /** for tests: stand in for the echo detector */
   echoForTests?: EchoCheck
@@ -118,8 +118,9 @@ export function createPipeline(p: {
   /** me lines whose hold is over (all of them when forced) are checked against what them said, then given out */
   const release = (force: boolean) => {
     const now = Date.now()
-    // their line may still be on its way, or they are mid-sentence (the chunk not cut yet): the echo check needs it
-    const waitingOnThem = queued('them') > 0 || cut.isOpen('them')
+    // their line may still be on its way, or they are mid-sentence (the chunk not cut yet): the echo check needs it.
+    // In batch mode their text can be minutes away, so the extra wait only delays me lines without enabling the check.
+    const waitingOnThem = batchMs > 0 ? false : queued('them') > 0 || cut.isOpen('them')
     const due = held.filter((h) => force || (now >= h.readyAt && (!waitingOnThem || now >= h.readyAt + extraWait)))
     if (!due.length) return
     held = held.filter((h) => !due.includes(h))
@@ -169,12 +170,15 @@ export function createPipeline(p: {
     running[t] = true
     const chunkEnd = endMsOf(c)
     let retrying = false
-    p.transcribe(c)
+    // the call is deferred to a microtask so a synchronous throw takes the same failure path as a rejection
+    Promise.resolve().then(() => p.transcribe(c))
       .then((lines) => onLines(t, lines, c.startMs, chunkEnd))
       // its quick reading goes too: nothing final will replace it
       .catch((e) => {
         console.error(`transcribing a ${t} chunk failed`, e)
-        if (retries > 0) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        // a closed pipeline or an aborted request (the app is going away) is never retried
+        const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
+        if (retries > 0 && !cancelled) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
         warn('transcribe-failed'); settle(t, chunkEnd)
       })
       .finally(() => { if (!retrying) { running[t] = false; pump(t) } })

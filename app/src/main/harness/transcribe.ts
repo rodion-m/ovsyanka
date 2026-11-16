@@ -26,6 +26,9 @@ type TranscribeOptions = {
 }
 export type AudioRequest = { directory: string; language?: string; instructions: string; prompt: string; signal: AbortSignal }
 
+/** Audio requests get at least this long: a packed batch can take far longer than a text answer. */
+export const MIN_AUDIO_TIMEOUT_SECONDS = 600
+
 /** Parse only the structured terminal answer. Never include diagnostics or malformed provider text in an error. */
 export function parseTranscript(text: string, duration: number): Transcript {
   if (!Number.isFinite(duration) || duration < 0) throw new HarnessError('Invalid recording duration.')
@@ -88,12 +91,13 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
     })
     assertRunning(o.signal)
     const transcript = parseTranscript(response, duration)
-    const lines: Line[] = transcript.segments.map(segment => ({
-      track: chunk.track,
-      startMs: Math.round(packedToMeeting(chunk.parts, segment.start * 1000, 'start', chunk.startMs)),
-      endMs: Math.round(packedToMeeting(chunk.parts, segment.end * 1000, 'end', chunk.startMs)),
-      text: segment.text,
-    }))
+    const lines: Line[] = transcript.segments.map(segment => {
+      const endMs = Math.round(packedToMeeting(chunk.parts, segment.end * 1000, 'end', chunk.startMs))
+      // start and end map as a pair: inside one compressed pause the start snaps to the next part
+      // and the end to the previous one, which would invert the line; pin it to the previous part's end
+      const startMs = Math.min(Math.round(packedToMeeting(chunk.parts, segment.start * 1000, 'start', chunk.startMs)), endMs)
+      return { track: chunk.track, startMs, endMs, text: segment.text }
+    })
     const text = lines.map(line => line.text).join(' ')
     const reported = language ?? transcript.language
     if (text && reported && reported.toLowerCase() !== 'auto') {

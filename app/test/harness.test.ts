@@ -3,12 +3,14 @@ import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, 
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AI_SETTINGS, type AiSettings } from '../src/shared/ai'
-import { agyAnswer } from '../src/main/harness/agy'
+import { agyAnswer, createAgy } from '../src/main/harness/agy'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
 import { countTokens } from '../src/main/harness/model'
-import { exactProfile, porchInstallation } from '../src/main/harness/porch'
+import { createPorch, exactProfile, porchInstallation } from '../src/main/harness/porch'
 import { HarnessProcesses, inStage } from '../src/main/harness/process'
-import { parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
+import { createHarnessTranscriber, parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
+import { takeBatch } from '../src/main/asr/batch'
+import type { Chunk } from '../src/main/asr/chunker'
 import { wavBytes } from '../src/main/asr/transcribe'
 import { enhance, partBudget, splitForContext, summaryPrompt, type Llm } from '../src/main/notes/enhance'
 
@@ -93,6 +95,62 @@ describe('transcript validation', () => {
   })
 })
 
+describe('packed batch segment times', () => {
+  /** two 1 s parts with a 60 s meeting pause between them: packed as 1 s + 1 s of zeros + 1 s */
+  const parts = [
+    { atMs: 0, startMs: 10_000, durationMs: 1000 },
+    { atMs: 2000, startMs: 60_000, durationMs: 1000 },
+  ]
+  const packed = (): Chunk => ({ track: 'them', startMs: 10_000, samples: new Float32Array(48_000), parts })
+  const hear = async (segments: Array<{ start: number; end: number; text: string }>, c: Chunk = packed()) => {
+    const tempDir = await directory()
+    const transcribe = createHarnessTranscriber({
+      settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async () => JSON.stringify({ segments }),
+    }, callbacks())
+    return transcribe(c)
+  }
+
+  it('pins a segment inside a compressed pause to the previous part\'s end instead of inverting', async () => {
+    // packed 1.3–1.7 s sits in the compressed gap: the start would snap to part 2, the end back to part 1
+    expect(await hear([
+      { start: 0.2, end: 0.8, text: 'В первой части.' },
+      { start: 1.3, end: 1.7, text: 'В сжатой паузе.' },
+      { start: 2.2, end: 2.8, text: 'Во второй части.' },
+    ])).toEqual([
+      { track: 'them', startMs: 10_200, endMs: 10_800, text: 'В первой части.' },
+      { track: 'them', startMs: 11_000, endMs: 11_000, text: 'В сжатой паузе.' },
+      { track: 'them', startMs: 60_200, endMs: 60_800, text: 'Во второй части.' },
+    ])
+  })
+
+  it('keeps a zero-length segment exactly at a part boundary ordered', async () => {
+    // packed 1.0 s is the first zero of the compressed gap: start snaps forward, end snaps back
+    expect(await hear([{ start: 1.0, end: 1.0, text: 'На границе.' }])).toEqual([
+      { track: 'them', startMs: 11_000, endMs: 11_000, text: 'На границе.' },
+    ])
+  })
+
+  it('maps a chunk from a real takeBatch through the harness transcriber', async () => {
+    const one = new Float32Array(16_000)
+    const queue: Chunk[] = [
+      { track: 'them', startMs: 5_000, samples: one, clearMs: 1000 },
+      { track: 'them', startMs: 66_000, samples: one, clearMs: 1000 },
+    ]
+    const batch = takeBatch(queue, 300_000)!
+    expect(batch.parts).toHaveLength(2)
+    expect(await hear([
+      { start: 0.2, end: 0.8, text: 'Первая часть.' },
+      { start: 1.3, end: 1.7, text: 'В паузе.' },
+      { start: 2.2, end: 2.8, text: 'Вторая часть.' },
+    ], batch)).toEqual([
+      { track: 'them', startMs: 5_200, endMs: 5_800, text: 'Первая часть.' },
+      { track: 'them', startMs: 6_000, endMs: 6_000, text: 'В паузе.' },
+      { track: 'them', startMs: 66_200, endMs: 66_800, text: 'Вторая часть.' },
+    ])
+  })
+})
+
 describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   it('stages a real WAV, pins Gemini Flash medium, uses native reads, offsets Russian speech and cleans up', async () => {
     vi.stubEnv('GEMINI_API_KEY', 'never forward this')
@@ -133,6 +191,17 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
       { track: 'them', startMs: 12_250, endMs: 12_500, text: 'Начало первой части.' },
       { track: 'them', startMs: 62_250, endMs: 62_750, text: 'Хвост второй части.' },
     ])
+  })
+  it('gives audio requests at least 600 s while text keeps the configured timeout', async () => {
+    const fixture = await agyFixture()
+    const processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    const run = vi.spyOn(processes, 'run').mockResolvedValue({ stdout: successful('ok'), stderr: '', exitCode: 0 })
+    const dir = await directory()
+    const agy = createAgy({ ...fixture.settings, timeoutSeconds: 180 }, processes)
+    await agy({ prompt: 'text request', directory: dir })
+    await agy({ prompt: 'audio request', directory: dir, audio: true, schema: TRANSCRIPT_SCHEMA })
+    expect(run.mock.calls.map(([options]) => options.timeoutMs)).toEqual([180_000, 600_000])
   })
   it('does not make remote requests or even create staging files for partial chunks', async () => {
     const fixture = await agyFixture()
@@ -457,6 +526,21 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     await fixture.harness.transcriber(cb)(audio)
     expect((await fixture.porchCalls()).filter(call => call.args[0] === 'media')).toHaveLength(1)
     expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('gives the audio route at least 600 s while text keeps the configured timeout', async () => {
+    const fixture = await porchFixture()
+    const processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    const run = vi.spyOn(processes, 'run').mockImplementation(async (options) => ({
+      stdout: options.args.includes('capabilities') ? JSON.stringify({ transcribe: [fixture.settings.transcriptionProfile] }) : '{"segments":[]}',
+      stderr: '', exitCode: 0,
+    }))
+    const dir = await directory()
+    const porch = createPorch({ ...fixture.settings, timeoutSeconds: 180 }, processes)
+    await porch.text('text request', dir)
+    await porch.transcribe('audio request', dir)
+    // text run, audio-capability probe (5 s), then the audio run
+    expect(run.mock.calls.map(([options]) => options.timeoutMs)).toEqual([180_000, 5000, 600_000])
   })
   it('accepts only explicit JSON silence and rejects an empty backend answer', async () => {
     const silent = await porchFixture({ response: '{"segments":[]}' }), cb = callbacks()
