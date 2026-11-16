@@ -36,7 +36,7 @@ export async function porchInstallation(path: string): Promise<{ porch: string; 
 
 function environment(directory: string): NodeJS.ProcessEnv {
   const env = { ...process.env }
-  for (const key of ['PORCH_DUMP_ARGV', 'PORCH_DEBUG_EVENTS', 'PORCH_DEBUG_EVENTS_PATH', 'PORCH_ARTIFACT_KEY', 'PORCH_RAW_PROMPT', 'PORCH_SKIP_OUTPUT_TEMPLATE', 'PORCH_OUTPUT_SCHEMA', 'PORCH_MEDIA_IMAGES']) delete env[key]
+  for (const key of ['PORCH_DUMP_ARGV', 'PORCH_DEBUG_EVENTS', 'PORCH_DEBUG_EVENTS_PATH', 'PORCH_ARTIFACT_KEY', 'PORCH_RAW_PROMPT', 'PORCH_SKIP_OUTPUT_TEMPLATE', 'PORCH_OUTPUT_SCHEMA', 'PORCH_MEDIA_IMAGES', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'AGY_ADC_AUTH']) delete env[key]
   return { ...env, TMPDIR: directory, TMP: directory, TEMP: directory,
     PORCH_PROGRESS: 'none', PORCH_PROGRESS_STYLE: 'none', PORCH_SAVE_OUTPUTS: '0',
     PORCH_RUN_DIR: join(directory, 'run'), PORCH_OUTPUT_DIR: join(directory, 'outputs'), PORCH_SINGLE_AGENT: '1' }
@@ -73,6 +73,11 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
     async text(prompt: string, directory: string, signal?: AbortSignal): Promise<string> {
       const profile = exactProfile(settings.textProfile)
       const { runner, bash } = await installation()
+      // The text profile may use a non-agy backend: an unresolvable agy path must not fail it.
+      // Porch reports its own error when the selected profile really needs agy.
+      let agy: string | undefined
+      try { agy = await executablePath(settings.agyPath, 'Antigravity CLI (agy)') }
+      catch (error) { if (!(error instanceof HarnessError)) throw error }
       assertRunning(signal)
       const file = join(directory, 'prompt.txt')
       await writeFile(file, prompt, { encoding: 'utf8', mode: 0o600 })
@@ -80,7 +85,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
       // No model override: the selected profile chooses the text harness, model and effort.
       const result = await processes.run({ label: 'Porch', executable: bash,
         args: [runner, '--mode', 'media', '--agent-id', profile, '--raw', '--prompt-file', file],
-        cwd: directory, env: environment(directory), signal, timeoutMs: settings.timeoutSeconds * 1000,
+        cwd: directory, env: { ...environment(directory), ...(agy ? { PORCH_BIN_AGY: agy } : {}) }, signal, timeoutMs: settings.timeoutSeconds * 1000,
         stdoutLimit: 2 * 1024 * 1024 })
       if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.')
       return result.stdout

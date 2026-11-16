@@ -324,7 +324,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const prompt=args.includes('--prompt-file')?fs.readFileSync(field('--prompt-file'),'utf8'):undefined;
 const schema=process.env.PORCH_OUTPUT_SCHEMA?JSON.parse(fs.readFileSync(process.env.PORCH_OUTPUT_SCHEMA,'utf8')):undefined;
 const audioPath=path.join(process.cwd(),'audio.wav'),wav=fs.existsSync(audioPath)?fs.readFileSync(audioPath):undefined;
-fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV}})+'\\n');
+fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV,GEMINI_API_KEY:'GEMINI_API_KEY' in process.env,GOOGLE_API_KEY:'GOOGLE_API_KEY' in process.env,AGY_ADC_AUTH:'AGY_ADC_AUTH' in process.env}})+'\\n');
 if(args[0]==='media' && args[1]==='capabilities' && args[2]==='--json') process.stdout.write(fs.readFileSync(${JSON.stringify(capabilities)},'utf8'));
 else if(args[0]==='media') { console.error('public media must not transcode this WAV'); process.exit(9); }
 else if(schema) process.stdout.write(${JSON.stringify(options.response ?? JSON.stringify(heard))});
@@ -359,6 +359,36 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     expect(call.env.PORCH_SINGLE_AGENT).toBe('1'); expect(call.env.PORCH_DUMP_ARGV).toBeUndefined()
     expect(call.env.TMPDIR).toBe(call.cwd); expect(call.env.PORCH_RUN_DIR).toBe(join(call.cwd, 'run'))
     expect(call.prompt).toContain('Сделай заметки.'); expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('never forwards API-key variables to any Porch child, for text or audio', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'never forward this')
+    vi.stubEnv('GOOGLE_API_KEY', 'never forward this either')
+    vi.stubEnv('AGY_ADC_AUTH', 'true')
+    const fixture = await porchFixture()
+    await (await fixture.harness.model.llm()).chat('Сделай заметки.', () => {})
+    await fixture.harness.transcriber(callbacks())(chunk())
+    const calls = await fixture.porchCalls()
+    expect(calls.map(call => call.args[0] === 'media' ? 'probe' : call.schema ? 'audio' : 'text')).toEqual(['text', 'probe', 'audio'])
+    for (const call of calls) {
+      expect(call.env).toMatchObject({ GEMINI_API_KEY: false, GOOGLE_API_KEY: false, AGY_ADC_AUTH: false })
+    }
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('passes the resolved agy path to the text route so a Finder launch can find it', async () => {
+    const fixture = await porchFixture()
+    await (await fixture.harness.model.llm()).chat('Сделай заметки.', () => {})
+    const [call] = await fixture.porchCalls()
+    expect(call.env.PORCH_BIN_AGY).toBe(fixture.settings.agyPath)
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('still runs the text route without PORCH_BIN_AGY when agy cannot be resolved', async () => {
+    const fixture = await porchFixture()
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir })
+    stoppers.push(harness.stop)
+    await expect((await harness.model.llm()).chat('Сделай заметки.', () => {})).resolves.toBe('## Итоги\n- Всё готово.\n')
+    const [call] = await fixture.porchCalls()
+    expect(call.env).not.toHaveProperty('PORCH_BIN_AGY')
+    expect(await readdir(fixture.tempDir)).toEqual([])
   })
   it('keeps the original two-second WAV, native schema and clock through one capable profile at medium effort', async () => {
     vi.stubEnv('AGY_MODEL', 'wrong inherited model'); vi.stubEnv('AGY_EFFORT', 'high')
