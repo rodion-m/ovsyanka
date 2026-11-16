@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AI_SETTINGS, type AiSettings } from '../src/shared/ai'
 import { agyAnswer } from '../src/main/harness/agy'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
 import { countTokens } from '../src/main/harness/model'
-import { exactProfile } from '../src/main/harness/porch'
+import { exactProfile, porchInstallation } from '../src/main/harness/porch'
 import { HarnessProcesses, inStage } from '../src/main/harness/process'
 import { parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
 import { wavBytes } from '../src/main/asr/transcribe'
@@ -313,7 +313,7 @@ describe.skipIf(isWindows)('bounded process lifecycle', () => {
 })
 
 const shQuote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`
-async function porchFixture(options: { response?: string; profile?: string; capabilities?: unknown } = {}) {
+async function porchFixture(options: { response?: string; profile?: string; capabilities?: unknown; textExit?: number; runnerMarkers?: string } = {}) {
   const fixture = await agyFixture()
   const scripts = join(fixture.root, 'installation', 'scripts'), lib = join(scripts, 'lib'), log = join(fixture.root, 'porch.jsonl')
   const profile = options.profile ?? 'agy-gemini-3.8-flash', capabilities = join(fixture.root, 'capabilities.json')
@@ -324,12 +324,12 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const prompt=args.includes('--prompt-file')?fs.readFileSync(field('--prompt-file'),'utf8'):undefined;
 const schema=process.env.PORCH_OUTPUT_SCHEMA?JSON.parse(fs.readFileSync(process.env.PORCH_OUTPUT_SCHEMA,'utf8')):undefined;
 const audioPath=path.join(process.cwd(),'audio.wav'),wav=fs.existsSync(audioPath)?fs.readFileSync(audioPath):undefined;
-fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV,GEMINI_API_KEY:'GEMINI_API_KEY' in process.env,GOOGLE_API_KEY:'GOOGLE_API_KEY' in process.env,AGY_ADC_AUTH:'AGY_ADC_AUTH' in process.env}})+'\\n');
+fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV,GEMINI_API_KEY:'GEMINI_API_KEY' in process.env,GOOGLE_API_KEY:'GOOGLE_API_KEY' in process.env,AGY_ADC_AUTH:'AGY_ADC_AUTH' in process.env,ANTHROPIC_API_KEY:'ANTHROPIC_API_KEY' in process.env,OPENAI_API_KEY:'OPENAI_API_KEY' in process.env,present:{PORCH_BIN_AGY:'PORCH_BIN_AGY' in process.env,AGY_MODEL:'AGY_MODEL' in process.env,AGY_EFFORT:'AGY_EFFORT' in process.env,CLAUDE_MODEL:'CLAUDE_MODEL' in process.env,CODEX_MODEL:'CODEX_MODEL' in process.env,PORCH_BIN_CODEX:'PORCH_BIN_CODEX' in process.env,PORCH_BIN_CLAUDE:'PORCH_BIN_CLAUDE' in process.env}}})+'\\n');
 if(args[0]==='media' && args[1]==='capabilities' && args[2]==='--json') process.stdout.write(fs.readFileSync(${JSON.stringify(capabilities)},'utf8'));
 else if(args[0]==='media') { console.error('public media must not transcode this WAV'); process.exit(9); }
 else if(schema) process.stdout.write(${JSON.stringify(options.response ?? JSON.stringify(heard))});
-else process.stdout.write('## Итоги\\n- Всё готово.\\n');`)
-  const source = `#!/usr/bin/env bash\n# --raw|--no-wrap) MODE_CAP_SHELL build_cmd_agy PORCH_OUTPUT_SCHEMA\nexec ${shQuote(process.execPath)} ${shQuote(handler)} "$@"\n`
+${options.textExit === undefined ? `else process.stdout.write('## Итоги\\n- Всё готово.\\n');` : `else { process.stderr.write('fake porch text failure'); process.exit(${options.textExit}); }`}`)
+  const source = `#!/usr/bin/env bash\n# ${options.runnerMarkers ?? '--raw|--no-wrap) MODE_CAP_SHELL build_cmd_agy PORCH_OUTPUT_SCHEMA PORCH_BIN_AGY'}\nexec ${shQuote(process.execPath)} ${shQuote(handler)} "$@"\n`
   const porch = join(scripts, 'porch')
   await writeFile(porch, source, { mode: 0o700 })
   await writeFile(join(lib, 'backend_run.sh'), source, { mode: 0o700 })
@@ -360,25 +360,27 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     expect(call.env.TMPDIR).toBe(call.cwd); expect(call.env.PORCH_RUN_DIR).toBe(join(call.cwd, 'run'))
     expect(call.prompt).toContain('Сделай заметки.'); expect(await readdir(fixture.tempDir)).toEqual([])
   })
-  it('never forwards API-key variables to any Porch child, for text or audio', async () => {
+  it('strips provider API credentials from the text, probe, and audio child environments', async () => {
     vi.stubEnv('GEMINI_API_KEY', 'never forward this')
     vi.stubEnv('GOOGLE_API_KEY', 'never forward this either')
     vi.stubEnv('AGY_ADC_AUTH', 'true')
+    vi.stubEnv('ANTHROPIC_API_KEY', 'never forward this')
+    vi.stubEnv('OPENAI_API_KEY', 'never forward this either')
     const fixture = await porchFixture()
     await (await fixture.harness.model.llm()).chat('Сделай заметки.', () => {})
     await fixture.harness.transcriber(callbacks())(chunk())
     const calls = await fixture.porchCalls()
     expect(calls.map(call => call.args[0] === 'media' ? 'probe' : call.schema ? 'audio' : 'text')).toEqual(['text', 'probe', 'audio'])
     for (const call of calls) {
-      expect(call.env).toMatchObject({ GEMINI_API_KEY: false, GOOGLE_API_KEY: false, AGY_ADC_AUTH: false })
+      expect(call.env).toMatchObject({ GEMINI_API_KEY: false, GOOGLE_API_KEY: false, AGY_ADC_AUTH: false, ANTHROPIC_API_KEY: false, OPENAI_API_KEY: false })
     }
     expect(await readdir(fixture.tempDir)).toEqual([])
   })
-  it('passes the resolved agy path to the text route so a Finder launch can find it', async () => {
+  it('passes the resolved agy path to the text route', async () => {
     const fixture = await porchFixture()
     await (await fixture.harness.model.llm()).chat('Сделай заметки.', () => {})
     const [call] = await fixture.porchCalls()
-    expect(call.env.PORCH_BIN_AGY).toBe(fixture.settings.agyPath)
+    expect(call.env.PORCH_BIN_AGY).toBe(await realpath(fixture.settings.agyPath))
     expect(await readdir(fixture.tempDir)).toEqual([])
   })
   it('still runs the text route without PORCH_BIN_AGY when agy cannot be resolved', async () => {
@@ -389,6 +391,33 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     const [call] = await fixture.porchCalls()
     expect(call.env).not.toHaveProperty('PORCH_BIN_AGY')
     expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('strips inherited Porch binary, model and effort overrides from the text child', async () => {
+    vi.stubEnv('PORCH_BIN_AGY', '/foreign/agy')
+    vi.stubEnv('AGY_MODEL', 'wrong'); vi.stubEnv('AGY_EFFORT', 'high'); vi.stubEnv('CLAUDE_MODEL', 'wrong')
+    const fixture = await porchFixture()
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir })
+    stoppers.push(harness.stop)
+    await expect((await harness.model.llm()).chat('Сделай заметки.', () => {})).resolves.toBe('## Итоги\n- Всё готово.\n')
+    const [call] = await fixture.porchCalls()
+    expect(call.env.present).toMatchObject({ PORCH_BIN_AGY: false, AGY_MODEL: false, AGY_EFFORT: false, CLAUDE_MODEL: false })
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('reports the missing agy path instead of sign-in advice when an unresolved text run fails', async () => {
+    const fixture = await porchFixture({ textExit: 4 })
+    const missing = join(fixture.root, 'missing-agy')
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: missing }, tempDir: fixture.tempDir })
+    stoppers.push(harness.stop)
+    const error = await (await harness.model.llm()).chat('Сделай заметки.', () => {}).catch(error => error)
+    expect(error).toBeInstanceOf(Error)
+    expect(String(error)).toContain(missing)
+    expect(String(error)).toContain('Finder')
+    expect(String(error)).not.toContain('sign-in, model access, and quota')
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('rejects a runner source without the PORCH_BIN_AGY contract marker', async () => {
+    const fixture = await porchFixture({ runnerMarkers: '--raw|--no-wrap) MODE_CAP_SHELL build_cmd_agy PORCH_OUTPUT_SCHEMA' })
+    await expect(porchInstallation(fixture.settings.porchPath)).rejects.toThrow('internal raw adapter')
   })
   it('keeps the original two-second WAV, native schema and clock through one capable profile at medium effort', async () => {
     vi.stubEnv('AGY_MODEL', 'wrong inherited model'); vi.stubEnv('AGY_EFFORT', 'high')
@@ -407,7 +436,7 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     expect(call.prompt).toContain('view_file / read_file')
     expect(call.prompt).toContain('Expected spoken language: ru'); expect(call.prompt).toContain('Родион, Yogurt')
     expect(call.env.AGY_MODEL).toBe('gemini-3.8-flash'); expect(call.env.AGY_EFFORT).toBe('medium')
-    expect(call.env.PORCH_BIN_AGY).toBe(fixture.settings.agyPath)
+    expect(call.env.PORCH_BIN_AGY).toBe(await realpath(fixture.settings.agyPath))
     expect(call.env.PORCH_SINGLE_AGENT).toBe('1')
     await fixture.harness.transcriber(cb)(audio)
     expect((await fixture.porchCalls()).filter(call => call.args[0] === 'media')).toHaveLength(1)

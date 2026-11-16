@@ -27,16 +27,30 @@ export async function porchInstallation(path: string): Promise<{ porch: string; 
     await access(runner, constants.R_OK)
     const source = await readFile(runner, 'utf8')
     if (!source.includes('--raw|--no-wrap)') || !source.includes('MODE_CAP_SHELL')
-      || !source.includes('build_cmd_agy') || !source.includes('PORCH_OUTPUT_SCHEMA')) throw new Error('unsupported interface')
+      || !source.includes('build_cmd_agy') || !source.includes('PORCH_OUTPUT_SCHEMA')
+      || !source.includes('PORCH_BIN_AGY')) throw new Error('unsupported interface')
   } catch {
     throw new HarnessError(`Porch's internal raw adapter was not found beside its real executable. Install the complete pragmatic-orchestration package compatible with ${PORCH_CONTRACT.slice(0, 7)}, then select scripts/porch.`)
   }
   return { porch, runner, bash: await executablePath('bash', 'Bash') }
 }
 
+// The Porch route is subscription-account only: provider API credentials never reach a child.
+const PORCH_PROVIDER_CREDENTIALS = [
+  'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'AGY_ADC_AUTH',
+  'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'XAI_API_KEY',
+  'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY', 'MOONSHOT_API_KEY', 'GOOGLE_APPLICATION_CREDENTIALS',
+]
+// An inherited binary, model or effort override would silently repoint a profile at another CLI or settings.
+const PORCH_INHERITED_OVERRIDES = [
+  'PORCH_BIN_CODEX', 'PORCH_BIN_CLAUDE', 'PORCH_BIN_OPENCODE', 'PORCH_BIN_GROK', 'PORCH_BIN_GEMINI', 'PORCH_BIN_DEVIN', 'PORCH_BIN_AGY',
+  'CODEX_MODEL', 'CLAUDE_MODEL', 'OPENCODE_MODEL', 'GROK_MODEL', 'GEMINI_MODEL', 'DEVIN_MODEL', 'AGY_MODEL',
+  'CODEX_EFFORT', 'CLAUDE_EFFORT', 'OPENCODE_EFFORT', 'GROK_EFFORT', 'AGY_EFFORT',
+]
+
 function environment(directory: string): NodeJS.ProcessEnv {
   const env = { ...process.env }
-  for (const key of ['PORCH_DUMP_ARGV', 'PORCH_DEBUG_EVENTS', 'PORCH_DEBUG_EVENTS_PATH', 'PORCH_ARTIFACT_KEY', 'PORCH_RAW_PROMPT', 'PORCH_SKIP_OUTPUT_TEMPLATE', 'PORCH_OUTPUT_SCHEMA', 'PORCH_MEDIA_IMAGES', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'AGY_ADC_AUTH']) delete env[key]
+  for (const key of ['PORCH_DUMP_ARGV', 'PORCH_DEBUG_EVENTS', 'PORCH_DEBUG_EVENTS_PATH', 'PORCH_ARTIFACT_KEY', 'PORCH_RAW_PROMPT', 'PORCH_SKIP_OUTPUT_TEMPLATE', 'PORCH_OUTPUT_SCHEMA', 'PORCH_MEDIA_IMAGES', ...PORCH_PROVIDER_CREDENTIALS, ...PORCH_INHERITED_OVERRIDES]) delete env[key]
   return { ...env, TMPDIR: directory, TMP: directory, TEMP: directory,
     PORCH_PROGRESS: 'none', PORCH_PROGRESS_STYLE: 'none', PORCH_SAVE_OUTPUTS: '0',
     PORCH_RUN_DIR: join(directory, 'run'), PORCH_OUTPUT_DIR: join(directory, 'outputs'), PORCH_SINGLE_AGENT: '1' }
@@ -87,6 +101,12 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
         args: [runner, '--mode', 'media', '--agent-id', profile, '--raw', '--prompt-file', file],
         cwd: directory, env: { ...environment(directory), ...(agy ? { PORCH_BIN_AGY: agy } : {}) }, signal, timeoutMs: settings.timeoutSeconds * 1000,
         stdoutLimit: 2 * 1024 * 1024 })
+        .catch(error => {
+          if (agy === undefined && error instanceof HarnessError) {
+            throw new HarnessError(`The Antigravity CLI (agy) was not found at the configured path: ${settings.agyPath}. An agy-backed text profile needs an absolute path to it when Yogurt is started from Finder. The original failure was reported by Porch.`)
+          }
+          throw error
+        })
       if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.')
       return result.stdout
     },
