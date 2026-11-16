@@ -142,7 +142,6 @@
   "Empty the Trash?": "Prullenmand leegmaken?",
   "English": "Engels",
   "English only": "Alleen Engels",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Alleen Engels is sneller en nauwkeuriger. Kies Meertalig voor meetings in andere talen.",
   "Everyone else": "Alle anderen",
   "Everything stays on your Mac.": "Alles blijft op je Mac.",
   "Everything stays on your computer.": "Alles blijft op je computer.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Navigatiekolom verbergen",
   "Hide transcript": "Transcript verbergen",
   "Hide {app}": "Verberg {app}",
-  "Highest quality": "Hoogste kwaliteit",
   "House": "Huis",
   "I'll send a draft by Friday.": "Ik stuur vóór vrijdag een concept.",
   "Icon": "Pictogram",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Yogurt neemt op",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt stelt de transcriptie in. Dit gebeurt één keer, daarna draait alles op je Mac.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt stelt de transcriptie in. Dit gebeurt één keer, daarna draait alles op je computer.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt luistert welke taal er wordt gesproken. Kies dit voor meetings die niet in het Engels zijn.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt heeft een Mac met minstens 8 GB geheugen nodig.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt draait volledig op je computer, en deze is niet krachtig genoeg. Er is minstens 8 GB geheugen nodig.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt leest de namen die Zoom, Meet en Teams tonen, zodat je transcript zegt wie er sprak in plaats van Anderen.",
@@ -675,5 +672,9 @@
   "Keep audio recordings after meetings": "Audio-opnamen na vergaderingen bewaren",
   "Recording deleted": "Opname verwijderd",
   "When off, new meetings' audio is deleted once the summary is saved.": "Indien uit, wordt audio van nieuwe vergaderingen gewist zodra de samenvatting is opgeslagen.",
-  "New recording": "Nieuwe opname"
+  "New recording": "Nieuwe opname",
+  "Russian": "Russisch",
+  "Transcribes Russian in Cyrillic": "Schrijft Russische spraak in het cyrillisch uit",
+  "Choose English or Russian, or let Yogurt detect the language.": "Kies Engels of Russisch, of laat Yogurt de taal herkennen.",
+  "Yogurt detects the spoken language automatically.": "Yogurt herkent automatisch de gesproken taal."
 }

@@ -142,7 +142,6 @@
   "Empty the Trash?": "Άδειασμα του Κάδου;",
   "English": "Αγγλικά",
   "English only": "Μόνο αγγλικά",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Τα μόνο αγγλικά είναι πιο γρήγορα και πιο ακριβή. Επιλέξτε Πολύγλωσσο για συσκέψεις σε άλλες γλώσσες.",
   "Everyone else": "Όλοι οι άλλοι",
   "Everything stays on your Mac.": "Όλα μένουν στο Mac σας.",
   "Everything stays on your computer.": "Όλα μένουν στον υπολογιστή σας.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Απόκρυψη πλαϊνής στήλης",
   "Hide transcript": "Απόκρυψη απομαγνητοφώνησης",
   "Hide {app}": "Απόκρυψη {app}",
-  "Highest quality": "Κορυφαία ποιότητα",
   "House": "Σπίτι",
   "I'll send a draft by Friday.": "Θα στείλω πρόχειρο έως την Παρασκευή.",
   "Icon": "Εικονίδιο",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Το Yogurt ηχογραφεί",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Το Yogurt ρυθμίζει την απομαγνητοφώνηση. Γίνεται μία φορά, μετά όλα τρέχουν στο Mac σας.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Το Yogurt ρυθμίζει την απομαγνητοφώνηση. Γίνεται μία φορά, μετά όλα τρέχουν στον υπολογιστή σας.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Το Yogurt αναγνωρίζει τη γλώσσα που μιλιέται. Επιλέξτε το για συσκέψεις που δεν είναι στα αγγλικά.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Το Yogurt χρειάζεται Mac με τουλάχιστον 8 GB μνήμης.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Το Yogurt τρέχει εξ ολοκλήρου στον υπολογιστή σας, και αυτός δεν είναι αρκετά ισχυρός. Χρειάζεται τουλάχιστον 8 GB μνήμης.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Το Yogurt διαβάζει τα ονόματα που δείχνουν το Zoom, το Meet και το Teams, ώστε η απομαγνητοφώνηση να λέει ποιος μίλησε αντί για Οι άλλοι.",
@@ -678,5 +675,9 @@
   "Keep audio recordings after meetings": "Διατήρηση ηχογραφήσεων μετά τις συναντήσεις",
   "Recording deleted": "Η ηχογράφηση διαγράφηκε",
   "When off, new meetings' audio is deleted once the summary is saved.": "Αν κλείσει, ο ήχος νέων συναντήσεων διαγράφεται μόλις σωθεί η σύνοψη.",
-  "New recording": "Νέα ηχογράφηση"
+  "New recording": "Νέα ηχογράφηση",
+  "Russian": "Ρωσικά",
+  "Transcribes Russian in Cyrillic": "Μεταγράφει τα ρωσικά σε κυριλλική γραφή",
+  "Choose English or Russian, or let Yogurt detect the language.": "Επιλέξτε αγγλικά ή ρωσικά ή αφήστε το Yogurt να αναγνωρίσει τη γλώσσα.",
+  "Yogurt detects the spoken language automatically.": "Το Yogurt αναγνωρίζει αυτόματα την ομιλούμενη γλώσσα."
 }

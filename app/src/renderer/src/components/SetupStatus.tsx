@@ -2,6 +2,7 @@ import { Check, LoaderCircle, Lock } from 'lucide-react'
 import type { SetupState } from '../../../shared/types'
 import { language, t } from '../../../shared/i18n'
 import { osWords } from '../keys'
+import { aiText } from './aiCopy'
 
 /** One thing being set up in the background: done, or how far along. Add a line here for each new download. */
 export type StatusItem = { id: string; done: boolean; text: string }
@@ -9,7 +10,8 @@ export const transcriptionPhase = (state: SetupState) => state.phase === 'downlo
   ? t('Downloading the transcription model') : t('Preparing the transcription model')
 export const transcriptionPercent = (state: SetupState) => new Intl.NumberFormat(language(), { style: 'percent', maximumFractionDigits: 0 }).format(Math.floor(Math.max(0, Math.min(1, state.fraction)) * 100) / 100)
 
-export function setupItems(state: SetupState): StatusItem[] {
+export function setupItems(state: SetupState, subscription = false): StatusItem[] {
+  if (subscription) return [{ id: 'provider', done: state.phase === 'ready', text: aiText('providerSetup') }]
   // SetupState covers speech only; the notes model arrives later and is waited for where it is needed.
   return [{
     id: 'transcription', done: state.phase === 'ready',
@@ -20,8 +22,8 @@ export function setupItems(state: SetupState): StatusItem[] {
 }
 
 /** The quiet line under the first run: the first thing still on its way, or that it's all ready */
-export function SetupStatus({ state }: { state: SetupState }) {
-  const items = setupItems(state)
+export function SetupStatus({ state, subscription = false }: { state: SetupState; subscription?: boolean }) {
+  const items = setupItems(state, subscription)
   const busy = items.find((i) => !i.done)
   const shown = busy ?? items[items.length - 1]
   const Icon = !busy ? Check : state.phase === 'downloading' ? LoaderCircle : Lock

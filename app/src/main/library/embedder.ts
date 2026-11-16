@@ -28,3 +28,14 @@ export function createEmbedder(o: { engine: Pick<Engine, 'embed' | 'unloadEmbed'
   }
 }
 export type Embedder = ReturnType<typeof createEmbedder>
+
+/** Subscription mode keeps the existing keyword retrieval path, with no llama worker or model download. */
+export function keywordOnlyEmbedder(): Embedder {
+  return {
+    ready: () => false,
+    model: () => 'keyword-only',
+    query: async () => undefined,
+    docs: async () => undefined,
+    unload: async () => {},
+  }
+}

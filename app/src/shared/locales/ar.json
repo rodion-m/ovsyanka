@@ -146,7 +146,6 @@
   "Empty the Trash?": "هل تريد إفراغ سلة المهملات؟",
   "English": "الإنجليزية",
   "English only": "الإنجليزية فقط",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "الإنجليزية فقط أسرع وأدق. اختر متعدد اللغات للاجتماعات بلغات أخرى.",
   "Everyone else": "الجميع",
   "Everything stays on your Mac.": "يبقى كل شيء على جهاز الـMac.",
   "Everything stays on your computer.": "يبقى كل شيء على الكمبيوتر.",
@@ -193,7 +192,6 @@
   "Hide Sidebar": "إخفاء الشريط الجانبي",
   "Hide transcript": "إخفاء النص",
   "Hide {app}": "إخفاء {app}",
-  "Highest quality": "أعلى جودة",
   "House": "منزل",
   "I'll send a draft by Friday.": "سأرسل مسودة بحلول الجمعة.",
   "Icon": "الأيقونة",
@@ -522,7 +520,6 @@
   "Yogurt is recording": "Yogurt يسجّل",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "يجهّز Yogurt النسخ النصي. يحدث هذا مرة واحدة، ثم يعمل كل شيء على الـMac.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "يجهّز Yogurt النسخ النصي. يحدث هذا مرة واحدة، ثم يعمل كل شيء على الكمبيوتر.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "يتعرّف Yogurt على اللغة المنطوقة. اختره للاجتماعات التي ليست بالإنجليزية.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "يحتاج Yogurt إلى Mac بذاكرة 8 GB على الأقل.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "يعمل Yogurt بالكامل على جهاز الكمبيوتر الخاص بك، وهذا الجهاز ليس قويًا بما يكفي. يحتاج إلى ذاكرة 8 GB على الأقل.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "يقرأ Yogurt الأسماء التي يعرضها Zoom وMeet وTeams، ليذكر النص من تحدّث بدلًا من «الآخرون».",
@@ -736,5 +733,9 @@
   "Keep audio recordings after meetings": "الاحتفاظ بالتسجيلات الصوتية بعد الاجتماعات",
   "Recording deleted": "تم حذف التسجيل",
   "When off, new meetings' audio is deleted once the summary is saved.": "عند إيقافه، يُحذف صوت الاجتماعات الجديدة بعد حفظ الملخص.",
-  "New recording": "تسجيل جديد"
+  "New recording": "تسجيل جديد",
+  "Russian": "الروسية",
+  "Transcribes Russian in Cyrillic": "يفرّغ الكلام الروسي بالأحرف السيريلية",
+  "Choose English or Russian, or let Yogurt detect the language.": "اختر الإنجليزية أو الروسية، أو دع Yogurt يتعرّف على اللغة.",
+  "Yogurt detects the spoken language automatically.": "يتعرّف Yogurt على اللغة المنطوقة تلقائيًا."
 }

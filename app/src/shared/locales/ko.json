@@ -139,7 +139,6 @@
   "Empty the Trash?": "휴지통을 비울까요?",
   "English": "영어",
   "English only": "영어만",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "영어만 선택하면 더 빠르고 정확해요. 다른 언어로 진행하는 회의에는 다국어를 고르세요.",
   "Everyone else": "나머지 모두",
   "Everything stays on your Mac.": "모든 것이 내 Mac에 남아요.",
   "Everything stays on your computer.": "모든 것이 내 컴퓨터에 남아요.",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "사이드바 숨기기",
   "Hide transcript": "녹취록 숨기기",
   "Hide {app}": "{app} 가리기",
-  "Highest quality": "최고 품질",
   "House": "집",
   "I'll send a draft by Friday.": "금요일까지 초안 보낼게요.",
   "Icon": "아이콘",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurt 녹음 중",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt가 녹취를 설정하고 있어요. 한 번만 하면 그다음부터는 모두 Mac에서 돌아가요.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt가 녹취를 설정하고 있어요. 한 번만 하면 그다음부터는 모두 컴퓨터에서 돌아가요.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt가 말하는 언어를 알아들어요. 영어가 아닌 회의에 고르세요.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt를 쓰려면 메모리가 8 GB 이상인 Mac이 필요해요.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt는 모든 작업을 컴퓨터에서 직접 처리하는데, 이 컴퓨터는 성능이 부족해요. 메모리가 8 GB 이상 필요해요.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt는 Zoom, Meet, Teams에 표시되는 이름을 읽어서, 녹취록에 상대방 대신 실제로 말한 사람을 적어요.",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "회의 후 녹음 보관",
   "Recording deleted": "녹음이 삭제되었습니다",
   "When off, new meetings' audio is deleted once the summary is saved.": "끄면 새 회의의 오디오가 요약 저장 후 삭제됩니다.",
-  "New recording": "새 녹음"
+  "New recording": "새 녹음",
+  "Russian": "러시아어",
+  "Transcribes Russian in Cyrillic": "러시아어를 키릴 문자로 받아써요",
+  "Choose English or Russian, or let Yogurt detect the language.": "영어나 러시아어를 선택하거나 Yogurt가 언어를 감지하도록 하세요.",
+  "Yogurt detects the spoken language automatically.": "Yogurt가 말하는 언어를 자동으로 감지해요."
 }

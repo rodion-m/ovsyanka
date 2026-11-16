@@ -80,7 +80,8 @@ export function chatContext(
   const tail = contextTail(meeting, notes, o.spelling)
   const turns = turnsOf(segments)
   const whole = transcriptHead + turns.map((t) => t.text).join('\n') + '\n' + tail
-  const cost = (s: string) => count(s) + 1
+  const lineBreak = Math.max(1, count('\n'))
+  const cost = (s: string) => count(s) + lineBreak
   if (count(transcriptHead) + turns.reduce((n, t) => n + cost(t.text), 0) + count(tail) <= maxTokens) return whole
 
   const budget = Math.min(EXCERPT_TOKENS, maxTokens - count(excerptHead) - count(tail))
@@ -172,7 +173,7 @@ async function prepare(d: Pick<Deps, 'store'>, llm: Model, m: Meeting, question:
   const texts = [...new Set([transcriptHead, excerptHead, tail, ...transcriptText(segments).split('\n')])]
   const counted = await llm.count(texts)
   const known = new Map(texts.map((l, k) => [l, counted[k]]))
-  const count: Count = (s) => known.get(s) ?? guess(s)
+  const count: Count = (s) => known.get(s) ?? llm.estimate?.(s) ?? guess(s)
   const hits = question.trim() ? d.store.segmentHits(m.id, question) : []
   return { context: chatContext(m, notes, segments, total - overhead, { hits, count, spelling }), recent }
 }

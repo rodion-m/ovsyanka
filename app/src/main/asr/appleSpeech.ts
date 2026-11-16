@@ -29,7 +29,9 @@ export const languageName = (code: string): string => Object.keys(CODES).find((n
 const lang = (locale: string) => locale.split(/[-_]/)[0].toLowerCase()
 const region = (locale: string) => locale.split(/[-_]/)[1]?.toUpperCase()
 /** the region to listen in when the interface names none: the biggest one for each language Apple covers */
-const HOME: Record<string, string> = { en: 'US', es: 'ES', de: 'DE', fr: 'FR', it: 'IT', pt: 'BR', zh: 'CN', ja: 'JP', ko: 'KR' }
+const HOME: Record<string, string> = { en: 'US', es: 'ES', de: 'DE', fr: 'FR', it: 'IT', pt: 'BR', zh: 'CN', ja: 'JP', ko: 'KR', ru: 'RU' }
+
+const isRussianLocale = (locale: string) => locale.replace(/_/g, '-').toLowerCase() === 'ru-ru'
 
 /**
  * The locale to listen in: the meeting's language once whisper heard it, else the last meetings', else the interface's.
@@ -52,16 +54,17 @@ export function pickSpeechLocale(o: { supported: string[]; detected?: string | n
 }
 
 /**
- * The locale for a new meeting under the spoken language picked: English only listens in English (the interface's region
- * when it is English, else the biggest), or not at all when the Mac has no English model; Multi-language is pickSpeechLocale.
+ * The locale for a new meeting under the spoken language picked: English uses an English locale; Russian uses ru-RU
+ * only when Apple supports it. Neither fixed choice falls back to another language. Multi-language is pickSpeechLocale.
  */
 export function wantedSpeechLocale(o: { spoken: Spoken; supported: string[]; last?: string | null; ui: string }): string | null {
   if (o.spoken === 'multi') return pickSpeechLocale(o)
+  if (o.spoken === 'ru') return o.supported.find(isRussianLocale) ?? null
   return pickSpeechLocale({ supported: o.supported.filter((l) => lang(l) === 'en'), detected: 'english', ui: o.ui })
 }
 
-/** Apple may keep listening in this locale under the spoken language picked (a recording switched to English only) */
-export const speechFits = (spoken: Spoken, locale: string): boolean => spoken === 'multi' || lang(locale) === 'en'
+/** Apple may keep listening only when its locale still fits the selected spoken language. */
+export const speechFits = (spoken: Spoken, locale: string): boolean => spoken === 'multi' || (spoken === 'ru' ? isRussianLocale(locale) : lang(locale) === 'en')
 
 /** whisper heard another language than the one Apple listens in: its words are not to be trusted for this meeting */
 export const speechDisagrees = (locale: string, detected: string | null | undefined): boolean => {

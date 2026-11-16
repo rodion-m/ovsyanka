@@ -18,6 +18,8 @@ import type { Chunk } from './chunker'
  * "meeting started" and "capture started" comes first, so the order the hooks were registered in does not matter.
  */
 type Session = { complete?: () => boolean; pipeline: Pipeline | null; priorLines: Set<number>; done?: Promise<void>; store?: SessionStore; refresh?: (id: string) => void
+  /** Stopped audio drains in this meeting's language even after the next recording changes the selection. */
+  freezeLanguage?: () => void
   /** Apple's speech listens in this locale for the meeting (null: whisper only); off once whisper hears another language */
   speech?: string | null }
 
@@ -74,7 +76,7 @@ function decide(): string | null {
  */
 export function spokenChanged() {
   const spoken = spokenNow()
-  for (const s of sessions.values()) if (s.speech && !speechFits(spoken, s.speech)) speechOff(s, 'English only was picked')
+  for (const s of sessions.values()) if (s.speech && !speechFits(spoken, s.speech)) speechOff(s, 'the selected spoken language changed')
 }
 /** segments and hideSegments: the echo sweep after the meeting (tests may leave them out) */
 type SessionStore = Pick<Store, 'updateMeeting'> & Partial<Pick<Store, 'segments' | 'hideSegments' | 'meeting'>>
@@ -146,6 +148,12 @@ export function hookTranscription(p: {
   pidFile?: string
   /** for tests; heard(language, chars, locked) says what language a chunk was in */
   transcriber?: ((c: Chunk, heard?: (language: string, chars: number, locked?: boolean) => void, o?: { partial?: boolean }) => Promise<Line[]> | Line[]) | undefined
+  /** A provider instance per meeting, with that meeting's vocabulary and language callbacks. */
+  transcriberFactory?: (o: { prompt: () => string; language: () => string | undefined; onLanguage: (track: Chunk['track'], language: string, chars: number, locked: boolean) => void }) => Transcribe
+  /** Remote providers receive finished speech only, never the high-frequency local previews. */
+  quickReads?: boolean
+  batchMs?: number
+  maxQueuedMs?: number
   onStart?: (fn: (m: Meeting) => void) => unknown
   onStop?: (fn: (m: Meeting) => void) => unknown
   /** for tests: a stand-in whisper-server, and how long it stays up after the last meeting */
@@ -183,9 +191,12 @@ export function hookTranscription(p: {
       if (locked && s.speech && speechDisagrees(s.speech, lang)) speechOff(s, `whisper heard ${lang}, not ${s.speech}`)
     }
     const promptOf = () => { const m = p.store.meeting?.(id); return m ? whisperPrompt(meetingWords(m)) : '' }
-    if (p.transcriber) { const f = p.transcriber; transcribe = async (c, o) => f(c, (l, n, locked) => hear(l, n, locked), o) }
+    let frozenSpoken: Spoken | undefined
+    const language = () => whisperLanguage(frozenSpoken ?? spokenNow())
+    if (p.transcriberFactory) transcribe = p.transcriberFactory({ prompt: promptOf, language, onLanguage: (_track, lang, chars, locked) => hear(lang, chars, locked) })
+    else if (p.transcriber) { const f = p.transcriber; transcribe = async (c, o) => f(c, (l, n, locked) => hear(l, n, locked), o) }
     // fake mode's stand-in is loaded only in fake mode, so it stays out of what real runs load
-    else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), whisperLanguage(spokenNow()))
+    else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), language())
     else {
       const model = p.modelPath()
       if (model) {
@@ -194,23 +205,25 @@ export function hookTranscription(p: {
         // the model takes a few seconds to load: start now, so the first chunk does not wait for it
         srv.url().catch((e) => console.error('whisper-server did not start', e))
         transcribe = createTranscriber({ url: () => srv.url(), recover: recoverer(srv), onLanguage: (_t, lang, chars, locked) => hear(lang, chars, locked), prompt: promptOf,
-          language: () => whisperLanguage(spokenNow()) })
+          language })
       } else {
         console.warn('no speech model yet: this meeting is recorded but not transcribed')
         setTimeout(() => warnOnce('no-speech-model'), NO_MODEL_NOTE_DELAY_MS)
       }
     }
     const s: Session = {
-      complete: () => !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed'),
+      freezeLanguage: () => { frozenSpoken ??= spokenNow() },
+      complete: () => !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed') && !warned.has('falling-behind'),
       store: p.store, refresh: p.refresh, speech: speechLocaleFor(id), priorLines: new Set(p.store.segments?.(id).map((s) => s.id) ?? []),
       pipeline: transcribe ? createPipeline({ meetingId: id, transcribe, save: (segs) => {
         try { p.store.addSegments(segs) } catch (e) { saveFailed = true; throw e }
         if (segs.some(s => s.hidden)) p.refresh?.(id)
       }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce,
+        batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs,
         nameOf: p.nameOf && ((a, b) => p.nameOf!(id, a, b)),
         respell: (t) => { const m = p.store.meeting?.(id); return m ? respell(t, meetingWords(m)) : t } }) : null,
     }
-    if (s.speech) s.pipeline?.setQuickReads(false)
+    if (s.speech || p.quickReads === false) s.pipeline?.setQuickReads(false)
     sessions.set(id, s)
     return s
   }
@@ -272,6 +285,7 @@ function sweepEcho(id: string, s: Session) {
 
 /** After the recorder is done (no more audio coming), the pipeline finishes what it has, then echoes are swept */
 function finishSession(id: string, s: Session, audioDone: () => Promise<void> = () => Promise.resolve(), store?: SessionStore): Promise<void> {
+  s.freezeLanguage?.()
   s.store ??= store
   s.done ??= audioDone().then(() => s.pipeline?.finish()).then(() => {
     sweepEcho(id, s)

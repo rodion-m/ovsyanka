@@ -16,7 +16,7 @@ const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T
 const languages = async (app: ElectronApplication) => (await fake<{ languages: string[] }>(app, 'prompts')).languages
 const saved = (userData: string) => JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8')).spoken
 
-test('the spoken language picker: English only by default, Multi-language for the recording going on, remembered and shown in Settings', async () => {
+test('the spoken language picker: English by default, Russian and automatic detection, remembered and shown in Settings', async () => {
   const a = await launch()
   const { app, page } = a
   try {
@@ -31,11 +31,22 @@ test('the spoken language picker: English only by default, Multi-language for th
     const menu = page.getByTestId('spoken-menu')
     await expect(menu).toBeVisible()
     await expect(page.getByTestId('spoken-en')).toContainText('English only')
-    await expect(page.getByTestId('spoken-en')).toContainText('Highest quality')
     await expect(page.getByTestId('spoken-en')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('spoken-ru')).toContainText('Russian')
+    await expect(page.getByTestId('spoken-ru')).toContainText('Transcribes Russian in Cyrillic')
     await expect(page.getByTestId('spoken-multi')).toContainText('Multi-language')
     await expect(page.getByTestId('spoken-multi')).toContainText('99 languages supported')
-    await expect(page.getByTestId('spoken-multi-info')).toHaveAttribute('title', /not in English/)
+    await expect(page.getByTestId('spoken-multi-info')).toHaveAttribute('title', /automatically/)
+
+    // Explicit Russian reaches transcription immediately and is retained by the settings IPC.
+    const beforeRussian = (await languages(app)).length
+    await page.getByTestId('spoken-ru').click()
+    await expect(menu).toHaveCount(0)
+    await expect(page.getByTestId('spoken-name')).toHaveText('Russian')
+    await expect.poll(() => saved(a.userData)).toBe('ru')
+    await expect.poll(async () => (await languages(app)).slice(beforeRussian), { timeout: 30_000 }).toContain('ru')
+    await page.getByTestId('spoken-chip').click()
+    await expect(page.getByTestId('spoken-ru')).toHaveAttribute('aria-checked', 'true')
 
     // the recording going on detects from its next words, and the choice is kept for the next ones
     const told = (await languages(app)).length
@@ -63,17 +74,24 @@ test('the spoken language picker: English only by default, Multi-language for th
     // English only is the default, so it is not written down
     await expect.poll(() => saved(a.userData)).toBeUndefined()
     await page.getByTestId('settings-spoken-en').press('ArrowRight')
+    await expect(page.getByTestId('settings-spoken-ru')).toHaveAttribute('aria-checked', 'true')
+    await expect.poll(focused).toBe('settings-spoken-ru')
+    await expect.poll(() => saved(a.userData)).toBe('ru')
+    await page.getByTestId('settings-spoken-ru').press('ArrowRight')
     await expect(page.getByTestId('settings-spoken-multi')).toHaveAttribute('aria-checked', 'true')
     await expect.poll(focused).toBe('settings-spoken-multi')
     await expect.poll(() => saved(a.userData)).toBe('multi')
+    await page.getByTestId('settings-spoken-multi').press('ArrowLeft')
+    await expect(page.getByTestId('settings-spoken-ru')).toHaveAttribute('aria-checked', 'true')
+    await expect.poll(() => saved(a.userData)).toBe('ru')
   } finally { await app.close() }
 
-  // after a relaunch the next recording starts in Multi-language
+  // After a relaunch the next recording starts in Russian while the interface stays English.
   const b = await launch(a.userData)
   try {
     await b.page.getByRole('button', { name: 'Start recording', exact: true }).click()
-    await expect(b.page.getByTestId('spoken-name')).toHaveText('Multi-language')
+    await expect(b.page.getByTestId('spoken-name')).toHaveText('Russian')
     await expect.poll(async () => (await languages(b.app)).length, { timeout: 30_000 }).toBeGreaterThan(0)
-    expect(new Set(await languages(b.app))).toEqual(new Set(['auto']))
+    expect(new Set(await languages(b.app))).toEqual(new Set(['ru']))
   } finally { await b.app.close() }
 })

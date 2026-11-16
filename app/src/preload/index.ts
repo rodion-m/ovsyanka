@@ -8,6 +8,12 @@ const api: YogurtApi = {
   os: platformOf(process.platform, process.env),
   capabilities: capabilities(platformOf(process.platform, process.env)),
   fake: process.env.YOGURT_FAKE === '1',
+  ai: {
+    get: () => ipcRenderer.invoke('ai:get'),
+    save: (settings) => ipcRenderer.invoke('ai:save', settings),
+    check: (settings) => ipcRenderer.invoke('ai:check', settings),
+    restart: () => ipcRenderer.invoke('ai:restart'),
+  },
   setup: {
     state: () => ipcRenderer.invoke('setup:state'),
     onState: (cb) => {

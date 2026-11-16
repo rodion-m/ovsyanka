@@ -142,7 +142,6 @@
   "Empty the Trash?": "Çöp Sepeti boşaltılsın mı?",
   "English": "İngilizce",
   "English only": "Yalnızca İngilizce",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Yalnızca İngilizce daha hızlı ve daha doğrudur. Başka dillerdeki toplantılar için Çok dilli’yi seçin.",
   "Everyone else": "Diğer herkes",
   "Everything stays on your Mac.": "Her şey Mac’inizde kalır.",
   "Everything stays on your computer.": "Her şey bilgisayarınızda kalır.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Kenar çubuğunu gizle",
   "Hide transcript": "Transkripti gizle",
   "Hide {app}": "{app} Uygulamasını Gizle",
-  "Highest quality": "En yüksek kalite",
   "House": "Ev",
   "I'll send a draft by Friday.": "Cuma gününe kadar bir taslak gönderirim.",
   "Icon": "Simge",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Yogurt kaydediyor",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt transkripsiyonu kuruyor. Bu bir kez olur, sonra her şey Mac’inizde çalışır.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt transkripsiyonu kuruyor. Bu bir kez olur, sonra her şey bilgisayarınızda çalışır.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt konuşulan dili algılar. İngilizce olmayan toplantılar için bunu seçin.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt en az 8 GB belleği olan bir Mac gerektirir.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt tamamen bilgisayarınızda çalışır ve bu bilgisayar yeterince güçlü değil. En az 8 GB bellek gerekir.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt, Zoom, Meet ve Teams’in gösterdiği adları okur, böylece transkriptinizde Diğerleri yerine kimin konuştuğu yazar.",
@@ -666,5 +663,9 @@
   "Keep audio recordings after meetings": "Toplantılardan sonra ses kayıtlarını sakla",
   "Recording deleted": "Kayıt silindi",
   "When off, new meetings' audio is deleted once the summary is saved.": "Kapalıyken yeni toplantıların sesi özet kaydedilince silinir.",
-  "New recording": "Yeni kayıt"
+  "New recording": "Yeni kayıt",
+  "Russian": "Rusça",
+  "Transcribes Russian in Cyrillic": "Rusça konuşmayı Kiril alfabesiyle yazıya döker",
+  "Choose English or Russian, or let Yogurt detect the language.": "İngilizce veya Rusça seçin ya da dili Yogurt algılasın.",
+  "Yogurt detects the spoken language automatically.": "Yogurt konuşulan dili otomatik olarak algılar."
 }

@@ -12,6 +12,8 @@ export type Llm = {
   contextSize: number
   /** tokens in each text, by the loaded model's own tokenizer */
   count(texts: string[]): Promise<number[]>
+  /** Conservative synchronous estimator for splitting text when a CLI cannot expose its tokenizer. */
+  estimate?(text: string): number
   /**
    * one answer; onToken gets the text as it is written. summary: a part of a long meeting, not shown.
    * before: an earlier prompt and its answer, in that order, that this one follows on from
@@ -152,16 +154,17 @@ export function summaryPrompt(part: string, n: number, language: string): string
 
 /**
  * Cuts a transcript ("Name: words" a line) into pieces of at most maxTokens, only between turns.
- * A single turn longer than that is cut between sentences, each piece starting with who said it.
+ * A single turn longer than that is cut between sentences or words, each piece starting with who said it.
  */
 export function splitForContext(transcript: string, maxTokens: number, count: (s: string) => number): string[] {
   if (count(transcript) <= maxTokens) return [transcript]
   const turns = transcript.split('\n').flatMap((t) => (count(t) <= maxTokens ? [t] : cutTurn(t, maxTokens, count)))
   const pieces: string[] = []
+  const lineBreak = Math.max(1, count('\n'))
   let cur: string[] = [], size = 0
   for (const t of turns) {
-    // +1 for the line break between turns
-    const n = count(t) + 1
+    // Encoded CLI inputs can spend more than one unit on a line break.
+    const n = count(t) + lineBreak
     if (cur.length && size + n > maxTokens) { pieces.push(cur.join('\n')); cur = []; size = 0 }
     cur.push(t); size += n
   }
@@ -172,14 +175,34 @@ export function splitForContext(transcript: string, maxTokens: number, count: (s
 export function cutTurn(turn: string, maxTokens: number, count: (s: string) => number): string[] {
   const m = /^([^:]{1,60}: )([\s\S]*)$/.exec(turn)
   const who = m?.[1] ?? '', words = m?.[2] ?? turn
-  const sentences = words.match(/[^.!?。！？]+[.!?。！？]*\s*/g) ?? [words]
+  const sentences = words.match(/[^.!?。！？]*[.!?。！？]+\s*|[^.!?。！？]+$/gu) ?? [words]
   const out: string[] = []
   let cur = ''
-  for (const s of sentences) {
+  const flush = () => { if (cur.trim()) out.push(who + cur.trim()); cur = '' }
+  const add = (s: string) => {
     const next = cur + s
-    if (cur && count(who + next.trim()) > maxTokens) { out.push(who + cur.trim()); cur = s } else cur = next
+    if (count(who + next.trim()) <= maxTokens) { cur = next; return }
+    flush()
+    if (count(who + s.trim()) <= maxTokens) { cur = s; return }
+    const units = s.match(/\S+\s*/gu) ?? []
+    if (units.length > 1) { for (const unit of units) add(unit); return }
+    // A URL or an unpunctuated word can itself exceed the budget. Split only at
+    // Unicode code points so Cyrillic and supplementary characters stay intact.
+    const points = Array.from(s.trim())
+    let start = 0
+    while (start < points.length) {
+      let low = start + 1, high = points.length, end = start
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2)
+        if (count(who + points.slice(start, middle).join('')) <= maxTokens) { end = middle; low = middle + 1 } else high = middle - 1
+      }
+      if (end === start) throw new Error('The transcript context budget cannot fit a speaker label and one character')
+      out.push(who + points.slice(start, end).join(''))
+      start = end
+    }
   }
-  if (cur.trim()) out.push(who + cur.trim())
+  for (const sentence of sentences) add(sentence)
+  flush()
   return out
 }
 
@@ -282,6 +305,12 @@ const OWNER = /^\s*[-*]\s+\*\*[^*\n]+:\*\*/m
 const nextStepsPrompt = (language: string) =>
   `Now write only the "## Next steps" section (heading in ${language || 'the same language'}): one bullet per thing someone will do after the meeting, as "- **Name:** what they will do, by when" (the when only if it was said), "You" for the person these notes are for, and plain words for who they are for someone without a name ("Them" is not a name). If nobody is to do anything, answer only NONE. Nothing else.`
 
+/** CLI models reserve their framing outside contextSize; also count the complete answer when reusing it. */
+function continuationFits(llm: Llm, messages: string[], output: number): boolean {
+  const estimate = llm.estimate
+  return !estimate || messages.reduce((size, text) => size + estimate(text), output) <= llm.contextSize
+}
+
 export type EnhanceInput = {
   meeting: { title: string; attendees: Person[] }; mine: string; segments: Segment[]; language: string | null
   /** the person who recorded it */
@@ -366,16 +395,17 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
     const lines = transcript.split('\n')
     const done = round === 0 ? reusable(lines, earlier) : []
     const [overhead, ...lineTokens] = await llm.count([enhancePrompt({ ...base, transcript: '', parts }), ...lines])
-    const total = lineTokens.reduce((a, b) => a + b + 1, 0)
+    const lineBreak = llm.estimate?.('\n') ?? 1
+    const total = lineTokens.reduce((a, b) => a + b + lineBreak, 0)
     // parts summarised during the meeting mean it was too long already: those are used even if it fits now
     if (!done.length && overhead + total + NOTES_TOKENS <= llm.contextSize) break
     const max = await partBudget(llm, language)
     const from = done.reduce((n, p) => n + p.lines.length, 0)
-    const rest = lineTokens.slice(from).reduce((a, b) => a + b + 1, 0)
+    const rest = lineTokens.slice(from).reduce((a, b) => a + b + lineBreak, 0)
     // even parts read better than one full part and a scrap
     const target = Math.min(max, Math.ceil(rest / Math.ceil(rest / max)) + 256)
     const known = new Map(lines.map((l, i) => [l, lineTokens[i]]))
-    const count = (s: string) => known.get(s) ?? Math.ceil(s.length / 3)
+    const count = (s: string) => known.get(s) ?? llm.estimate?.(s) ?? Math.ceil(s.length / 3)
     const pieces = from < lines.length ? splitForContext(lines.slice(from).join('\n'), target, count) : []
     const summaries = done.map((p) => p.summary)
     for (const piece of pieces) {
@@ -390,9 +420,11 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
   const prompt = enhancePrompt({ ...base, transcript, parts })
   let md = tidyNotes(await llm.chat(prompt, onToken, { maxTokens: NOTES_TOKENS }))
   const written = md
+  const next = nextStepsPrompt(language)
   // the model sometimes stops before the next steps (it samples): ask for just that part, after what it wrote. Notes
-  // with three sections or more and still none had none to give
-  if (md && !OWNER.test(md) && (md.match(/^## /gm) ?? []).length < 3) {
+  // with three sections or more and still none had none to give. Keep completed notes when this optional follow-up
+  // cannot fit their full prompt and answer; a CLI's conservative byte count can exceed the original token allowance.
+  if (md && !OWNER.test(md) && (md.match(/^## /gm) ?? []).length < 3 && continuationFits(llm, [prompt, md, next], 400)) {
     // shown as it is written only once it starts like the section, so a chatty answer never flashes up
     let held = '', showing = false
     const show = (t: string) => {
@@ -400,12 +432,19 @@ export async function enhance(input: EnhanceInput, llm: Llm, onToken: (text: str
       held += t
       if (held.trimStart().startsWith('#')) { showing = true; onToken(`\n${held.trimStart()}`) }
     }
-    const more = tidyNotes(await llm.chat(nextStepsPrompt(language), show, { maxTokens: 400, before: [prompt, md] }))
+    const more = tidyNotes(await llm.chat(next, show, { maxTokens: 400, before: [prompt, md] }))
     // only a real next-steps list is kept; anything else it said is dropped
     if (OWNER.test(more)) md = `${md}\n${more}`
   }
   // a title is nice to have: one that fails or comes out empty leaves the meeting's as it is
-  if (written) input.titleLater?.((model) => model.chat(titlePrompt(language, input.me, input.meeting.attendees), () => {}, { maxTokens: 40, before: [prompt, written], temperature: 0.3 })
-    .then((raw) => cleanTitle(raw, input.me), (e) => { console.error('a title from the notes failed', e); return '' }))
+  if (written) input.titleLater?.((model) => {
+    const title = titlePrompt(language, input.me, input.meeting.attendees)
+    const before = [prompt, written]
+    // A title can be based on the complete notes alone when the original transcript no longer fits too.
+    // Do not truncate either input; the model still rejects an oversized notes-only request explicitly.
+    const full = continuationFits(model, [...before, title], 40)
+    return model.chat(full ? title : `${title}\n\nNotes:\n${written}`, () => {}, { maxTokens: 40, ...(full ? { before } : {}), temperature: 0.3 })
+      .then((raw) => cleanTitle(raw, input.me), (e) => { console.error('a title from the notes failed', e); return '' })
+  })
   return markMine(withoutCopies(md, input.mine), input.mine)
 }

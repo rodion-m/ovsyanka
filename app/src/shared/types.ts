@@ -29,6 +29,15 @@ export type YogurtApi = {
   capabilities: Capabilities
   /** test mode: stand-ins for models, audio and calendars */
   fake: boolean
+  /** AI provider settings are persisted now and applied on the next launch. */
+  ai: {
+    get(): Promise<import('./ai').AiPreferences>
+    save(settings: import('./ai').AiSettings): Promise<import('./ai').AiPreferences>
+    /** Availability/version only: no model call or account verification. */
+    check(settings: import('./ai').AiSettings): Promise<import('./ai').AiCheck>
+    /** False while recording, transcription or other work prevents a safe restart. */
+    restart(): Promise<boolean>
+  }
   setup: {
     state(): Promise<SetupState>
     /** called with each change; returns the way to stop listening */

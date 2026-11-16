@@ -4,7 +4,7 @@ import { Languages } from 'lucide-react'
 import { SPOKEN, type Spoken } from '../../../shared/spoken'
 import { t } from '../../../shared/i18n'
 
-const label = (s: Spoken) => (s === 'en' ? t('English only') : t('Multi-language'))
+const label = (s: Spoken) => (s === 'en' ? t('English only') : s === 'ru' ? t('Russian') : t('Multi-language'))
 
 /** Settings → Language: the language people speak in meetings, the same choice as the picker under a note */
 export function SpokenSetting() {
@@ -25,9 +25,9 @@ export function SpokenSetting() {
       <span className="settings-permission-icon"><Languages size={17} strokeWidth={1.75} aria-hidden="true" /></span>
       <div className="settings-row-copy">
         <p className="settings-label">{t('Spoken language')}</p>
-        <p className="settings-description">{t('English only is faster and more accurate. Pick Multi-language for meetings in other languages.')}</p>
+        <p className="settings-description">{t('Choose English or Russian, or let Yogurt detect the language.')}</p>
       </div>
-      <div role="radiogroup" aria-label={t('Spoken language')} onKeyDown={arrows} className="settings-spoken">
+      <div role="radiogroup" aria-label={t('Spoken language')} onKeyDown={arrows} className="settings-spoken" style={{ gridTemplateColumns: `repeat(${SPOKEN.length}, minmax(0, 1fr))` }}>
         {SPOKEN.map((v) => (
           <button key={v} data-testid={`settings-spoken-${v}`} data-spoken-choice={v} role="radio" aria-checked={spoken === v} tabIndex={(spoken ?? 'en') === v ? 0 : -1} onClick={() => choose(v)}
             className="settings-spoken-choice">{label(v)}</button>

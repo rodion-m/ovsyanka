@@ -142,7 +142,6 @@
   "Empty the Trash?": "Kiüríted a Kukát?",
   "English": "Angol",
   "English only": "Csak angol",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "A csak angol gyorsabb és pontosabb. Más nyelvű megbeszélésekhez válaszd a Többnyelvűt.",
   "Everyone else": "Mindenki más",
   "Everything stays on your Mac.": "Minden a Maceden marad.",
   "Everything stays on your computer.": "Minden a számítógépeden marad.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Oldalsáv elrejtése",
   "Hide transcript": "Átirat elrejtése",
   "Hide {app}": "{app} elrejtése",
-  "Highest quality": "Legjobb minőség",
   "House": "Ház",
   "I'll send a draft by Friday.": "Péntekig küldök egy vázlatot.",
   "Icon": "Ikon",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "A Yogurt rögzít",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "A Yogurt beállítja az átírást. Ez egyszer történik meg, utána minden a Maceden fut.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "A Yogurt beállítja az átírást. Ez egyszer történik meg, utána minden a számítógépeden fut.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "A Yogurt felismeri, milyen nyelven beszélnek. Válaszd ezt a nem angol nyelvű megbeszélésekhez.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "A Yogurthoz legalább 8 GB memóriával rendelkező Mac kell.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "A Yogurt teljesen a számítógépeden fut, és ez a gép nem elég erős hozzá. Legalább 8 GB memória kell.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "A Yogurt beolvassa a Zoom, a Meet és a Teams által mutatott neveket, így az átiratban az áll, ki beszélt, nem az, hogy Mások.",
@@ -666,5 +663,9 @@
   "Keep audio recordings after meetings": "Hangfelvételek megőrzése a megbeszélések után",
   "Recording deleted": "Felvétel törölve",
   "When off, new meetings' audio is deleted once the summary is saved.": "Kikapcsolva az új megbeszélések hangja az összefoglaló mentése után törlődik.",
-  "New recording": "Új felvétel"
+  "New recording": "Új felvétel",
+  "Russian": "Orosz",
+  "Transcribes Russian in Cyrillic": "Cirill betűkkel írja át az orosz beszédet",
+  "Choose English or Russian, or let Yogurt detect the language.": "Válassz angolt vagy oroszt, vagy bízd a nyelv felismerését a Yogurtra.",
+  "Yogurt detects the spoken language automatically.": "A Yogurt automatikusan felismeri a beszélt nyelvet."
 }

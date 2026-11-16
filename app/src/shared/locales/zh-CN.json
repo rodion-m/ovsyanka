@@ -139,7 +139,6 @@
   "Empty the Trash?": "要清倒废纸篓吗？",
   "English": "英语",
   "English only": "仅英语",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "仅英语更快、更准确。其他语言的会议请选择多语言。",
   "Everyone else": "其他所有人",
   "Everything stays on your Mac.": "所有内容都留在你的 Mac 上。",
   "Everything stays on your computer.": "所有内容都留在你的电脑上。",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "隐藏侧边栏",
   "Hide transcript": "隐藏文字记录",
   "Hide {app}": "隐藏{app}",
-  "Highest quality": "最高质量",
   "House": "房屋",
   "I'll send a draft by Friday.": "我周五前把初稿发出来。",
   "Icon": "图标",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurt 正在录音",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt 正在设置转写。只需一次，之后一切都在你的 Mac 上运行。",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt 正在设置转写。只需一次，之后一切都在你的电脑上运行。",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt 会识别正在说的语言。非英语会议请选择此项。",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt 需要内存至少 8 GB 的 Mac。",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt 完全在你的电脑上运行，而这台电脑性能不够。需要至少 8 GB 内存。",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt 会读取 Zoom、Meet 和 Teams 显示的名字，让文字记录写明是谁在说话，而不是“对方”。",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "会后保留录音",
   "Recording deleted": "录音已删除",
   "When off, new meetings' audio is deleted once the summary is saved.": "关闭后，新会议的音频将在摘要保存后删除。",
-  "New recording": "新建录音"
+  "New recording": "新建录音",
+  "Russian": "俄语",
+  "Transcribes Russian in Cyrillic": "使用西里尔字母转写俄语",
+  "Choose English or Russian, or let Yogurt detect the language.": "选择英语或俄语，也可以让 Yogurt 自动识别语言。",
+  "Yogurt detects the spoken language automatically.": "Yogurt 会自动识别所说的语言。"
 }

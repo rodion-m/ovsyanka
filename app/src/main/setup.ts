@@ -17,6 +17,8 @@ export type SpeedDeps = {
 }
 
 export type SetupDeps = {
+  /** Subscription AI does not need hardware probing, local models, or model downloads. */
+  subscription?: boolean
   getHardware(): Promise<Hardware>
   /** the catalog in this build; never waits on the network */
   getCatalog(): Promise<Catalog>
@@ -198,6 +200,10 @@ export class SetupController {
 
   private async run() {
     this.set({ phase: 'checking', fraction: 0 })
+    if (this.deps.subscription) {
+      this.set({ phase: 'ready', fraction: 1 })
+      return
+    }
     try {
       const [hw, catalog] = await Promise.all([this.deps.getHardware(), this.deps.getCatalog()])
       const llm = pick(hw, catalog.models)

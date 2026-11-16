@@ -11,6 +11,24 @@ const load = (id: string): Record<string, Entry> => JSON.parse(readFileSync(join
 const blanks = (s: string) => [...new Set(s.match(/\{\w+\}/g) ?? [])].sort()
 const forms = (e: Entry) => (typeof e === 'string' ? [e] : Object.values(e))
 
+it('explains the explicit Russian spoken-language choice in every interface language', () => {
+  for (const { id } of LOCALES) {
+    const table = load(id)
+    for (const key of [
+      'Russian', 'Transcribes Russian in Cyrillic',
+      'Choose English or Russian, or let Yogurt detect the language.',
+      'Yogurt detects the spoken language automatically.',
+    ]) {
+      expect(keys).toContain(key)
+      expect(table[key]).toBeTypeOf('string')
+      expect(table[key]).not.toBe('')
+      if (id !== 'en') expect(table[key]).not.toBe(key)
+    }
+  }
+  expect(load('ru').Russian).toBe('Русский')
+  expect(load('ru')['Transcribes Russian in Cyrillic']).toContain('кириллицей')
+})
+
 it('translates the agenda date command in every locale', () => {
   const key = 'Go to {date}'
   expect(keys).toContain(key)

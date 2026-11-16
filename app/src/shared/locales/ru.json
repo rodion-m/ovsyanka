@@ -144,7 +144,6 @@
   "Empty the Trash?": "Очистить Корзину?",
   "English": "Английский",
   "English only": "Только английский",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Только английский работает быстрее и точнее. Для встреч на других языках выберите «Несколько языков».",
   "Everyone else": "Все остальные",
   "Everything stays on your Mac.": "Всё остаётся на вашем Mac.",
   "Everything stays on your computer.": "Всё остаётся на вашем компьютере.",
@@ -189,7 +188,6 @@
   "Hide Sidebar": "Скрыть боковую панель",
   "Hide transcript": "Скрыть расшифровку",
   "Hide {app}": "Скрыть {app}",
-  "Highest quality": "Наилучшее качество",
   "House": "Дом",
   "I'll send a draft by Friday.": "Пришлю черновик к пятнице.",
   "Icon": "Значок",
@@ -514,7 +512,6 @@
   "Yogurt is recording": "Yogurt записывает",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt настраивает расшифровку. Это нужно сделать один раз, потом всё работает на вашем Mac.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt настраивает расшифровку. Это нужно сделать один раз, потом всё работает на вашем компьютере.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt определяет, на каком языке говорят. Выберите это для встреч не на английском.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Для Yogurt нужен Mac с памятью не меньше 8 ГБ.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt работает целиком на вашем компьютере, а этот недостаточно мощный. Нужно не меньше 8 ГБ памяти.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt читает имена, которые показывают Zoom, Meet и Teams, поэтому в расшифровке видно, кто говорил, а не «Собеседники».",
@@ -705,5 +702,9 @@
   "Keep audio recordings after meetings": "Хранить аудиозаписи после встреч",
   "Recording deleted": "Запись удалена",
   "When off, new meetings' audio is deleted once the summary is saved.": "Если выключено, аудио новых встреч удаляется после сохранения сводки.",
-  "New recording": "Новая запись"
+  "New recording": "Новая запись",
+  "Russian": "Русский",
+  "Transcribes Russian in Cyrillic": "Записывает русскую речь кириллицей",
+  "Choose English or Russian, or let Yogurt detect the language.": "Выберите английский или русский либо доверьте определение языка Yogurt.",
+  "Yogurt detects the spoken language automatically.": "Yogurt автоматически определяет язык речи."
 }

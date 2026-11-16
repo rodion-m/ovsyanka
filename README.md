@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  Private AI meeting notes. A free, open-source alternative to Granola.
+  AI meeting notes with agy and Porch provider support. An open-source fork of Yogurt.
 </p>
 
 <p align="center">
-  Download for <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-mac-arm64.dmg">Mac</a> · <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-windows-x64.exe">Windows</a> · <a href="https://github.com/FrigadeHQ/yogurt/releases/latest/download/Yogurt-linux-x86_64.AppImage">Linux</a>
+  <a href="docs/subscription-harness.md">Настройка agy / Porch · Provider setup</a> · <a href="docs/building.md">Build this fork from source</a>
 </p>
 
 <p align="center">
@@ -28,12 +28,13 @@
 
 ## What it does
 
+- **Provider choice.** Fresh installs use agy with Gemini 3.8 Flash and medium thinking for audio and text. Select exact Porch profiles or local models in Settings → AI processing.
 - **Live transcripts.** Yogurt records calls and turns speech into text as you talk.
 - **Meeting summaries.** Yogurt writes up the conversation and any notes you add.
-- **Private by default.** Your audio, transcripts and AI processing stay on your computer.
-- **Free and open source.** You can use Yogurt without an account.
+- **Local storage, explicit processing mode.** Meetings are saved on your computer. agy and Porch send audio and text to the chosen providers; local mode processes them on your computer.
+- **Open source.** Yogurt is MIT-licensed. Provider modes require separately installed, authenticated CLIs and an eligible account; local mode needs no provider account.
 - **Who said what.** Yogurt names speakers from Zoom, Teams and Meet on Mac only.
-- **Languages.** Multi-language mode transcribes 99 languages.
+- **Russian support.** Choose Russian as the spoken language and as the AI output language independently of the interface language.
 - **Recording reminders.** Yogurt offers to record when a supported call starts.
 - **Answers with sources.** Yogurt answers questions across meetings and links to the source.
 - **Folders and search.** You can find meetings by folder, title, notes or transcript.
@@ -48,10 +49,12 @@ https://github.com/user-attachments/assets/da16b894-beb1-491a-89e1-fd10666dc9b8
 ## How it works
 
 1. **Record.** Start recording your microphone and call audio; you can add your own notes.
-2. **Transcribe.** Yogurt uses whisper.cpp and, on supported Macs, Apple SpeechAnalyzer.
-3. **Summarize and ask.** A local open-weight model runs through llama.cpp.
+2. **Transcribe.** The default agy adapter sends real WAV audio to Gemini 3.8 Flash with medium thinking. Porch uses an exact agy audio profile. Local mode uses whisper.cpp and, on supported Macs, Apple SpeechAnalyzer.
+3. **Summarize and ask.** Summaries, titles, rewrites, Ask and folder suggestions share the selected text provider. Local mode uses llama.cpp.
 
-Meeting data stays local; Yogurt goes online for model downloads and update checks.
+Provider mode skips local speech, notes and embedding model downloads, GPU probing and local model loading. Library Ask uses keyword retrieval without embeddings in this mode. Settings remain accessible even when a CLI is missing, and provider changes apply after restart.
+
+See the [Russian-first provider guide](docs/subscription-harness.md) for authentication, exact Porch profiles, privacy, compatibility and known limitations. Upstream Yogurt installers do not include this fork’s changes. Live provider quality and account access must be verified in your environment; this repository’s automated adapter tests use stand-ins.
 
 <details><summary>Where your meetings, recordings, settings and models are stored</summary>
 
@@ -67,7 +70,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> A Mac with Apple silicon and macOS 14.4 or newer, a 64-bit PC with Windows 10 (version 2004) or newer, or a 64-bit Linux computer with Ubuntu 22.04 or newer. Each needs at least 8 GB of memory. If your computer is too slow, Yogurt tells you during setup. Calendar and speaker names from calls are Mac only for now.
+> Recording requires a Mac with Apple silicon and macOS 14.4 or newer, a 64-bit PC with Windows 10 (version 2004) or newer, or a compatible 64-bit Linux computer. Local model mode checks memory and transcription speed during setup. Provider mode skips those model checks but requires internet access and the selected CLI. Calendar and speaker names from calls are Mac only for now.
 
 </details>
 
@@ -99,7 +102,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> Yes. Yogurt is free and open source under the MIT license. No account is needed.
+> Yogurt is free and open source under the MIT license. Local processing needs no provider account. agy and Porch use separately configured provider accounts, whose plans, quotas and terms apply.
 
 </details>
 
@@ -107,7 +110,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> Yes. After a one-time download of the AI models, transcription and summaries run locally on your computer.
+> Local mode works offline after downloading its models. agy and Porch need network access for AI processing; existing notes and recordings remain stored on your computer.
 
 </details>
 
@@ -115,7 +118,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> It depends on your computer. Yogurt downloads a smaller notes model first, about 5 GB, then the best one your computer can run well, which can be 14 GB or more. Recording works once setup finishes, and notes and questions work offline once the notes model is in.
+> The default provider mode downloads no local AI models. Local mode downloads speech, notes and embedding models selected for your computer, including an optional larger notes model. CLI installation and the app’s native build dependencies are separate from model downloads.
 
 </details>
 
@@ -139,7 +142,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> Transcription uses Whisper through whisper.cpp, with large-v3-turbo or a smaller model depending on your computer. On supported Macs, Apple SpeechAnalyzer supplies live words while Whisper produces the saved transcript. Summaries and answers use a local open-weight model from the Gemma 4, gpt-oss or Qwen3 families, chosen for your hardware and run through llama.cpp. The app uses Electron and needs no account.
+> Fresh installs use `gemini-3.8-flash` with `medium` effort through agy for transcription and text. Settings can select another supported model or exact Porch profiles. Porch transcription requires an agy profile; text follows the chosen profile. Local mode retains the original Whisper and local text-model pipeline.
 
 </details>
 
@@ -147,7 +150,7 @@ Meeting data stays local; Yogurt goes online for model downloads and update chec
 
 <br>
 
-> Pick **Multi-language** in **Settings → Language → Spoken language** to transcribe 99 languages. You can also switch from the **English** menu in a note’s footer before or during recording. English only is the default. Summaries follow the meeting’s main language; answers follow your question’s language. Settings also offers 32 app languages.
+> Choose **Russian**, **English only** or **Multi-language** under **Settings → Language → Spoken language**, or use the note footer. Set **AI processing → AI output language** to Automatic, Russian or English separately. Automatic summaries follow the meeting’s language and answers follow the question. The interface language is independent. This fork’s provider settings are translated into Russian and English, with English fallback for other interface languages.
 
 </details>
 

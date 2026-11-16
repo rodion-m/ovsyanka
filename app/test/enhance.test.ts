@@ -150,6 +150,49 @@ describe('transcriptText', () => {
   })
 })
 
+describe('Russian meeting output', () => {
+  it('recognizes the detected language and keeps transcript names and words in Cyrillic', () => {
+    expect(languageName('ru')).toBe('Russian')
+    expect(languageName('russian')).toBe('Russian')
+    expect(transcriptText([
+      seg('me', 0, 'Обсудим запуск Ёлки.'),
+      seg('them', 1000, 'Отправлю отчёт к пятнице.', 'Елена Соловьёва'),
+    ])).toBe('You: Обсудим запуск Ёлки.\nЕлена Соловьёва: Отправлю отчёт к пятнице.')
+  })
+
+  it('writes Russian notes, next steps and titles using the detected meeting language', async () => {
+    const calls: Array<{ prompt: string; before?: string[] }> = []
+    const notes = '## Запуск Ёлки\n- Бюджет — 300 000 рублей.'
+    const next = '## Следующие шаги\n- **Елена:** Отправить отчёт к пятнице.'
+    const llm: Llm = {
+      contextSize: 100_000, count: async (xs) => xs.map(words),
+      chat: async (prompt, onToken, options) => {
+        calls.push({ prompt, before: options?.before })
+        const reply = calls.length === 1 ? notes : calls.length === 2 ? next : '«Запуск Ёлки с Еленой»'
+        onToken(reply)
+        return reply
+      },
+    }
+    let title!: (model: Llm) => Promise<string>
+    const streamed: string[] = []
+    const md = await enhance({
+      meeting: { title: 'Launch planning', attendees: [{ name: 'Елена Соловьёва', email: null }] },
+      mine: '', language: 'ru',
+      segments: [seg('me', 0, 'Бюджет запуска Ёлки — 300 000 рублей.'), seg('them', 1000, 'Отправлю отчёт к пятнице.', 'Елена Соловьёва')],
+      titleLater: (ask) => { title = ask },
+    }, llm, (text) => streamed.push(text))
+    expect(calls[0].prompt).toContain('- Write in Russian, headings too.')
+    expect(calls[0].prompt).toContain('Бюджет запуска Ёлки — 300 000 рублей.')
+    expect(calls[1].prompt).toContain('heading in Russian')
+    expect(md).toBe(`${notes}\n${next}`)
+    expect(streamed.join('')).toBe(md)
+    expect(await title(llm)).toBe('Запуск Ёлки с Еленой')
+    expect(calls[2].prompt).toContain('a title, in Russian')
+    expect(calls[2].before).toContain(notes)
+    expect(summaryPrompt('Елена: Отправлю отчёт к пятнице.', 1, languageName('ru'))).toContain('in Russian:')
+  })
+})
+
 describe('splitForContext', () => {
   const turns = Array.from({ length: 60 }, (_, i) => `${i % 2 ? 'You' : 'Speaker A'}: ${'word '.repeat(5 + (i * 7) % 30).trim()} end${i}.`)
   const transcript = turns.join('\n')
@@ -170,6 +213,31 @@ describe('splitForContext', () => {
     const pieces = splitForContext(long, 30, words)
     expect(pieces.length).toBeGreaterThan(1)
     for (const p of pieces) { expect(words(p)).toBeLessThanOrEqual(30); expect(p.startsWith('Speaker A: ')).toBe(true) }
+  })
+  it('accounts for encoded newlines, Cyrillic and quotes at a tight boundary', () => {
+    const count = (s: string) => Buffer.byteLength(JSON.stringify(s).slice(1, -1), 'utf8')
+    const lines = Array.from({ length: 100 }, (_, i) => `Елена: «План ${i}» — \\"запуск\\".`)
+    const pieces = splitForContext(lines.join('\n'), 301, count)
+    expect(pieces.length).toBeGreaterThan(1)
+    expect(pieces.join('\n')).toBe(lines.join('\n'))
+    for (const piece of pieces) expect(count(piece)).toBeLessThanOrEqual(301)
+  })
+  it('splits long Russian speech without sentence punctuation without losing words', () => {
+    const text = 'согласуем сроки запуска Ёлки и отправим отчёт в пятницу '.repeat(100).trim()
+    const count = (s: string) => Buffer.byteLength(s, 'utf8')
+    const pieces = splitForContext(`Елена: ${text}`, 150, count)
+    expect(pieces.length).toBeGreaterThan(1)
+    const lines = pieces.flatMap((piece) => piece.split('\n'))
+    expect(lines.every((line) => line.startsWith('Елена: '))).toBe(true)
+    expect(lines.map((line) => line.slice('Елена: '.length)).join(' ')).toBe(text)
+    for (const piece of pieces) expect(count(piece)).toBeLessThanOrEqual(150)
+  })
+  it('keeps Unicode code points intact when even one unbroken token is too long', () => {
+    const text = 'ёж🦔'.repeat(100)
+    const count = (s: string) => Buffer.byteLength(s, 'utf8')
+    const pieces = splitForContext(`Елена: ${text}`, 101, count)
+    expect(pieces.flatMap((piece) => piece.split('\n')).map((line) => line.slice('Елена: '.length)).join('')).toBe(text)
+    for (const piece of pieces) { expect(count(piece)).toBeLessThanOrEqual(101); expect(piece).not.toContain('\uFFFD') }
   })
 })
 

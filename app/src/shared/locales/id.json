@@ -139,7 +139,6 @@
   "Empty the Trash?": "Kosongkan Sampah?",
   "English": "Inggris",
   "English only": "Hanya Inggris",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Hanya Inggris lebih cepat dan akurat. Pilih Multibahasa untuk rapat dalam bahasa lain.",
   "Everyone else": "Semua orang lain",
   "Everything stays on your Mac.": "Semuanya tetap di Mac Anda.",
   "Everything stays on your computer.": "Semuanya tetap di komputer Anda.",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "Sembunyikan bar samping",
   "Hide transcript": "Sembunyikan transkrip",
   "Hide {app}": "Sembunyikan {app}",
-  "Highest quality": "Kualitas terbaik",
   "House": "Rumah",
   "I'll send a draft by Friday.": "Saya kirim draf paling lambat Jumat.",
   "Icon": "Ikon",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurt sedang merekam",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt sedang menyiapkan transkripsi. Ini hanya sekali, setelah itu semuanya berjalan di Mac Anda.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt sedang menyiapkan transkripsi. Ini hanya sekali, setelah itu semuanya berjalan di komputer Anda.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt mengenali bahasa yang diucapkan. Pilih ini untuk rapat yang tidak berbahasa Inggris.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt membutuhkan Mac dengan memori minimal 8 GB.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt berjalan sepenuhnya di komputer Anda, dan komputer ini kurang kuat. Dibutuhkan memori minimal 8 GB.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt membaca nama yang ditampilkan Zoom, Meet, dan Teams, sehingga transkrip Anda menyebut siapa yang bicara, bukan Yang lain.",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "Simpan rekaman audio setelah rapat",
   "Recording deleted": "Rekaman dihapus",
   "When off, new meetings' audio is deleted once the summary is saved.": "Jika dimatikan, audio rapat baru dihapus setelah ringkasan tersimpan.",
-  "New recording": "Rekaman baru"
+  "New recording": "Rekaman baru",
+  "Russian": "Rusia",
+  "Transcribes Russian in Cyrillic": "Mentranskripsikan bahasa Rusia dalam aksara Kiril",
+  "Choose English or Russian, or let Yogurt detect the language.": "Pilih bahasa Inggris atau Rusia, atau biarkan Yogurt mendeteksi bahasanya.",
+  "Yogurt detects the spoken language automatically.": "Yogurt mendeteksi bahasa yang diucapkan secara otomatis."
 }

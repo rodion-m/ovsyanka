@@ -1,7 +1,14 @@
 import { expect, it } from 'vitest'
-import { isPreviewBuild, offersRestart, updatesOn } from '../src/main/updates'
+import { isPreviewBuild, isSubscriptionBuild, offersRestart, updatesOn } from '../src/main/updates'
 
 const installed = { packaged: true, fake: false, profile: false, feed: true }
+
+it('never overwrites the subscription fork with an upstream release', () => {
+  expect(isSubscriptionBuild('{"yogurtSubscription":true}')).toBe(true)
+  expect(isSubscriptionBuild('{"yogurtSubscription":false}')).toBe(false)
+  expect(isSubscriptionBuild('invalid')).toBe(false)
+  expect(updatesOn({ ...installed, subscription: true })).toBe(false)
+})
 
 it('an installed Yogurt looks for new versions', () => {
   expect(updatesOn(installed)).toBe(true)

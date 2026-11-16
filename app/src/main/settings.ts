@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { isLocale } from '../shared/i18n'
 import { spokenOf, type Spoken } from '../shared/spoken'
+import { aiSettings, type AiSettings } from '../shared/ai'
 
 /** theme: light or dark regardless of the system; follows the system when left out. language: the interface's, the computer's when left out */
 export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what the person is called in their meetings; their Mac's full name when left out */ myName?: string
@@ -38,12 +39,14 @@ export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what t
   hiddenCalendarIds?: string[]
   /** names, products and acronyms to spell right in transcripts and notes (shared/jargon.ts) */
   jargon?: string[]
-  /** the language people speak in meetings: English only unless 'multi' (shared/spoken.ts) */
+  /** The spoken language: English by default, explicit Russian, or automatic detection (shared/spoken.ts). */
   spoken?: Spoken
+  /** The selected subscription harness or the original local models. Applied at the next launch. */
+  ai?: AiSettings
   /** new versions download by themselves; on unless turned off */
   autoUpdate?: boolean }
 
-/** "English only" unless Multi-language was picked */
+/** English unless Russian or Multi-language was picked. */
 export const spokenSetting = (s: Settings): Spoken => spokenOf(s.spoken)
 
 /** "Finish recording when the call ends": on by default */
@@ -54,6 +57,20 @@ export const keepsRecording = (s: Settings, endedAt: number | null): boolean =>
   s.keepRecordings !== false || typeof s.recordingsOffAt !== 'number' || !Number.isFinite(s.recordingsOffAt) || endedAt == null || endedAt <= s.recordingsOffAt
 
 export const autoUpdateOn = (s: Settings): boolean => s.autoUpdate !== false
+
+/** The fork starts with subscription AI. Test fixtures retain their original local setup unless explicitly configured. */
+export function configuredAi(s: Settings, env: NodeJS.ProcessEnv = process.env, fake = false): AiSettings {
+  const saved = aiSettings(s.ai)
+  const backend = env.YOGURT_AI_BACKEND
+  if (backend && !['agy', 'porch', 'local'].includes(backend)) throw new Error('YOGURT_AI_BACKEND must be agy, porch, or local')
+  return aiSettings({
+    ...saved,
+    ...(fake && !s.ai ? { backend: 'local' } : {}),
+    ...(backend ? { backend } : {}),
+    ...(env.YOGURT_AGY_PATH ? { agyPath: env.YOGURT_AGY_PATH } : {}),
+    ...(env.YOGURT_PORCH_PATH ? { porchPath: env.YOGURT_PORCH_PATH } : {}),
+  })
+}
 
 export function loadSettings(path: string): Settings {
   try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {} } catch { return {} }

@@ -139,7 +139,6 @@
   "Empty the Trash?": "ゴミ箱を空にしますか？",
   "English": "英語",
   "English only": "英語のみ",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "英語のみの方が速く、正確です。英語以外のミーティングには多言語を選んでください。",
   "Everyone else": "ほかの参加者",
   "Everything stays on your Mac.": "すべてMacの中に残ります。",
   "Everything stays on your computer.": "すべてコンピュータの中に残ります。",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "サイドバーを非表示",
   "Hide transcript": "文字起こしを隠す",
   "Hide {app}": "{app}を非表示",
-  "Highest quality": "最高品質",
   "House": "家",
   "I'll send a draft by Friday.": "金曜までに下書きを送ります。",
   "Icon": "アイコン",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurtが録音中",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurtが文字起こしの準備をしています。これは最初の1回だけで、その後はすべてMac上で動きます。",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurtが文字起こしの準備をしています。これは最初の1回だけで、その後はすべてコンピュータ上で動きます。",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurtが話されている言語を聞き分けます。英語以外のミーティングで選んでください。",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurtには8 GB以上のメモリを搭載したMacが必要です。",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurtはすべてお使いのコンピュータ上で動作しますが、このコンピュータでは性能が足りません。8 GB以上のメモリが必要です。",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "YogurtはZoom、Meet、Teamsに表示される名前を読み取るので、文字起こしには「相手」ではなく話した人の名前が入ります。",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "会議後も録音を保存",
   "Recording deleted": "録音を削除しました",
   "When off, new meetings' audio is deleted once the summary is saved.": "オフにすると、新しい会議の音声は要約の保存後に削除されます。",
-  "New recording": "新規録音"
+  "New recording": "新規録音",
+  "Russian": "ロシア語",
+  "Transcribes Russian in Cyrillic": "ロシア語をキリル文字で文字起こし",
+  "Choose English or Russian, or let Yogurt detect the language.": "英語かロシア語を選ぶか、Yogurtに言語の自動検出を任せてください。",
+  "Yogurt detects the spoken language automatically.": "Yogurtが話されている言語を自動で検出します。"
 }

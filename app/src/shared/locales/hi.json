@@ -142,7 +142,6 @@
   "Empty the Trash?": "ट्रैश खाली करें?",
   "English": "अंग्रेज़ी",
   "English only": "सिर्फ़ अंग्रेज़ी",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "सिर्फ़ अंग्रेज़ी तेज़ और ज़्यादा सटीक है। दूसरी भाषाओं वाली मीटिंग के लिए बहुभाषी चुनें।",
   "Everyone else": "बाकी सभी",
   "Everything stays on your Mac.": "सब कुछ आपके Mac पर रहता है।",
   "Everything stays on your computer.": "सब कुछ आपके कंप्यूटर पर रहता है।",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "साइडबार छिपाएँ",
   "Hide transcript": "ट्रांसक्रिप्ट छिपाएँ",
   "Hide {app}": "{app} छिपाएँ",
-  "Highest quality": "सबसे अच्छी क्वालिटी",
   "House": "घर",
   "I'll send a draft by Friday.": "मैं शुक्रवार तक ड्राफ़्ट भेज दूँगी।",
   "Icon": "आइकन",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Yogurt रिकॉर्ड कर रहा है",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt ट्रांसक्रिप्शन सेट कर रहा है। यह एक ही बार होता है, फिर सब कुछ आपके Mac पर चलता है।",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt ट्रांसक्रिप्शन सेट कर रहा है। यह एक ही बार होता है, फिर सब कुछ आपके कंप्यूटर पर चलता है।",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt पहचानता है कि कौन-सी भाषा बोली जा रही है। जो मीटिंग अंग्रेज़ी में नहीं हैं, उनके लिए इसे चुनें।",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt के लिए कम से कम 8 GB मेमोरी वाला Mac चाहिए।",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt पूरी तरह आपके कंप्यूटर पर चलता है, और यह कंप्यूटर काफ़ी शक्तिशाली नहीं है। इसके लिए कम से कम 8 GB मेमोरी चाहिए।",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt, Zoom, Meet और Teams में दिखने वाले नाम पढ़ता है, ताकि आपके ट्रांसक्रिप्ट में “बाकी लोग” की जगह बोलने वाले का नाम हो।",
@@ -666,5 +663,9 @@
   "Keep audio recordings after meetings": "मीटिंग के बाद ऑडियो रिकॉर्डिंग रखें",
   "Recording deleted": "रिकॉर्डिंग मिटा दी गई",
   "When off, new meetings' audio is deleted once the summary is saved.": "बंद होने पर नई मीटिंग का ऑडियो सारांश सेव होने के बाद मिटेगा।",
-  "New recording": "नई रिकॉर्डिंग"
+  "New recording": "नई रिकॉर्डिंग",
+  "Russian": "रूसी",
+  "Transcribes Russian in Cyrillic": "रूसी बोलचाल को सिरिलिक लिपि में लिखता है",
+  "Choose English or Russian, or let Yogurt detect the language.": "अंग्रेज़ी या रूसी चुनें, या Yogurt को भाषा पहचानने दें।",
+  "Yogurt detects the spoken language automatically.": "Yogurt बोली जाने वाली भाषा अपने आप पहचानता है।"
 }

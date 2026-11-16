@@ -142,7 +142,6 @@
   "Empty the Trash?": "Tømme papirkurven?",
   "English": "Engelsk",
   "English only": "Bare engelsk",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Bare engelsk er raskere og mer nøyaktig. Velg Flerspråklig for møter på andre språk.",
   "Everyone else": "Alle andre",
   "Everything stays on your Mac.": "Alt blir på Macen din.",
   "Everything stays on your computer.": "Alt blir på datamaskinen din.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Skjul sidepanelet",
   "Hide transcript": "Skjul transkripsjon",
   "Hide {app}": "Skjul {app}",
-  "Highest quality": "Høyeste kvalitet",
   "House": "Hus",
   "I'll send a draft by Friday.": "Jeg sender et utkast innen fredag.",
   "Icon": "Ikon",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Yogurt tar opp",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt setter opp transkripsjon. Det skjer én gang, deretter kjører alt på Macen din.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt setter opp transkripsjon. Det skjer én gang, deretter kjører alt på datamaskinen din.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt lytter etter hvilket språk som snakkes. Velg det for møter som ikke er på engelsk.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt trenger en Mac med minst 8 GB minne.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt kjører helt på datamaskinen din, og denne er ikke kraftig nok. Den trenger minst 8 GB minne.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt leser navnene Zoom, Meet og Teams viser, så transkripsjonen sier hvem som snakket i stedet for Andre.",
@@ -675,5 +672,9 @@
   "Keep audio recordings after meetings": "Behold lydopptak etter møter",
   "Recording deleted": "Opptak slettet",
   "When off, new meetings' audio is deleted once the summary is saved.": "Når avslått, slettes lyd fra nye møter etter at sammendraget er lagret.",
-  "New recording": "Nytt opptak"
+  "New recording": "Nytt opptak",
+  "Russian": "Russisk",
+  "Transcribes Russian in Cyrillic": "Transkriberer russisk med kyrilliske bokstaver",
+  "Choose English or Russian, or let Yogurt detect the language.": "Velg engelsk eller russisk, eller la Yogurt gjenkjenne språket.",
+  "Yogurt detects the spoken language automatically.": "Yogurt gjenkjenner automatisk språket som snakkes."
 }

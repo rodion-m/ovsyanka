@@ -53,6 +53,39 @@ describe('people in a question', () => {
   })
 })
 
+describe('Russian relative dates', () => {
+  it.each([
+    ['Что решили сегодня?', day(2026, 10, 4), day(2026, 10, 5), 'Что решили?'],
+    ['Итоги встреч за вчера', day(2026, 10, 3), day(2026, 10, 4), 'Итоги встреч'],
+    ['Мои задачи на этой неделе', day(2026, 10, 2), day(2026, 10, 9), 'Мои задачи'],
+    ['Задачи за эту неделю', day(2026, 10, 2), day(2026, 10, 9), 'Задачи'],
+    ['Что решили на прошлой неделе?', day(2026, 9, 26), day(2026, 10, 2), 'Что решили?'],
+    ['Итоги за прошлую неделю', day(2026, 9, 26), day(2026, 10, 2), 'Итоги'],
+    ['Решения за предыдущую неделю', day(2026, 9, 26), day(2026, 10, 2), 'Решения'],
+    ['Итоги встреч за этот месяц', day(2026, 10, 1), day(2026, 11, 1), 'Итоги встреч'],
+    ['Что мы решили в текущем месяце?', day(2026, 10, 1), day(2026, 11, 1), 'Что мы решили?'],
+    ['Договорённости за прошлый месяц', day(2026, 9, 1), day(2026, 10, 1), 'Договорённости'],
+    ['Обзор встреч в прошлом месяце', day(2026, 9, 1), day(2026, 10, 1), 'Обзор встреч'],
+    ['СВОДКА ЗА ПРЕДЫДУЩИЙ МЕСЯЦ', day(2026, 9, 1), day(2026, 10, 1), 'СВОДКА'],
+  ])('narrows %s to local calendar boundaries and removes the date phrase', (question, from, to, rest) => {
+    expect(f(question)).toMatchObject({ from, to, rest })
+  })
+
+  it('handles a previous month across a year boundary', () => {
+    expect(parseFilters('Итоги за прошлый месяц', { now: day(2027, 0, 3), names: [] }))
+      .toMatchObject({ from: day(2026, 11, 1), to: day(2027, 0, 1), rest: 'Итоги' })
+  })
+
+  it('does not mistake substrings for Russian dates or alter Cyrillic names', () => {
+    for (const question of ['позавчера', 'сегодняшний бюджет', 'псевдопрошлой неделе', 'за прошлый месяцами']) {
+      expect(f(question).from).toBeUndefined()
+      expect(f(question).rest).toBe(question)
+    }
+    expect(parseFilters('Что сказала Елена Соловьёва вчера?', { now, names: ['Елена Соловьёва'] }))
+      .toMatchObject({ people: ['Елена Соловьёва'], rest: 'Что сказала Елена Соловьёва?', from: day(2026, 10, 3), to: day(2026, 10, 4) })
+  })
+})
+
 describe('the kind of question', () => {
   const k = (q: string) => questionKind(q, f(q))
   it('finding what was said is "find"', () => {
@@ -67,5 +100,31 @@ describe('the kind of question', () => {
     expect(k('Summarize my meetings from yesterday')).toBe('across')
     expect(k('what are my next steps?')).toBe('across')
     expect(k('recap of this week')).toBe('across')
+  })
+  it.each([
+    'Какие у меня задачи?',
+    'Покажи мои задачи',
+    'Какие у нас следующие шаги?',
+    'Все поручения',
+    'Что решили на прошлой неделе?',
+    'Какие решения мы приняли?',
+    'О чём мы договорились?',
+    'О чем договорились вчера?',
+    'Договорённости за прошлый месяц',
+    'Итоги встреч за этот месяц',
+    'Обзор встреч',
+    'Сводка за текущую неделю',
+  ])('gathers Russian cross-meeting requests: %s', (question) => {
+    expect(k(question)).toBe('across')
+  })
+  it.each([
+    'Что сказала Елена о бюджете вчера?',
+    'Когда запуск?',
+    'Кто упомянул подрядчика?',
+    'Обсуждали задачи клиента?',
+    'Что значит «псевдообзор встреч»?',
+    'Что входит в беззадачие?',
+  ])('keeps specific Russian fact searches as find: %s', (question) => {
+    expect(k(question)).toBe('find')
   })
 })

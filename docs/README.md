@@ -1,16 +1,20 @@
 # Yogurt help
 
-Yogurt records your microphone and call audio, transcribes the meeting, and writes a Summary alongside your own notes. Processing stays on your computer. No bot joins the call.
+Yogurt records your microphone and call audio, transcribes the meeting, and writes a Summary alongside your own notes. No bot joins the call. This fork defaults to agy with Gemini 3.8 Flash and medium thinking; audio and text are processed by the selected provider. Local model mode remains available.
+
+Start with [Настройка agy / Porch — provider setup](subscription-harness.md) for the Russian-first guide, account setup, profiles, privacy and limitations.
 
 ## Install
 
-Download Yogurt from [GitHub Releases](https://github.com/FrigadeHQ/yogurt/releases/latest). Every computer needs at least 8 GB of memory.
+Build this fork using [Build and run locally](building.md). [Upstream Yogurt releases](https://github.com/FrigadeHQ/yogurt/releases/latest) contain the original local-model app, not these provider adapters. Installer formats and recording requirements are:
 
 - **Mac:** Apple Silicon, macOS 14.4 or later. Open the DMG, drag Yogurt into Applications, then open it from Applications.
 - **Windows:** Windows 10 version 2004 or later, x64. Run the `.exe` installer. The installer isn't signed yet: if Windows says it protected your PC, click More info, then Run anyway.
 - **Linux:** x64, Ubuntu 22.04 or a compatible newer system, with PulseAudio or PipeWire. Make the `.AppImage` executable in its file properties, then open it. If it doesn't open, install FUSE 2 first: `sudo apt install libfuse2` on Ubuntu 22.04, `sudo apt install libfuse2t64` on 24.04 and newer. GNOME needs the AppIndicator extension to show the tray icon.
 
-On first run, Yogurt downloads the models it needs. Windows and Linux also check transcription speed and stop setup if the computer cannot keep up. Recording works as soon as setup finishes. The notes model keeps downloading in the background, and notes and questions work offline once it's in. Calendar access and speaker names from calls are available on Mac only.
+On first run, provider mode opens without downloading AI models or probing a GPU. Open **Settings → AI processing** to configure agy or Porch. A missing CLI does not block access to Settings. **Check executable** checks only availability/version; it does not test credentials, model availability or subscription eligibility. Save changes and restart after current recording and transcription finish.
+
+Selecting **Local models** enables the original downloads and hardware checks after restart. Notes and questions work offline once those models are installed. Calendar access and speaker names from calls are available on Mac only.
 
 ## Mac permissions
 
@@ -26,9 +30,9 @@ If a permission is off, use its button in Yogurt's Settings to open the right sy
 
 ## Privacy
 
-Audio, transcripts, notes, and questions are processed locally. Yogurt does not upload your meetings, and there is no telemetry.
+Meetings, recordings, transcripts and notes are saved on your computer. In **agy** or **Porch** mode, the audio and text needed for transcription and text features are sent to the selected provider through its CLI. Authentication and provider-side retention are managed by the CLI/provider. Yogurt stores the selected executable, model/profile and language settings, not provider credentials.
 
-Yogurt connects to the internet to download models from Hugging Face, to get Apple's optional on-device speech assets (on a Mac), and to check GitHub for updates. After setup it keeps downloading in the background: first a smaller notes model, then the best one your computer can run, which can be large (about 14 GB on a Mac with 64 GB of memory, about 63 GB with 96 GB or more). Updates download in the background and install when you quit. Links open in your browser. Copying and exporting does not upload your content.
+In **Local models** mode, AI processing runs on your computer. That mode downloads model files and, on supported Macs, may download Apple’s speech assets. Provider mode skips those downloads, including embeddings, and uses keyword retrieval for library Ask. Links open in your browser. Copying and exporting does not upload your content.
 
 If you [connect an AI app](#connect-an-ai-app), it may send what it reads to its own online model.
 
@@ -62,4 +66,4 @@ Removing the app keeps your data. To remove that too, export a backup if you wan
 
 ## Report a problem
 
-[Open a GitHub issue](https://github.com/FrigadeHQ/yogurt/issues) with your operating system, Yogurt version, what you did, what you expected and what happened. Leave private meeting content out of screenshots and reports.
+Report provider-integration problems to this fork’s maintainer, including your operating system, Yogurt and CLI versions, what you did, what you expected and what happened. Use [upstream issues](https://github.com/FrigadeHQ/yogurt/issues) for problems reproduced in the original app. Leave private meeting content and credentials out of screenshots and reports.

@@ -14,10 +14,23 @@ const MINE = /\b(?:my|our)\s+(?:open\s+)?(?:action items?|to-?dos?|tasks|next st
 const DECIDED = /\bwhat\s+(?:did|have|has)\s+(?:we|they|i|the team)\s+(?:decide|decided|agree|agreed)\b/i
 const RECAP = /\b(?:summari[sz]e|sum up|recap|overview|catch me up|what happened)\b/i
 
+// JavaScript's \b does not recognize Cyrillic word boundaries. Keep these rules to common requests for a list or recap.
+const russian = (source: string) => new RegExp(`(?<![\\p{L}\\p{N}_])(?:${source})(?![\\p{L}\\p{N}_])`, 'iu')
+const TASKS_RU = russian('задачи|поручения|дела|следующие\\s+шаги|дальнейшие\\s+шаги')
+const MINE_RU = russian('мои|наши|у\\s+(?:меня|нас)')
+const GATHER_RU = russian('задачи|поручения|следующие\\s+шаги|дальнейшие\\s+шаги|решения|договор[её]нности|выводы')
+const ALL_RU = russian('все|всех|каждой|каждого|каждую')
+const DECIDED_RU = russian('что\\s+(?:(?:мы|они|я|команда)\\s+)?(?:решили|решила|решил|решено)|о\\s+ч[её]м\\s+(?:(?:мы|они|я|команда)\\s+)?(?:договорились|договорилась|договорился)|какие\\s+решения\\s+(?:(?:мы|они|команда)\\s+)?(?:приняли|приняла|принял)')
+const RECAP_RU = russian('итоги|обзор|сводка|сводку|резюме|что\\s+произошло')
+const MEETINGS_RU = russian('встреч|встречи|встречах|встречам|совещаний|совещания|совещаниях|собраний|собрания|собраниях')
+
 export function questionKind(question: string, f: Filters): Kind {
   const dated = f.from !== undefined
   if (MINE.test(question) || DECIDED.test(question)) return 'across'
   if (GATHER.test(question) && (ALL.test(question) || dated)) return 'across'
   if (RECAP.test(question) && (dated || /\bmeetings\b/i.test(question))) return 'across'
+  if ((TASKS_RU.test(question) && MINE_RU.test(question)) || DECIDED_RU.test(question)) return 'across'
+  if (GATHER_RU.test(question) && (ALL_RU.test(question) || dated)) return 'across'
+  if (RECAP_RU.test(question) && (dated || MEETINGS_RU.test(question))) return 'across'
   return 'find'
 }

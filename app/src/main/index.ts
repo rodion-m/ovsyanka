@@ -18,7 +18,7 @@ import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isFake, userDataDir } from './paths'
 import { logToFile } from './log'
-import { loadSettings, localeOf, keepsRecording, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings } from './settings'
+import { configuredAi, loadSettings, localeOf, keepsRecording, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings } from './settings'
 import { CALL_GONE_MS, useCallApps } from './detect'
 import { systemLocale } from './locale'
 import { language as uiLanguage, onLanguage, setLanguage, t } from '../shared/i18n'
@@ -49,7 +49,7 @@ import { isId, text } from './ipcArgs'
 import { hookMics } from './mics'
 import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
-import { hookTranscription, onWhisperGpuOff, meetingLanguage, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptPartials } from './asr'
+import { hookTranscription, onWhisperGpuOff, meetingLanguage, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptPartials, transcribing } from './asr'
 import { hookCallNames, type Watch } from './callNames'
 import { helperWatch, killAllWatches } from './callNames/watch'
 import { macFullName } from './user'
@@ -65,7 +65,9 @@ import { hookReadAhead, readAheadAllowed } from './notes/readAhead'
 import { createQueue, isSmallMac } from './notes/queue'
 import type { ContextChip } from '../shared/askContext'
 import { Library } from './library/store'
-import { createEmbedder } from './library/embedder'
+import { createEmbedder, keywordOnlyEmbedder } from './library/embedder'
+import { createSubscriptionHarness } from './harness'
+import { hookAiPreferences } from './harness/ipc'
 import { createIndexer } from './library/indexer'
 import { hookConversations } from './library/conversations'
 import { hookShare } from './share'
@@ -75,7 +77,7 @@ import { hookMcp } from './mcp'
 import { startedHidden } from './mcp/paths'
 import { deleteRecording } from './deleteRecording'
 import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
-import { finishQuit, hookUpdates, isPreviewBuild, updateOfferChanged, updatesOn } from './updates'
+import { finishQuit, hookUpdates, isPreviewBuild, isSubscriptionBuild, updateOfferChanged, updatesOn } from './updates'
 import type { NoteSaveResult, StartResult } from '../shared/types'
 
 // the transcript's player streams each meeting's audio from here; seeking needs stream support (before ready)
@@ -158,9 +160,10 @@ function createWindow() {
 /** First-run downloads: speech, speaker and notes models. Fake mode swaps in instant downloads and a fixed Mac. */
 /** Windows and Linux: what graphics the notes engine can use; null when it can't tell (or crashed checking: it then runs without them) */
 let probeGpu: () => Promise<GpuProbe | null> = async () => null
-function createSetup(): SetupController {
+function createSetup(subscription = false): SetupController {
   const modelsDir = join(userDataDir(), 'models')
   return new SetupController({
+    subscription,
     modelsDir,
     upgradePreference: {
       load: () => loadSettings(join(userDataDir(), 'settings.json')).notesUpgradeSkipped === true,
@@ -455,6 +458,9 @@ app.whenReady().then(() => {
   // Local Electron launches need the same Dock icon as the packaged application.
   if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   const settings = loadSettings(join(userDataDir(), 'settings.json'))
+  const ai = configuredAi(settings, process.env, isFake())
+  const subscription = ai.backend !== 'local'
+  const harness = subscription ? createSubscriptionHarness({ settings: ai, tempDir: join(userDataDir(), 'harness-tmp') }) : undefined
   // the theme picked in Settings; the system's when none
   nativeTheme.themeSource = settings.theme ?? 'system'
   setLanguage(localeOf(settings, systemLocale()))
@@ -492,7 +498,7 @@ app.whenReady().then(() => {
     onMeetingStart(() => void media.pause())
     onMeetingStop(() => void media.resume())
   }
-  const setup = createSetup()
+  const setup = createSetup(subscription)
   setup.onState((st) => win?.webContents.send('setup:state', st))
   ipcMain.handle('setup:state', () => setup.state)
   ipcMain.handle('setup:retry', () => setup.retry())
@@ -504,6 +510,14 @@ app.whenReady().then(() => {
   initMeetings(store)
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
+  hookAiPreferences({ file: settingsFile, active: ai, restart: () => {
+    if (activeMeeting() || transcribing() || finishing || queue.busy()) return false
+    if (isFake()) { relaunched++; return true }
+    stripAppImageEnv()
+    app.relaunch(relaunchOptions(process.platform, app.isPackaged, process.execPath, process.env.APPIMAGE))
+    app.quit()
+    return true
+  } })
   setCalendarSelection(() => loadSettings(settingsFile).hiddenCalendarIds ?? [])
   const me = () => loadSettings(settingsFile).myName?.trim() || macName()
   setOwnerName(me)
@@ -527,10 +541,11 @@ app.whenReady().then(() => {
     refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
-    // English only (the default) or Multi-language, read on each chunk so the footer's picker counts at once
+    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 45_000, maxQueuedMs: 10 * 60_000 } : {}),
+    // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),
     // Apple's on-device speech for the live words (macOS 26, Apple Silicon); fake mode has a stand-in when a test asks
-    speech: {
+    speech: subscription ? undefined : {
       host: { platform: process.platform, arch: process.arch, osRelease: isFake() ? (process.env.YOGURT_FAKE_SPEECH === '1' ? '25.4.0' : '24.0.0') : os.release() }, binary: audioHelperPath(),
       ui: () => localeOf(loadSettings(join(userDataDir(), 'settings.json')), systemLocale()), last: () => store.lastLanguage(),
       ...(isFake() ? { locales: async () => ({ available: true, supported: ['en-US', 'es-ES'], installed: ['en-US'] }), install: async () => true } : {}),
@@ -560,7 +575,7 @@ app.whenReady().then(() => {
     // recording that can't go on ends the meeting, with the notes kept
     stopMeeting: (id) => { stopMeeting(id) } })
   // 32 GB and up: the notes model reads each meeting in as it happens (notes/readAhead.ts)
-  const readsAhead = !isFake() && readAheadAllowed(os.totalmem())
+  const readsAhead = !subscription && !isFake() && readAheadAllowed(os.totalmem())
   // the notes model: one job at a time, recording first; loaded when needed, the best one downloaded
   const engine = isFake() ? new FakeEngine() : new UtilityEngine(join(__dirname, 'engine.js'), { gpuFallback: process.platform !== 'darwin', cpuCrashes: process.platform === 'linux' })
   if (engine instanceof UtilityEngine) probeGpu = () => engine.probe().then((g) => {
@@ -568,12 +583,13 @@ app.whenReady().then(() => {
     return g
   }, (e) => { console.warn("couldn't check the graphics", e); return null })
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
-  const smallMac = isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem())
-  const model = createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path) })
+  const smallMac = !subscription && (isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem()))
+  const model = harness?.model ?? createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path) })
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
-  const embedder = createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
-  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, backlogMs: transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady: () => !!setup.notesPath() })
+  const embedder = subscription ? keywordOnlyEmbedder() : createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
+  const modelReady = () => subscription || !!setup.notesPath()
+  const queue = createQueue({ recording: () => !!activeMeeting(), smallMac, backlogMs: subscription ? () => 0 : transcriptionBacklogMs, onIdle: () => { void model.unload().catch(e => console.error('letting the notes model go failed', e)); void embedder.unload() }, modelReady })
   ipcMain.handle('setup:remove-upgrade', () => setup.removeUpgrade(remove => queue.enqueue(async () => {
     await model.unload()
     remove()
@@ -651,9 +667,9 @@ app.whenReady().then(() => {
       win?.webContents.send('conversations:changed', v)
       if (v.chips.length === 1 && v.chips[0].kind === 'meeting') win?.webContents.send('chat:changed', { ...v, meetingId: v.chips[0].id })
     }, sendList: (l) => win?.webContents.send('conversations:list', l),
-    waitsForMeeting: () => smallMac && !!activeMeeting(), waitsForModel: () => !setup.notesPath(),
+    waitsForMeeting: () => smallMac && !!activeMeeting(), waitsForModel: () => !modelReady(),
     // a meeting read in ahead during a recording only where reading ahead is allowed (32 GB and up; the fake Mac is big)
-    warmAllowed: () => !activeMeeting() || (isFake() ? !smallMac : readAheadAllowed(os.totalmem())),
+    warmAllowed: () => !subscription && (!activeMeeting() || (isFake() ? !smallMac : readAheadAllowed(os.totalmem()))),
   })
   const validChips = (value: unknown): value is ContextChip[] => Array.isArray(value) && value.length <= 40 && value.every(c =>
     c && (c.kind === 'meeting' || c.kind === 'folder') && isId(c.id)) && new Set(value.map(c => `${c.kind}:${c.id}`)).size === value.length
@@ -807,6 +823,7 @@ app.whenReady().then(() => {
     })
   })
   app.on('will-quit', stopTranscriptionServer)
+  app.on('will-quit', () => harness?.stop())
   const reminder = createRecordingReminder(() => recordingReminderOn(loadSettings(settingsFile)))
   onMeetingStart(reminder.started)
   onMeetingStop(reminder.stopped)
@@ -972,6 +989,7 @@ app.whenReady().then(() => {
   void setup.start()
   // new versions from GitHub Releases, downloaded in the background and installed on quit
   const updatesAvailable = updatesOn({ packaged: app.isPackaged, fake: isFake(), profile: !!process.env.YOGURT_USER_DATA, platform: process.platform, appImage: !!process.env.APPIMAGE,
+    subscription: isSubscriptionBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })()),
     feed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
     preview: app.isPackaged && isPreviewBuild((() => { try { return readFileSync(join(app.getAppPath(), 'package.json'), 'utf8') } catch { return '' } })()) })
   hookUpdates({ file: join(userDataDir(), 'settings.json'), available: updatesAvailable, recording: () => !!activeMeeting(), onCall: () => onCall(),

@@ -139,7 +139,6 @@
   "Empty the Trash?": "ล้างถังขยะไหม",
   "English": "อังกฤษ",
   "English only": "อังกฤษเท่านั้น",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "อังกฤษเท่านั้นเร็วกว่าและแม่นยำกว่า เลือกหลายภาษาสำหรับการประชุมในภาษาอื่น",
   "Everyone else": "ทุกคนที่เหลือ",
   "Everything stays on your Mac.": "ทุกอย่างอยู่บน Mac ของคุณ",
   "Everything stays on your computer.": "ทุกอย่างอยู่บนคอมพิวเตอร์ของคุณ",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "ซ่อนแถบด้านข้าง",
   "Hide transcript": "ซ่อนคำถอดความ",
   "Hide {app}": "ซ่อน {app}",
-  "Highest quality": "คุณภาพสูงสุด",
   "House": "บ้าน",
   "I'll send a draft by Friday.": "จะส่งร่างให้ภายในวันศุกร์",
   "Icon": "ไอคอน",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurt กำลังบันทึก",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt กำลังตั้งค่าการถอดความ ทำแค่ครั้งเดียว จากนั้นทุกอย่างทำงานบน Mac ของคุณ",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt กำลังตั้งค่าการถอดความ ทำแค่ครั้งเดียว จากนั้นทุกอย่างทำงานบนคอมพิวเตอร์ของคุณ",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt ฟังว่ากำลังพูดภาษาอะไร เลือกตัวเลือกนี้สำหรับการประชุมที่ไม่ใช่ภาษาอังกฤษ",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt ต้องใช้ Mac ที่มีหน่วยความจำอย่างน้อย 8 GB",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt ทำงานบนคอมพิวเตอร์ของคุณทั้งหมด และเครื่องนี้มีประสิทธิภาพไม่พอ ต้องมีหน่วยความจำอย่างน้อย 8 GB",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt อ่านชื่อที่ Zoom, Meet และ Teams แสดง คำถอดความจึงบอกได้ว่าใครพูด แทนที่จะเป็น คนอื่น",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "เก็บเสียงบันทึกหลังประชุม",
   "Recording deleted": "ลบเสียงบันทึกแล้ว",
   "When off, new meetings' audio is deleted once the summary is saved.": "เมื่อปิด เสียงของการประชุมใหม่จะถูกลบหลังบันทึกสรุปแล้ว",
-  "New recording": "การบันทึกใหม่"
+  "New recording": "การบันทึกใหม่",
+  "Russian": "ภาษารัสเซีย",
+  "Transcribes Russian in Cyrillic": "ถอดเสียงภาษารัสเซียเป็นอักษรซีริลลิก",
+  "Choose English or Russian, or let Yogurt detect the language.": "เลือกภาษาอังกฤษหรือรัสเซีย หรือให้ Yogurt ตรวจจับภาษา",
+  "Yogurt detects the spoken language automatically.": "Yogurt ตรวจจับภาษาที่พูดโดยอัตโนมัติ"
 }

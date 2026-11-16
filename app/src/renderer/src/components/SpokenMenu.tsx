@@ -5,11 +5,11 @@ import { WHISPER_LANGUAGES, type Spoken } from '../../../shared/spoken'
 import { t } from '../../../shared/i18n'
 
 /** the names shown on the chip and in Settings */
-export const spokenName = (s: Spoken): string => (s === 'en' ? t('English') : t('Multi-language'))
+export const spokenName = (s: Spoken): string => (s === 'en' ? t('English') : s === 'ru' ? t('Russian') : t('Multi-language'))
 
 /**
- * The spoken language under the note's bar, beside the mic, as a menu: English only (faster, nothing guessed) or
- * Multi-language. Choosing counts for the recording going on from its next words, and is remembered for the next ones.
+ * The spoken language under the note's bar, beside the mic: English, Russian, or automatic detection.
+ * Choosing applies to the recording's next words and is remembered for the next meetings.
  */
 export function SpokenMenu() {
   const [spoken, setSpoken] = useState<Spoken>()
@@ -57,7 +57,7 @@ export function SpokenMenu() {
   if (!spoken) return null
   const row = 'flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-start text-sm hover:bg-[var(--line)] focus-visible:bg-[var(--line)] focus-visible:outline-none'
   const tick = (on: boolean) => <Check size={15} aria-hidden="true" className={`ms-auto shrink-0 ${on ? '' : 'invisible'}`} />
-  const about = t('Yogurt listens for the language being spoken. Pick it for meetings that are not in English.')
+  const about = t('Yogurt detects the spoken language automatically.')
   return (
     <div ref={root} className="relative flex min-w-0 items-center">
       <button ref={button} data-testid="spoken-chip" aria-haspopup="menu" aria-expanded={!!open} title={t('Spoken language')}
@@ -71,11 +71,15 @@ export function SpokenMenu() {
         <div data-testid="spoken-menu" {...presence.props} data-anchor="bottom-start" role="menu" aria-label={t('Spoken language')} onKeyDown={onKey}
           className="menu-entry absolute bottom-full start-0 z-30 mb-2 w-64 rounded-xl border border-line bg-float p-1.5 text-ink shadow-[var(--shadow)]">
           <button role="menuitemradio" aria-checked={spoken === 'en'} data-testid="spoken-en" onClick={() => choose('en')} className={row}>
-            <span className="flex min-w-0 flex-col">
-              <span>{t('English only')}</span>
-              <span className="text-xs text-muted">{t('Highest quality')}</span>
-            </span>
+            <span>{t('English only')}</span>
             {tick(spoken === 'en')}
+          </button>
+          <button role="menuitemradio" aria-checked={spoken === 'ru'} data-testid="spoken-ru" onClick={() => choose('ru')} className={row}>
+            <span className="flex min-w-0 flex-col">
+              <span>{t('Russian')}</span>
+              <span className="text-xs text-muted">{t('Transcribes Russian in Cyrillic')}</span>
+            </span>
+            {tick(spoken === 'ru')}
           </button>
           <button role="menuitemradio" aria-checked={spoken === 'multi'} data-testid="spoken-multi" onClick={() => choose('multi')} className={row}>
             <span className="flex min-w-0 flex-col">

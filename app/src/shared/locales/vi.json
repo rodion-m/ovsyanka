@@ -139,7 +139,6 @@
   "Empty the Trash?": "Dọn sạch Thùng rác?",
   "English": "Tiếng Anh",
   "English only": "Chỉ tiếng Anh",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Chỉ tiếng Anh nhanh và chính xác hơn. Chọn Đa ngôn ngữ cho các cuộc họp bằng ngôn ngữ khác.",
   "Everyone else": "Mọi người khác",
   "Everything stays on your Mac.": "Mọi thứ đều ở trên máy Mac của bạn.",
   "Everything stays on your computer.": "Mọi thứ đều ở trên máy tính của bạn.",
@@ -179,7 +178,6 @@
   "Hide Sidebar": "Ẩn thanh bên",
   "Hide transcript": "Ẩn bản chép lời",
   "Hide {app}": "Ẩn {app}",
-  "Highest quality": "Chất lượng cao nhất",
   "House": "Ngôi nhà",
   "I'll send a draft by Friday.": "Mình sẽ gửi bản nháp trước thứ Sáu.",
   "Icon": "Biểu tượng",
@@ -494,7 +492,6 @@
   "Yogurt is recording": "Yogurt đang ghi",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt đang thiết lập chép lời. Việc này chỉ diễn ra một lần, sau đó mọi thứ chạy trên máy Mac của bạn.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt đang thiết lập chép lời. Việc này chỉ diễn ra một lần, sau đó mọi thứ chạy trên máy tính của bạn.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt nhận ra ngôn ngữ đang được nói. Chọn mục này cho các cuộc họp không dùng tiếng Anh.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt cần máy Mac có ít nhất 8 GB bộ nhớ.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt chạy hoàn toàn trên máy tính của bạn, và máy này không đủ mạnh. Cần ít nhất 8 GB bộ nhớ.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt đọc tên mà Zoom, Meet và Teams hiển thị, để bản chép lời ghi rõ ai đã nói thay vì Người khác.",
@@ -630,5 +627,9 @@
   "Keep audio recordings after meetings": "Giữ bản ghi âm sau cuộc họp",
   "Recording deleted": "Đã xóa bản ghi",
   "When off, new meetings' audio is deleted once the summary is saved.": "Khi tắt, âm thanh cuộc họp mới sẽ bị xóa sau khi lưu tóm tắt.",
-  "New recording": "Bản ghi mới"
+  "New recording": "Bản ghi mới",
+  "Russian": "Tiếng Nga",
+  "Transcribes Russian in Cyrillic": "Chép lời tiếng Nga bằng chữ Kirin",
+  "Choose English or Russian, or let Yogurt detect the language.": "Chọn tiếng Anh hoặc tiếng Nga, hoặc để Yogurt nhận diện ngôn ngữ.",
+  "Yogurt detects the spoken language automatically.": "Yogurt tự động nhận diện ngôn ngữ đang được nói."
 }

@@ -11,17 +11,16 @@
 ## Run it
 
 ```sh
-git clone https://github.com/FrigadeHQ/yogurt.git
-cd yogurt
+# Run from your checkout of this fork, not the upstream release source.
 pnpm install --frozen-lockfile
 pnpm -C app native   # builds the audio, system and transcription helpers (first time, and after they change)
 pnpm dev             # opens Yogurt from source
 ```
 
-The first run downloads the AI models, like the installed app.
+The first run uses agy provider mode and downloads no local AI models. Install and authenticate the CLI separately, then configure it in **Settings → AI processing**; see [the provider guide](subscription-harness.md). Selecting Local models restores the original model downloads after restart. Native build dependencies and helpers are still required for recording.
 
 - **Separate profile:** `YOGURT_USER_DATA=/tmp/yogurt-dev pnpm dev` keeps your real meetings out of it.
-- **Without models:** `YOGURT_FAKE=1 pnpm dev` swaps in a fake transcriber, notes model and call audio, so the whole app runs in seconds.
+- **Offline development:** `YOGURT_FAKE=1 pnpm dev` uses fake local setup, transcription, notes and call audio unless saved AI settings or `YOGURT_AI_BACKEND` explicitly select a provider. Use a fresh `YOGURT_USER_DATA` directory for a predictable fake run.
 
 ## Test
 
@@ -42,4 +41,4 @@ Installers land in `app/dist/`. They're unsigned unless signing is set up; see `
 
 ## Release
 
-`sh app/scripts/release.sh X.Y.Z` sets the version, tags it and pushes. GitHub Actions builds Mac (signed and notarized), Windows and Linux, and publishes one release once all three pass. Installed copies update from it.
+The inherited `sh app/scripts/release.sh X.Y.Z` script sets the version, tags it and pushes; review its repository and signing configuration before using it for a fork. This subscription build disables upstream automatic updates so an official Yogurt release cannot replace the provider integration. Distribute this fork’s builds separately and configure an independent update feed before enabling automatic updates.

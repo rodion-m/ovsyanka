@@ -142,7 +142,6 @@
   "Empty the Trash?": "I-empty ang Trash?",
   "English": "English",
   "English only": "English lang",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Mas mabilis at mas tumpak ang English lang. Piliin ang Maraming wika para sa mga meeting sa ibang wika.",
   "Everyone else": "Lahat ng iba",
   "Everything stays on your Mac.": "Lahat ay nananatili sa Mac mo.",
   "Everything stays on your computer.": "Lahat ay nananatili sa computer mo.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Itago ang sidebar",
   "Hide transcript": "Itago ang transcript",
   "Hide {app}": "Itago ang {app}",
-  "Highest quality": "Pinakamataas na kalidad",
   "House": "Bahay",
   "I'll send a draft by Friday.": "Magpapadala ako ng draft bago mag-Biyernes.",
   "Icon": "Icon",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Nagre-record ang Yogurt",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Sine-set up ng Yogurt ang transcription. Isang beses lang ito, tapos sa Mac mo na tatakbo ang lahat.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Sine-set up ng Yogurt ang transcription. Isang beses lang ito, tapos sa computer mo na tatakbo ang lahat.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Pinapakinggan ng Yogurt kung anong wika ang sinasalita. Piliin ito para sa mga meeting na hindi English.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Kailangan ng Yogurt ng Mac na may hindi bababa sa 8 GB na memory.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Tumatakbo nang buo ang Yogurt sa iyong computer, at hindi sapat ang lakas ng isang ito. Kailangan nito ng hindi bababa sa 8 GB na memory.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Binabasa ng Yogurt ang mga pangalang ipinapakita ng Zoom, Meet at Teams, para makita sa transcript kung sino ang nagsalita sa halip na Iba.",
@@ -675,5 +672,9 @@
   "Keep audio recordings after meetings": "Itago ang mga audio recording pagkatapos ng pulong",
   "Recording deleted": "Nabura ang recording",
   "When off, new meetings' audio is deleted once the summary is saved.": "Kapag naka-off, buburahin ang audio ng bagong pulong pag na-save ang buod.",
-  "New recording": "Bagong recording"
+  "New recording": "Bagong recording",
+  "Russian": "Ruso",
+  "Transcribes Russian in Cyrillic": "Isinusulat ang pagsasalitang Ruso sa alpabetong Siriliko",
+  "Choose English or Russian, or let Yogurt detect the language.": "Pumili ng Ingles o Ruso, o hayaang tukuyin ng Yogurt ang wika.",
+  "Yogurt detects the spoken language automatically.": "Awtomatikong tinutukoy ng Yogurt ang wikang sinasalita."
 }

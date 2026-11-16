@@ -32,6 +32,8 @@ describe('which locale it listens in', () => {
   it("whisper's names become codes; unknown names are left alone", () => {
     expect(languageCode('english')).toBe('en')
     expect(languageCode('Japanese')).toBe('ja')
+    expect(languageCode('Russian')).toBe('ru')
+    expect(languageCode('ru')).toBe('ru')
     expect(languageCode('de')).toBe('de')
     expect(languageCode('klingon')).toBeNull()
     expect(languageCode(null)).toBeNull()
@@ -54,6 +56,15 @@ describe('the spoken language picked in Yogurt', () => {
   it('English only with no English model on the Mac: whisper only, never another language', () => {
     expect(wantedSpeechLocale({ spoken: 'en', supported: ['es-ES', 'de-DE'], last: null, ui: 'es-ES' })).toBeNull()
   })
+  it('Russian selects the supported ru-RU locale regardless of interface and previous meeting', () => {
+    expect(wantedSpeechLocale({ spoken: 'ru', supported: [...supported, 'ru-RU'], last: 'english', ui: 'en-GB' })).toBe('ru-RU')
+    expect(wantedSpeechLocale({ spoken: 'ru', supported: ['ru_RU', 'en-US'], last: 'german', ui: 'de-DE' })).toBe('ru_RU')
+  })
+  it('Russian without ru-RU disables Apple instead of listening in English or another locale', () => {
+    expect(wantedSpeechLocale({ spoken: 'ru', supported, last: 'english', ui: 'en-US' })).toBeNull()
+    expect(wantedSpeechLocale({ spoken: 'ru', supported: [...supported, 'ru-UA'], last: 'russian', ui: 'ru-RU' })).toBeNull()
+    expect(wantedSpeechLocale({ spoken: 'ru', supported: [], ui: 'ru-RU' })).toBeNull()
+  })
   it("Multi-language keeps today's choice: the last meeting's language, else the interface's", () => {
     expect(wantedSpeechLocale({ spoken: 'multi', supported, last: 'spanish', ui: 'en-GB' })).toBe('es-ES')
     expect(wantedSpeechLocale({ spoken: 'multi', supported, last: null, ui: 'de-DE' })).toBe('de-DE')
@@ -62,5 +73,15 @@ describe('the spoken language picked in Yogurt', () => {
     expect(speechFits('en', 'en-GB')).toBe(true)
     expect(speechFits('en', 'es-ES')).toBe(false)
     expect(speechFits('multi', 'es-ES')).toBe(true)
+  })
+  it('a recording switched to Russian keeps only a Russian Apple model', () => {
+    expect(speechFits('ru', 'ru-RU')).toBe(true)
+    expect(speechFits('ru', 'ru_RU')).toBe(true)
+    expect(speechFits('ru', 'en-US')).toBe(false)
+    expect(speechFits('ru', 'ru-UA')).toBe(false)
+    expect(speechFits('en', 'ru-RU')).toBe(false)
+    expect(speechFits('multi', 'ru-RU')).toBe(true)
+    expect(speechDisagrees('ru-RU', 'russian')).toBe(false)
+    expect(speechDisagrees('ru-RU', 'english')).toBe(true)
   })
 })

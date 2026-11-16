@@ -3,6 +3,7 @@ import type { PermissionKind } from '../../shared/types'
 import type { ScreenId } from '../../shared/onboarding'
 import { t } from '../../shared/i18n'
 import { osWords } from './keys'
+import { aiText } from './components/aiCopy'
 
 /**
  * What each permission gives the person: reason is the explanation Settings shows. pane and where
@@ -45,14 +46,14 @@ export function finishSetupReason(k: PermissionKind): string {
 }
 
 /** The first run's screens: a short headline and one sentence on why it matters */
-export const screenCopy = (id: 'welcome' | ScreenId | 'ready'): { title: string; text: string } => {
+export const screenCopy = (id: 'welcome' | ScreenId | 'ready', subscription = false): { title: string; text: string } => {
   switch (id) {
-    case 'welcome': return { title: t('Take note.'), text: osWords({ mac: t('Yogurt writes your meeting notes while you talk. No bot joins the call, and nothing leaves your Mac.'), other: t('Yogurt writes your meeting notes while you talk. No bot joins the call, and nothing leaves your computer.') }) }
+    case 'welcome': return { title: t('Take note.'), text: subscription ? aiText('welcomeSubscription') : osWords({ mac: t('Yogurt writes your meeting notes while you talk. No bot joins the call, and nothing leaves your Mac.'), other: t('Yogurt writes your meeting notes while you talk. No bot joins the call, and nothing leaves your computer.') }) }
     case 'record': return { title: t('Hear the whole call'), text: t("Yogurt hears you through your microphone, and everyone else through your Mac's sound.") }
     case 'calendar': return { title: t('Know every meeting'), text: t("Notes start with the meeting's name and who's invited, from the calendars already on your Mac.") }
     case 'notifications': return { title: t('Never miss a call'), text: t('When a call starts, Yogurt offers to take notes. One click and it starts recording.') }
     case 'accessibility': return { title: t('See who said what'), text: t('Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.') }
-    case 'ready': return { title: t('Almost ready'), text: osWords({ mac: t('Yogurt is setting up transcription. This happens once, then it all runs on your Mac.'), other: t('Yogurt is setting up transcription. This happens once, then it all runs on your computer.') }) }
+    case 'ready': return { title: t('Almost ready'), text: subscription ? aiText('readySubscription') : osWords({ mac: t('Yogurt is setting up transcription. This happens once, then it all runs on your Mac.'), other: t('Yogurt is setting up transcription. This happens once, then it all runs on your computer.') }) }
   }
 }
 

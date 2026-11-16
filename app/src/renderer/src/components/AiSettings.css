@@ -1,0 +1,20 @@
+.ai-settings-intro { margin:0 0 12px;color:var(--muted);font-size:13px;line-height:1.6; }
+.ai-settings-form fieldset { min-width:0;margin:0;padding:0;border:0; }
+.ai-settings-form .settings-row { align-items:flex-start; }
+.ai-settings-form .settings-row-copy { padding-block:4px; }
+.ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap { width:240px;max-width:100%; }
+.ai-settings-form .settings-select { width:100%;min-width:0; }
+.ai-settings-form .settings-name-field { min-width:0; }
+.ai-settings-note { margin:0;padding:14px 20px;color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
+.ai-settings-note strong { color:var(--ink);font-weight:550; }
+.ai-settings-advanced { border-top:1px solid var(--line); }
+.ai-settings-advanced summary { padding:15px 20px;cursor:pointer;color:var(--ink);font-size:13px; }
+.ai-settings-advanced summary:focus-visible { outline:2px solid var(--focus);outline-offset:-4px;border-radius:6px; }
+.ai-settings-actions { display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px;border-top:1px solid var(--line); }
+.ai-settings-status { margin:0;padding:0 20px 16px;font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
+.ai-settings-status[data-error=true] { color:var(--ink); }
+.ai-settings-result { display:block;margin-top:4px;color:var(--muted);white-space:pre-wrap; }
+@media(max-width:600px) {
+  .ai-settings-form .settings-row { display:block; }
+  .ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap { width:100%;margin-top:8px; }
+}

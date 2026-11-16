@@ -1,6 +1,7 @@
 {
   "name": "@yogurt/app",
   "version": "0.3.21",
+  "yogurtSubscription": true,
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -54,7 +55,7 @@
   },
   "productName": "Yogurt",
   "desktopName": "yogurt.desktop",
-  "description": "Free, private, open-source AI meeting notes for Mac, Windows and Linux.",
+  "description": "Open-source meeting notes with subscription AI harnesses and optional local processing.",
   "author": "Frigade",
   "license": "MIT"
 }

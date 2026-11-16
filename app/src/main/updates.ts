@@ -12,8 +12,13 @@ const EVERY_MS = 4 * 60 * 60 * 1000
  * latest-linux.yml). Not while developing, testing, or on a separate profile; on Linux only the AppImage can replace itself.
  * Never in a preview build (preview.yml by hand): it was never released, so there is nothing to look for.
  */
-export function updatesOn(o: { packaged: boolean; fake: boolean; profile: boolean; feed: boolean; platform?: string; appImage?: boolean; preview?: boolean }): boolean {
-  return o.packaged && !o.fake && !o.profile && o.feed && !o.preview && (o.platform !== 'linux' || !!o.appImage)
+export function updatesOn(o: { packaged: boolean; fake: boolean; profile: boolean; feed: boolean; platform?: string; appImage?: boolean; preview?: boolean; subscription?: boolean }): boolean {
+  return o.packaged && !o.fake && !o.profile && o.feed && !o.preview && !o.subscription && (o.platform !== 'linux' || !!o.appImage)
+}
+
+/** The fork must never be replaced by an upstream binary that lacks the selected subscription backend. */
+export const isSubscriptionBuild = (packageJson: string): boolean => {
+  try { return JSON.parse(packageJson).yogurtSubscription === true } catch { return false }
 }
 
 /** preview.yml marks a build made by hand (not for a release) in the packaged package.json */

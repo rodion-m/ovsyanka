@@ -6,6 +6,7 @@ import { chunker, type Chunk } from './chunker'
 import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
+import { takeBatch } from './batch'
 
 type Out = Omit<Segment, 'id'>
 
@@ -30,6 +31,8 @@ export function createPipeline(p: {
   holdMs?: number
   extraWaitMs?: number
   maxQueuedMs?: number
+  /** Combine queued speech up to this duration for a remote provider, preserving silent gaps. Local reads stay unchanged. */
+  batchMs?: number
   /** for tests: stand in for the echo detector */
   echoForTests?: EchoCheck
   /** trouble worth telling the person about; each kind is reported once */
@@ -142,7 +145,7 @@ export function createPipeline(p: {
 
   const pump = (t: Track) => {
     if (running[t]) return
-    const c = waiting[t].shift()
+    const c = takeBatch(waiting[t], p.batchMs)
     if (!c) { if (!queued('me') && !queued('them')) { const w = idle; idle = []; w.forEach((f) => f()) } return }
     running[t] = true
     const chunkEnd = c.startMs + c.samples.length / 16

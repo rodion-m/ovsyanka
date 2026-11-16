@@ -9,6 +9,7 @@ import { SetupStatus, transcriptionPhase, transcriptionPercent } from '../compon
 import { permissionCopy, screenCopy } from '../permissionCopy'
 import { usePermissionFlow } from '../permissionFlow'
 import { t } from '../../../shared/i18n'
+import { aiText } from '../components/aiCopy'
 
 /**
  * First run: one welcome screen, then one screen per idea still to ask (the mic and the call audio share one), each
@@ -16,6 +17,15 @@ import { t } from '../../../shared/i18n'
  * again. Then the download, if it isn't done yet. The models keep downloading in the background the whole time.
  */
 export function Onboarding({ state, plan, onDone }: { state: SetupState; plan: OnboardingPlan; onDone(): void }) {
+  // The default fork uses a provider. Avoid a local-only privacy promise while preferences are loading.
+  const [subscription, setSubscription] = useState(true)
+  useEffect(() => {
+    let current = true
+    void Promise.resolve().then(() => window.yogurt.ai.get()).then(p => {
+      if (current) setSubscription(p.active.backend !== 'local')
+    }).catch(() => {})
+    return () => { current = false }
+  }, [])
   const screens = useMemo(() => screensOf(plan.steps), [plan])
   const [stage, setStage] = useState<'intro' | 'steps' | 'progress'>(plan.intro ? 'intro' : screens.length ? 'steps' : 'progress')
   const [i, setI] = useState(0)
@@ -31,9 +41,9 @@ export function Onboarding({ state, plan, onDone }: { state: SetupState; plan: O
   const progress = { n: stage === 'intro' ? 0 : first + i, total: first + screens.length }
   return (
     <div data-testid="onboarding" data-phase={state.phase} data-stage={stage} className="setup-screen">
-      {stage === 'intro' ? <Welcome state={state} progress={progress} onDone={introDone} />
-        : stage === 'steps' && screen ? <PermissionScreen key={screen.id} screen={screen} state={state} progress={progress} onNext={next} />
-          : <Ready state={state} />}
+      {stage === 'intro' ? <Welcome state={state} progress={progress} onDone={introDone} subscription={subscription} />
+        : stage === 'steps' && screen ? <PermissionScreen key={screen.id} screen={screen} state={state} progress={progress} onNext={next} subscription={subscription} />
+          : <Ready state={state} subscription={subscription} />}
     </div>
   )
 }
@@ -45,9 +55,9 @@ type Progress = { n: number; total: number }
  * buttons sit in the same place on every screen; the note under the buttons has its own room so nothing moves.
  * motionKey: a change fades the words in again; its part before ":" does the same for the picture.
  */
-function Layout({ testId, step, kind, motionKey, art, title, text, textTestId = 'step-reason', actions, note, progress, state }: {
+function Layout({ testId, step, kind, motionKey, art, title, text, textTestId = 'step-reason', actions, note, progress, state, subscription = false }: {
   testId: string; step?: string; kind?: string; motionKey: string; art: ReactNode; title: string; text: string; textTestId?: string
-  actions: ReactNode; note?: ReactNode; progress?: Progress; state?: SetupState
+  actions: ReactNode; note?: ReactNode; progress?: Progress; state?: SetupState; subscription?: boolean
 }) {
   return (
     <section data-testid={testId} data-step={step} data-kind={kind} className="ob">
@@ -64,7 +74,7 @@ function Layout({ testId, step, kind, motionKey, art, title, text, textTestId = 
         </div>
         <div className="ob-foot">
           {progress && <Steps {...progress} />}
-          {state && <SetupStatus state={state} />}
+          {state && <SetupStatus state={state} subscription={subscription} />}
         </div>
       </div>
       <div className="ob-stage" aria-hidden="true">
@@ -89,13 +99,13 @@ function useFocus(ref: RefObject<HTMLButtonElement | null>, deps: unknown[]) {
 }
 
 /** What Yogurt is, in the website's words */
-function Welcome({ state, progress, onDone }: { state: SetupState; progress: Progress; onDone(): void }) {
-  const c = screenCopy('welcome')
+function Welcome({ state, progress, onDone, subscription }: { state: SetupState; progress: Progress; onDone(): void; subscription: boolean }) {
+  const c = screenCopy('welcome', subscription)
   const primary = useRef<HTMLButtonElement>(null)
   useFocus(primary, [])
   return (
     <Layout
-      testId="intro-page" step="welcome" motionKey="welcome" art={<WelcomeArt />} title={c.title} text={c.text} progress={progress} state={state}
+      testId="intro-page" step="welcome" motionKey="welcome" art={<WelcomeArt />} title={c.title} text={c.text} progress={progress} state={state} subscription={subscription}
       actions={<button ref={primary} data-testid="intro-next" onClick={onDone} className="ob-button primary no-drag">{t('Get started')}</button>}
     />
   )
@@ -105,7 +115,7 @@ function Welcome({ state, progress, onDone }: { state: SetupState; progress: Pro
  * One screen of permissions, asked one after the other: one Allow asks for the mic, then straight away for the call
  * audio. One turned off before waits for a click instead, since only System Settings can turn it on.
  */
-function PermissionScreen({ screen, state, progress, onNext }: { screen: OnboardingScreen; state: SetupState; progress: Progress; onNext(): void }) {
+function PermissionScreen({ screen, state, progress, onNext, subscription }: { screen: OnboardingScreen; state: SetupState; progress: Progress; onNext(): void; subscription: boolean }) {
   const [k, setK] = useState(0)
   const [chained, setChained] = useState(false)
   // what the picture shows as on: whatever this screen didn't need to ask, and whatever was turned on here
@@ -118,11 +128,11 @@ function PermissionScreen({ screen, state, progress, onNext }: { screen: Onboard
     // a picture that shows what is on stays a moment, so the person sees it come alive
     if (screen.kinds.length > 1) { setLeaving(true); setTimeout(onNext, 700) } else onNext()
   }
-  return <Ask key={step.kind} screen={screen} step={step} lit={lit} chained={chained} leaving={leaving} state={state} progress={progress} onOn={on} onLater={onNext} />
+  return <Ask key={step.kind} screen={screen} step={step} lit={lit} chained={chained} leaving={leaving} state={state} progress={progress} onOn={on} onLater={onNext} subscription={subscription} />
 }
 
-function Ask({ screen, step, lit, chained, leaving, state, progress, onOn, onLater }: {
-  screen: OnboardingScreen; step: OnboardingStep; lit: PermissionKind[]; chained: boolean; leaving: boolean; state: SetupState; progress: Progress; onOn(): void; onLater(): void
+function Ask({ screen, step, lit, chained, leaving, state, progress, onOn, onLater, subscription }: {
+  screen: OnboardingScreen; step: OnboardingStep; lit: PermissionKind[]; chained: boolean; leaving: boolean; state: SetupState; progress: Progress; onOn(): void; onLater(): void; subscription: boolean
 }) {
   const { kind } = step
   const c = permissionCopy(kind)
@@ -144,7 +154,7 @@ function Ask({ screen, step, lit, chained, leaving, state, progress, onOn, onLat
   // the picture changes only when there is a new thing to show: System Settings, or the screen's own drawing
   const art = away ? <SettingsArt kind={kind} /> : <ScreenArt id={screen.id} on={back ? [...lit, kind] : lit} />
   return (
-    <Layout
+    <Layout subscription={subscription}
       testId="onboarding-step" step={screen.id} kind={kind} motionKey={away ? `${screen.id}-away` : screen.id}
       art={art} progress={progress} state={state} note={note}
       title={away ? t('Turn on Yogurt in System Settings') : back ? t('All set') : sc.title}
@@ -182,18 +192,18 @@ function GuideNote({ kind }: { kind: PermissionKind }) {
 }
 
 /** Speech setup: no choices to make. Home takes over when recording is ready; the notes model can arrive later. */
-function Ready({ state }: { state: SetupState }) {
+function Ready({ state, subscription }: { state: SetupState; subscription: boolean }) {
   const [shown, setShown] = useState(0)
   const pct = Math.floor(shown * 100 + 1e-8)
   const error = state.phase === 'error'
-  const c = screenCopy('ready')
+  const c = screenCopy('ready', subscription)
   return (
-    <Layout
+    <Layout subscription={subscription}
       testId="setup-ready" motionKey={error ? 'error' : 'ready'} art={<ReadyArt fraction={state.fraction} paused={error} onShown={setShown} />}
       title={error ? t("Couldn't finish setting up") : c.title} text={error ? state.message ?? '' : c.text} textTestId={error ? 'setup-error' : undefined}
       actions={error ? (
         <button data-testid="setup-retry" className="ob-button primary no-drag" onClick={() => void window.yogurt.setup.retry()}>{t('Try again')}</button>
-      ) : (
+      ) : subscription ? <p className="ob-note" role="status">{aiText('providerSetup')}</p> : (
         <div className="ob-progress">
           <div data-testid="setup-progress" role="progressbar" aria-label={transcriptionPhase(state)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="ob-progress-track">
             <div className="ob-progress-fill" style={{ transform: `scaleX(${pct / 100})` }} />

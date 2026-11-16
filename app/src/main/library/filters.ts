@@ -1,6 +1,6 @@
 /**
  * Dates and people read out of a question in plain code, no model: they narrow which meetings are searched before
- * anything else. English words only for now; a question in another language is searched whole.
+ * anything else. English dates and common Russian relative dates; other date expressions are searched whole.
  * from/to: a range of meeting start times (local days, weeks starting on Monday). people: full names it mentions.
  * rest: the question without its date words, for the word search.
  */
@@ -22,6 +22,17 @@ const monthOf = (w: string) => { const i = MONTHS.indexOf(w); return i >= 0 ? i 
 
 type Rule = { re: RegExp; range: (m: RegExpMatchArray, now: number) => [number, number] | undefined }
 const RULES: Rule[] = [
+  // Unicode-aware boundaries keep "вчера" out of "позавчера" and date words out of larger Cyrillic words.
+  { re: /(?<![\p{L}\p{N}_])(?:за\s+)?сегодня(?![\p{L}\p{N}_])/iu, range: (_m, now) => [midnight(now), addDays(now, 1)] },
+  { re: /(?<![\p{L}\p{N}_])(?:за\s+)?вчера(?![\p{L}\p{N}_])/iu, range: (_m, now) => [addDays(now, -1), midnight(now)] },
+  { re: /(?<![\p{L}\p{N}_])(?:(?:на|за)\s+)?(этой|эту|эта|текущей|текущую|текущая|прошлой|прошлую|прошлая|предыдущей|предыдущую|предыдущая)\s+недел(?:е|ю|я)(?![\p{L}\p{N}_])/iu, range: (m, now) => {
+    const start = monday(now)
+    return /^(?:эт|текущ)/iu.test(m[1]) ? [start, addDays(start, 7)] : [addDays(start, -7), start]
+  } },
+  { re: /(?<![\p{L}\p{N}_])(?:(?:в|за)\s+)?(этот|этом|текущий|текущем|прошлый|прошлом|предыдущий|предыдущем)\s+месяц(?:е)?(?![\p{L}\p{N}_])/iu, range: (m, now) => {
+    const d = new Date(now), y = d.getFullYear(), mo = d.getMonth()
+    return /^(?:эт|текущ)/iu.test(m[1]) ? [monthStart(y, mo), monthStart(y, mo + 1)] : [monthStart(y, mo - 1), monthStart(y, mo)]
+  } },
   { re: /\b(?:in |over |during )?the (?:past|last) (\d{1,3}) days\b/i, range: (m, now) => [now - Number(m[1]) * DAY, now] },
   { re: /\btoday\b|\bthis (?:morning|afternoon|evening)\b/i, range: (_m, now) => [midnight(now), addDays(now, 1)] },
   { re: /\byesterday\b/i, range: (_m, now) => [addDays(now, -1), midnight(now)] },

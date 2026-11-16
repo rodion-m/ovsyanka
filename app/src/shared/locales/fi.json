@@ -142,7 +142,6 @@
   "Empty the Trash?": "Tyhjennetäänkö roskakori?",
   "English": "Englanti",
   "English only": "Vain englanti",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Vain englanti on nopeampi ja tarkempi. Valitse Monikielinen muunkielisiin kokouksiin.",
   "Everyone else": "Kaikki muut",
   "Everything stays on your Mac.": "Kaikki pysyy Macillasi.",
   "Everything stays on your computer.": "Kaikki pysyy tietokoneellasi.",
@@ -185,7 +184,6 @@
   "Hide Sidebar": "Piilota sivupalkki",
   "Hide transcript": "Piilota litterointi",
   "Hide {app}": "Kätke {app}",
-  "Highest quality": "Paras laatu",
   "House": "Talo",
   "I'll send a draft by Friday.": "Lähetän luonnoksen perjantaihin mennessä.",
   "Icon": "Kuvake",
@@ -506,7 +504,6 @@
   "Yogurt is recording": "Yogurt tallentaa",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt ottaa litteroinnin käyttöön. Tämä tehdään kerran, sitten kaikki toimii Macillasi.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt ottaa litteroinnin käyttöön. Tämä tehdään kerran, sitten kaikki toimii tietokoneellasi.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt kuuntelee, mitä kieltä puhutaan. Valitse tämä kokouksiin, jotka eivät ole englanniksi.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt tarvitsee Macin, jossa on vähintään 8 Gt muistia.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt toimii kokonaan tietokoneellasi, eikä tämä kone ole tarpeeksi tehokas. Se tarvitsee vähintään 8 Gt muistia.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt lukee Zoomin, Meetin ja Teamsin näyttämät nimet, joten litteroinnissa näkyy puhuja eikä Muut.",
@@ -678,5 +675,9 @@
   "Keep audio recordings after meetings": "Säilytä äänitallenteet kokousten jälkeen",
   "Recording deleted": "Tallenne poistettu",
   "When off, new meetings' audio is deleted once the summary is saved.": "Pois päältä uusien kokousten ääni poistetaan yhteenvedon tallennuttua.",
-  "New recording": "Uusi tallennus"
+  "New recording": "Uusi tallennus",
+  "Russian": "Venäjä",
+  "Transcribes Russian in Cyrillic": "Kirjoittaa venäjän kyrillisin kirjaimin",
+  "Choose English or Russian, or let Yogurt detect the language.": "Valitse englanti tai venäjä tai anna Yogurtin tunnistaa kieli.",
+  "Yogurt detects the spoken language automatically.": "Yogurt tunnistaa puhutun kielen automaattisesti."
 }

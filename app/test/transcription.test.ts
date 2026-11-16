@@ -43,7 +43,7 @@ const disposers: Array<() => void> = []
 afterEach(async () => { disposers.splice(0).forEach((d) => d()); await settleTranscription(2000); stopTranscriptionServer() })
 
 /** both hooks over one shared start/stop fan-out, registered in the order asked for */
-function rig(order: 'capture-first' | 'transcription-first', t: { transcriber?: (c: Chunk, heard?: (language: string, chars: number) => void) => Promise<Line[]> | Line[]; modelPath?: () => string | undefined; refresh?: (id: string) => void; holdMs?: number } = {}) {
+function rig(order: 'capture-first' | 'transcription-first', t: { transcriber?: (c: Chunk, heard?: (language: string, chars: number) => void) => Promise<Line[]> | Line[]; modelPath?: () => string | undefined; refresh?: (id: string) => void; holdMs?: number } & Pick<Parameters<typeof hookTranscription>[0], 'transcriberFactory' | 'spoken' | 'quickReads' | 'maxQueuedMs'> = {}) {
   const starts: Array<(m: Meeting) => void> = [], stops: Array<(m: Meeting) => void> = []
   const onStart = (fn: (m: Meeting) => void) => { starts.push(fn); return () => {} }
   const onStop = (fn: (m: Meeting) => void) => { stops.push(fn); return () => {} }
@@ -52,6 +52,7 @@ function rig(order: 'capture-first' | 'transcription-first', t: { transcriber?: 
   const hookT = () => disposers.push(hookTranscription({
     store, modelPath: t.modelPath ?? (() => '/model.bin'), send: (s) => sent.push(`${s.track}:${s.text}`), warn: (c) => warns.push(c),
     refresh: t.refresh, holdMs: t.holdMs, transcriber: 'transcriber' in t ? t.transcriber : async (c) => says(c), onStart, onStop, pidFile: undefined,
+    transcriberFactory: t.transcriberFactory, spoken: t.spoken, quickReads: t.quickReads, maxQueuedMs: t.maxQueuedMs,
   }))
   const hookC = () => hookCapture({
     dirOf: (id) => `/m/${id}`, onStart, onStop, stopMeeting: (id) => stops.forEach((f) => f({ id } as Meeting)),
@@ -68,6 +69,73 @@ function rig(order: 'capture-first' | 'transcription-first', t: { transcriber?: 
 }
 
 describe('live transcription of a meeting', () => {
+  it('uses a per-meeting subscription transcriber without a local model or speculative requests', async () => {
+    const requests: Array<{ partial: boolean; language?: string; prompt: string }> = []
+    const factory = vi.fn<NonNullable<Parameters<typeof hookTranscription>[0]['transcriberFactory']>>(o => async (c, options) => {
+      requests.push({ partial: !!options?.partial, language: o.language(), prompt: o.prompt() })
+      o.onLanguage(c.track, 'russian', 40, true)
+      return [{ track: c.track, startMs: c.startMs, endMs: c.startMs + 1000, text: 'Алексей пришлёт отчёт в пятницу.' }]
+    })
+    const r = rig('transcription-first', {
+      modelPath: () => { throw new Error('Must not load Whisper') }, transcriberFactory: factory,
+      quickReads: false, spoken: () => 'ru',
+    })
+    const m = meeting()
+    store.updateMeeting(m.id, { attendees: [{ name: 'Алексей', email: null }] })
+    r.begin(m)
+    r.procs[0].say('them', 50_000)
+    await r.stop(m)
+    expect(factory).toHaveBeenCalledTimes(1)
+    expect(requests.length).toBeGreaterThan(0)
+    expect(requests.every(request => !request.partial && request.language === 'ru' && request.prompt.includes('Алексей'))).toBe(true)
+    expect(store.meeting(m.id)).toMatchObject({ language: 'russian' })
+    expect(store.meeting(m.id)?.transcriptionPending).not.toBe(true)
+    expect(store.segments(m.id)[0]).toMatchObject({ startMs: 50_000, text: 'Алексей пришлёт отчёт в пятницу.' })
+    expect(r.warns).toEqual([])
+  })
+
+  it('keeps original audio pending when a delayed provider overflows the bounded queue', async () => {
+    const r = rig('transcription-first', { maxQueuedMs: 500 }), m = meeting()
+    r.begin(m)
+    r.procs[0].say('them', 500)
+    await r.stop(m)
+    expect(r.warns).toContain('falling-behind')
+    expect(store.meeting(m.id)?.transcriptionPending).toBe(true)
+  })
+
+  it('drains a stopped Russian meeting in Russian after the next meeting selects English', async () => {
+    let spoken: Spoken = 'ru', release!: () => void
+    const gate = new Promise<void>(resolve => { release = resolve })
+    const requests: Array<{ name: string; language?: string }> = []
+    let held = false
+    const r = rig('transcription-first', {
+      quickReads: false, spoken: () => spoken,
+      transcriberFactory: o => async c => {
+        const name = o.prompt().includes('Алексей') ? 'Алексей' : 'Dana'
+        requests.push({ name, language: o.language() })
+        if (name === 'Алексей' && !held) { held = true; await gate }
+        return says(c)
+      },
+    })
+    const a = meeting(), b = meeting()
+    store.updateMeeting(a.id, { attendees: [{ name: 'Алексей', email: null }] })
+    store.updateMeeting(b.id, { attendees: [{ name: 'Dana', email: null }] })
+    r.begin(a)
+    r.procs[0].say('them', 0)
+    r.procs[0].say('them', 2000)
+    const stoppedA = r.stop(a)
+    spoken = 'en'
+    r.begin(b)
+    r.procs[1].say('them', 10_000)
+    const stoppedB = r.stop(b)
+    release()
+    await Promise.all([stoppedA, stoppedB])
+    expect(requests.filter(r => r.name === 'Алексей')).toEqual([
+      { name: 'Алексей', language: 'ru' }, { name: 'Алексей', language: 'ru' },
+    ])
+    expect(requests.filter(r => r.name === 'Dana')).toEqual([{ name: 'Dana', language: 'en' }])
+  })
+
   it('only clears pending audio after transcription saves, and retains older unfinished sessions', async () => {
     const r = rig('transcription-first'), m = meeting()
     r.begin(m)

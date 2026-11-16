@@ -143,7 +143,6 @@
   "Empty the Trash?": "Goliți Coșul?",
   "English": "Engleză",
   "English only": "Doar engleză",
-  "English only is faster and more accurate. Pick Multi-language for meetings in other languages.": "Doar engleza e mai rapidă și mai precisă. Alegeți Multilingv pentru întâlniri în alte limbi.",
   "Everyone else": "Toți ceilalți",
   "Everything stays on your Mac.": "Totul rămâne pe Mac-ul dvs.",
   "Everything stays on your computer.": "Totul rămâne pe computerul dvs.",
@@ -187,7 +186,6 @@
   "Hide Sidebar": "Ascundeți bara laterală",
   "Hide transcript": "Ascundeți transcrierea",
   "Hide {app}": "Ascunde {app}",
-  "Highest quality": "Cea mai bună calitate",
   "House": "Casă",
   "I'll send a draft by Friday.": "Trimit o ciornă până vineri.",
   "Icon": "Pictogramă",
@@ -510,7 +508,6 @@
   "Yogurt is recording": "Yogurt înregistrează",
   "Yogurt is setting up transcription. This happens once, then it all runs on your Mac.": "Yogurt pregătește transcrierea. Se întâmplă o singură dată, apoi totul rulează pe Mac-ul dvs.",
   "Yogurt is setting up transcription. This happens once, then it all runs on your computer.": "Yogurt pregătește transcrierea. Se întâmplă o singură dată, apoi totul rulează pe computerul dvs.",
-  "Yogurt listens for the language being spoken. Pick it for meetings that are not in English.": "Yogurt recunoaște limba vorbită. Alegeți asta pentru întâlnirile care nu sunt în engleză.",
   "Yogurt needs a Mac with at least 8 GB of memory.": "Yogurt are nevoie de un Mac cu cel puțin 8 GB de memorie.",
   "Yogurt runs entirely on your computer, and this one isn't strong enough. It needs at least 8 GB of memory.": "Yogurt rulează în întregime pe computerul tău, iar acesta nu este suficient de puternic. Are nevoie de cel puțin 8 GB de memorie.",
   "Yogurt reads the names Zoom, Meet and Teams show, so your transcript says who spoke instead of Them.": "Yogurt citește numele afișate de Zoom, Meet și Teams, ca transcrierea să spună cine a vorbit în loc de Ceilalți.",
@@ -693,5 +690,9 @@
   "Keep audio recordings after meetings": "Păstrează înregistrările audio după întâlniri",
   "Recording deleted": "Înregistrare ștearsă",
   "When off, new meetings' audio is deleted once the summary is saved.": "Când e oprit, sunetul întâlnirilor noi se șterge după salvarea rezumatului.",
-  "New recording": "Înregistrare nouă"
+  "New recording": "Înregistrare nouă",
+  "Russian": "Rusă",
+  "Transcribes Russian in Cyrillic": "Transcrie rusa cu caractere chirilice",
+  "Choose English or Russian, or let Yogurt detect the language.": "Alegeți engleza sau rusa sau lăsați Yogurt să detecteze limba.",
+  "Yogurt detects the spoken language automatically.": "Yogurt detectează automat limba vorbită."
 }
