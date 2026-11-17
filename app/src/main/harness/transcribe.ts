@@ -57,10 +57,20 @@ export function parseTranscript(text: string, duration: number): Transcript {
   return { ...(typeof object.language === 'string' ? { language: object.language.trim() } : {}), segments }
 }
 
+/** Live probe on synthetic noise with no speech (9 requests): gemini-3.8-flash invented sentences from the vocabulary line on 2 (15 s of clicks, 90 s of room tone), reporting SUCCESS. */
+export const MIN_CLEAR_SPEECH_MS = 300
+/** Only chunks shorter than this are skipped for lack of clear speech; longer noise-only stretches are still sent and can rarely produce invented text. */
+export const SKIP_MAX_SAMPLES = 30 * 16_000
+
 export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: string; signal: AbortSignal; transcribe: (request: AudioRequest) => Promise<string> }, callbacks: TranscribeOptions): Transcribe {
   return async (chunk, options) => {
     // Speculative reads of every partial would multiply remote requests. Only completed VAD chunks are sent.
     if (options?.partial) return []
+    // A short chunk with almost no clear speech is the noise case where the model invents text; don't spend a CLI call on it.
+    if (chunk.clearMs !== undefined && chunk.clearMs < MIN_CLEAR_SPEECH_MS && chunk.samples.length < SKIP_MAX_SAMPLES) {
+      console.log(`transcriber skipped ${chunk.track} chunk at ${chunk.startMs} ms: ${(chunk.samples.length / 16_000).toFixed(1)} s of audio with ${chunk.clearMs} ms of clear speech`)
+      return []
+    }
     assertRunning(o.signal)
     if (!Number.isFinite(chunk.startMs) || chunk.startMs < 0 || chunk.samples.length > 16_000 * 15 * 60) throw new HarnessError('Invalid or oversized recording chunk.')
     if (!chunk.samples.length) return []

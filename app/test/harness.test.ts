@@ -221,6 +221,20 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     await expect(stat(fixture.log)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(fixture.tempDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+  it('skips a short chunk with almost no clear speech without a CLI call', async () => {
+    const fixture = await agyFixture(), cb = callbacks(), transcribe = fixture.harness.transcriber(cb)
+    const clip = (seconds: number, clearMs?: number): Chunk => ({ track: 'them', startMs: 12_000, samples: new Float32Array(seconds * 16_000), ...(clearMs === undefined ? {} : { clearMs }) })
+    const heard_line = [{ track: 'them' as const, startMs: 12_250, endMs: 13_500, text: heard.segments[0].text }]
+    // 10 s with 200 ms clear: the noise case where the model invents text — no request, no lines
+    expect(await transcribe(clip(10, 200))).toEqual([])
+    await expect(stat(fixture.log)).rejects.toMatchObject({ code: 'ENOENT' })
+    // at the 0.3 s clear-speech bound, past the 30 s audio bound, and with no clearMs at all: sent as before
+    for (const c of [clip(10, 300), clip(40, 0), clip(10)]) {
+      expect(await transcribe(c)).toEqual(heard_line)
+    }
+    expect(await fixture.calls()).toHaveLength(3)
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
   it('accepts silence without a language callback', async () => {
     const fixture = await agyFixture('{"segments":[]}'), cb = callbacks()
     expect(await fixture.harness.transcriber(cb)(chunk())).toEqual([])
