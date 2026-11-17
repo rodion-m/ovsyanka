@@ -227,8 +227,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const recording = m.state === 'recording'
   /** in the Trash: it can be read and restored, not recorded into */
   const trashed = m.trashedAt != null
-  /** remote audio a quit or crash left untranscribed is still on disk: the transcript is incomplete until it is sent again */
-  const transcriptPending = m.transcriptionPending === true && (m.state === 'stopped' || m.state === 'done') && !trashed
+  /** remote audio a quit or crash left untranscribed is still on disk, and nothing is sending it right now */
+  const transcriptPending = m.transcriptIncomplete === true && (m.state === 'stopped' || m.state === 'done') && !trashed
   const retryTranscript = () => {
     if (retryingTranscript) return
     setRetryingTranscript(true)

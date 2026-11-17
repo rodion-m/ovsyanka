@@ -6,6 +6,7 @@ import { chunker, type Chunk } from './chunker'
 import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
+import type { Spoken } from '../../shared/spoken'
 import { takeBatch, type Batch } from './batch'
 
 type Out = Omit<Segment, 'id'>
@@ -34,7 +35,9 @@ export function createPipeline(p: {
   /** Combine queued speech for a remote provider into packed batches of up to this much audio, sent once the oldest queued chunk is this old in meeting time or at the end. Local reads stay unchanged. */
   batchMs?: number
   /** remote path only (batchMs > 0): every queued chunk is kept on disk until its lines are saved, so a quit or crash can send it again */
-  spool?: { add(chunk: Chunk): string | undefined; remove(keys: string[]): void }
+  spool?: { add(chunk: Chunk, spoken?: Spoken): string | undefined; remove(keys: string[]): void; bump?(key: string): void }
+  /** the meeting's spoken language setting as its sidecars should remember it; read each time a chunk is queued */
+  spoken?: () => Spoken | undefined
   /** for tests: stand in for the echo detector */
   echoForTests?: EchoCheck
   /** trouble worth telling the person about; each kind is reported once */
@@ -200,8 +203,14 @@ export function createPipeline(p: {
         // a closed pipeline or an aborted request (the app is going away) is never retried
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
         if (retries > 0 && !cancelled) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
-        // its audio stays in the spool for the next launch or a Retry; only the map entry can go
-        for (const s of sources) spoolKeys.delete(s)
+        // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
+        // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
+        // chunks that never went out count nothing
+        for (const s of sources) {
+          const key = spoolKeys.get(s)
+          spoolKeys.delete(s)
+          if (!cancelled && key !== undefined) { try { p.spool?.bump?.(key) } catch (err) { console.error('counting a transcription retry failed', err) } }
+        }
         warn('transcribe-failed'); settle(t, chunkEnd)
       })
       .finally(() => { if (!retrying) { running[t] = false; pump(t) } })
@@ -213,7 +222,7 @@ export function createPipeline(p: {
     // kept on disk before anything can drop it: a failed or aborted batch, and a queue-overflow drop, all stay for recovery
     if (spooling) {
       let key: string | undefined
-      try { key = p.spool!.add(c) } catch (e) { console.error('keeping queued audio failed', e) }
+      try { key = p.spool!.add(c, p.spoken?.()) } catch (e) { console.error('keeping queued audio failed', e) }
       if (key !== undefined) spoolKeys.set(c, key)
     }
     let size = q.reduce((n, x) => n + x.samples.length, 0)

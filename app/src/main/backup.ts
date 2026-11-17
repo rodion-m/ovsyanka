@@ -4,10 +4,11 @@ import { backfillPeople, mergePeople } from './people'
 import { constants, existsSync } from 'node:fs'
 import { cp, lstat, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { isId } from './ipcArgs'
 import { pack, unpack } from './zip'
+import { SPOOL_DIR } from './asr/spool'
 
 /**
  * A backup is one zip: manifest.json, a snapshot of yogurt.db and meetings/<id>/ with each meeting's recordings.
@@ -152,9 +153,11 @@ export async function exportBackup(o: { db: DatabaseSync; meetingsDir: string; o
     for (const id of ids) {
       const src = join(o.meetingsDir, id)
       if (!existsSync(src)) continue
-      // a clone on the Mac's disk: instant, and no extra space until one side changes
+      // a clone on the Mac's disk: instant, and no extra space until one side changes.
+      // the remote path's on-disk spool never crosses a backup: a restore must not find sidecars without their audio
+      const spoolDir = join(src, SPOOL_DIR)
       try {
-        await cp(src, join(work, 'meetings', id), { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (s) => !scratch(s) })
+        await cp(src, join(work, 'meetings', id), { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (s) => !scratch(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
       } catch (e) {
         // Recordings can be deleted during export; the saved text still makes a complete backup.
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
@@ -207,7 +210,8 @@ export async function importBackup(o: { db: DatabaseSync; meetingsDir: string; z
       if (!existsSync(src) || existsSync(dest)) continue
       await mkdir(o.meetingsDir, { recursive: true })
       copied.push(dest)
-      await cp(src, dest, { recursive: true, filter: plainOnly })
+      const spoolDir = join(src, SPOOL_DIR)
+      await cp(src, dest, { recursive: true, filter: async (s) => await plainOnly(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
     }
     const r = mergeBackup(o.db, from)
     return { ok: true, added: r.added.length, skipped: r.skipped }

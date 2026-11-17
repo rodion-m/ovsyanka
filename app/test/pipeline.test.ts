@@ -8,7 +8,7 @@ const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE)
 const quiet = (sec: number) => new Float32Array(Math.round(sec * RATE))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string; spool?: { add(chunk: Chunk): string | undefined; remove(keys: string[]): void } } = {}) {
+function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string; spool?: { add(chunk: Chunk, spoken?: string): string | undefined; remove(keys: string[]): void; bump?(key: string): void } } = {}) {
   const warns: string[] = []
   const saved: Array<{ track: string; text: string; speaker: string | null; meetingId: string }> = []
   const sent: string[] = []
@@ -278,15 +278,16 @@ describe('pipeline with long remote batches', () => {
 })
 
 describe('pipeline audio spool (remote path only)', () => {
-  /** a fake on-disk spool: every add/remove is recorded */
+  /** a fake on-disk spool: every add/remove/bump is recorded */
   function fakeSpool() {
-    const added: Chunk[] = [], removed: string[][] = []
+    const added: Chunk[] = [], removed: string[][] = [], bumped: string[] = []
     let n = 0
     return {
-      added, removed,
+      added, removed, bumped,
       spool: {
         add: (c: Chunk) => { added.push(c); return `k${n++}` },
         remove: (keys: string[]) => { removed.push(keys) },
+        bump: (key: string) => { bumped.push(key) },
       },
     }
   }
@@ -348,6 +349,30 @@ describe('pipeline audio spool (remote path only)', () => {
     expect(f.added).toEqual([])
     expect(f.removed).toEqual([])
     expect(s.saved).toHaveLength(2)
+  })
+
+  it('counts one attempt per chunk only when its batch fails for good', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fakeSpool()
+      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
+      s.speak('them', 0); s.speak('them', 5000)
+      const done = s.p.finish()
+      await vi.advanceTimersByTimeAsync(5000) // first send + the one in-pipeline retry
+      await done
+      // every queued chunk went out in the failed batch: one bump each, not one per send
+      expect(f.bumped.slice().sort()).toEqual(f.added.map((_, i) => `k${i}`).sort())
+      expect(f.removed).toEqual([])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('counts no attempt for an aborted batch', async () => {
+    const f = fakeSpool()
+    const s = setup(() => { const e = new Error('AI request cancelled'); e.name = 'AbortError'; throw e }, { batchMs: 60_000, spool: f.spool })
+    s.speak('them', 0)
+    await s.p.finish()
+    expect(f.bumped).toEqual([])
+    expect(f.removed).toEqual([])
   })
 })
 

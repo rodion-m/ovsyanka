@@ -8,6 +8,7 @@ import { openStore, type Store } from '../src/main/store'
 import { BACKUP_FORMAT, carriedTables, checkManifest, exportBackup, importBackup, meetingTables, mergeBackup } from '../src/main/backup'
 import { Library } from '../src/main/library/store'
 import { pack, packPortable, unpack, unpackPortable } from '../src/main/zip'
+import { SPOOL_DIR } from '../src/main/asr/spool'
 
 vi.mock('../src/main/zip', async (original) => {
   const actual = await original<typeof import('../src/main/zip')>()
@@ -267,6 +268,35 @@ describe('backup file', { timeout: 20_000 }, () => {
     expect(readFileSync(join(bDir, m.id, 'me.m4a'), 'utf8')).toBe('my voice')
     expect(readFileSync(join(bDir, m.id, 'original', 'me-source-hash.m4a'), 'utf8')).toBe('retained full-quality voice')
     expect(await importBackup({ db: b.db, meetingsDir: bDir, zip: out })).toEqual({ ok: true, added: 0, skipped: 1 })
+  })
+
+  it('never carries the pending-audio spool: no sidecars without their audio on a restore', async () => {
+    const a = fresh(), aDir = tmp()
+    const m = fill(a, 'Pending audio', 'spool')
+    mkdirSync(join(aDir, m.id, SPOOL_DIR), { recursive: true })
+    writeFileSync(join(aDir, m.id, SPOOL_DIR, 'them-0.json'), JSON.stringify({ track: 'them', startMs: 0, attempts: 0 }))
+    writeFileSync(join(aDir, m.id, SPOOL_DIR, 'them-0.f32'), 'queued audio')
+    writeFileSync(join(aDir, m.id, 'me.m4a'), 'voice')
+    const out = join(tmp(), 'Yogurt backup.zip')
+    await exportBackup({ db: a.db, meetingsDir: aDir, out, appVersion: '1' })
+
+    const look = tmp()
+    await unpack(out, look)
+    expect(existsSync(join(look, 'meetings', m.id, SPOOL_DIR))).toBe(false)
+    expect(readFileSync(join(look, 'meetings', m.id, 'me.m4a'), 'utf8')).toBe('voice')
+
+    // and an archive made before the exclusion (sidecars inside) restores without them either
+    const old = tmp()
+    a.db.exec(`VACUUM INTO '${join(old, 'yogurt.db').replace(/'/g, "''")}'`)
+    mkdirSync(join(old, 'meetings', m.id, SPOOL_DIR), { recursive: true })
+    writeFileSync(join(old, 'meetings', m.id, SPOOL_DIR, 'them-0.json'), '{}')
+    writeFileSync(join(old, 'meetings', m.id, SPOOL_DIR, 'them-0.f32'), 'queued audio')
+    writeFileSync(join(old, 'manifest.json'), JSON.stringify({ format: BACKUP_FORMAT, app: '1', createdAt: 1, meetings: 1 }))
+    const legacy = join(tmp(), 'legacy.zip')
+    await pack(old, legacy)
+    const b = fresh(), bDir = tmp()
+    expect(await importBackup({ db: b.db, meetingsDir: bDir, zip: legacy })).toEqual({ ok: true, added: 1, skipped: 0 })
+    expect(existsSync(join(bDir, m.id, SPOOL_DIR))).toBe(false)
   })
 
   // a Mac zips with ditto and Windows and Linux with packPortable: each restores the other's, Opus and AAC recordings alike

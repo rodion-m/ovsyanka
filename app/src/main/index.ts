@@ -49,7 +49,7 @@ import { isId, text } from './ipcArgs'
 import { hookMics } from './mics'
 import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
-import { hookTranscription, onWhisperGpuOff, meetingLanguage, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptPartials, transcribing } from './asr'
+import { hookTranscription, onWhisperGpuOff, meetingLanguage, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcriptPartials, transcribing } from './asr'
 import { meetingsWithSpool } from './asr/spool'
 import { hookCallNames, type Watch } from './callNames'
 import { helperWatch, killAllWatches } from './callNames/watch'
@@ -77,6 +77,8 @@ import { hookFolders } from './foldersIpc'
 import { hookMcp } from './mcp'
 import { startedHidden } from './mcp/paths'
 import { deleteRecording } from './deleteRecording'
+import { recoverMeetingTranscript } from './transcriptRecovery'
+import { runCatchUp } from './startup'
 import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
 import { finishQuit, hookUpdates, isPreviewBuild, isSubscriptionBuild, updateOfferChanged, updatesOn } from './updates'
 import type { NoteSaveResult, StartResult } from '../shared/types'
@@ -540,6 +542,10 @@ app.whenReady().then(() => {
   },
     nameOf: (id, a, b) => callNames.nameFor(id, a, b),
     refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
+    // the note's incomplete-transcript banner may have flipped: reload the meeting
+    changed: (id) => win?.webContents.send('meetings:changed'),
+    // a meeting being resumed gets a fresh session: spool recovery must not open one beside it
+    resuming: (id) => resumingId === id,
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, maxQueuedMs: 15 * 60_000 } : {}),
@@ -614,7 +620,8 @@ app.whenReady().then(() => {
   const removeRecording = (id: string, automatic = false) => deleteRecording(id, {
     store, dirOf: id => join(userDataDir(), 'meetings', id),
     busy: id => resumingId === id || stopSavePending(id),
-    settle: async id => { await rejoined; await recordingFinished(id); await transcriptFinished(id) },
+    // an in-flight spool recovery finishes first: its lines are saved before the audio can go
+    settle: async id => { await pendingRecovery(id); await rejoined; await recordingFinished(id); await transcriptFinished(id) },
     removed: id => { for (const w of BrowserWindow.getAllWindows()) w.webContents.send('audio:deleted', id) },
     ...(automatic ? { keep: endedAt => keepsRecording(loadSettings(settingsFile), endedAt) } : {}),
   })
@@ -639,6 +646,8 @@ app.whenReady().then(() => {
     const analysis = notes.suspendForResume(id)
     let started = false, timer: NodeJS.Timeout | undefined
     try {
+      // an in-flight spool recovery of this meeting finishes first (resumingId already keeps new ones out)
+      await pendingRecovery(id)
       await Promise.race([
         Promise.all([recordingFinished(id), transcriptFinished(id), callNames.finished(id), analysis.settled]),
         new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Previous recording is still finishing')), resumeTranscriptWaitMs(!!harness)) }),
@@ -651,6 +660,8 @@ app.whenReady().then(() => {
       if (!append.startMs) append.startMs = store.segments(id, { hidden: true }).reduce((end, s) => Math.max(end, s.endMs), Math.max(append.startMs, store.meeting(id)?.durationMs ?? 0))
       // Another explicit start may have happened while the old files were settling.
       if (finishing || activeMeeting()) return { error: 'failed' }
+      // right before capture starts: whatever transcript work is left must be done
+      await transcriptFinished(id)
       const m = resumeMeeting(id, append)
       if (!m) return { error: 'failed' }
       started = true; goTo(`/note/${id}`)
@@ -662,10 +673,17 @@ app.whenReady().then(() => {
       clearTimeout(timer); resumingId = null; analysis.release(!started)
     }
   })
+  // what a finished spool recovery feeds back into: unedited notes written again, and the library re-indexed
+  const transcriptFollowUp = {
+    segmentCount: (id: string) => store.segments(id).length,
+    notesEdited: (id: string) => store.notes(id).edited,
+    writeAgain: (id: string) => notes.writeAgain(id),
+    scheduleIndex: () => indexer.schedule(),
+  }
   // a pending remote transcript's audio is still on disk: send it again, this time including the chunks that failed enough times to be skipped
   ipcMain.handle('meetings:retry-transcription', async (_e, id: unknown) => {
     if (!isId(id) || !store.meeting(id)) return
-    await recoverTranscription(id, { retry: true })
+    await recoverMeetingTranscript(id, { retry: true }, transcriptFollowUp)
     win?.webContents.send('meetings:changed')
   })
   // Both Ask surfaces share saved conversations and the same recording-first model queue.
@@ -772,17 +790,14 @@ app.whenReady().then(() => {
     const meetingsDir = join(userDataDir(), 'meetings'), active = activeMeeting()?.id
     for (const id of meetingsWithSpool(meetingsDir)) {
       const m = store.meeting(id)
-      if (id === active || !m || m.trashedAt != null) continue
-      try {
-        const before = store.segments(id).length
-        await recoverTranscription(id)
-        // lines recovered after the notes were written: unedited notes are written again (the person's own edits stand)
-        if (store.segments(id).length > before && !store.notes(id).edited) void notes.writeAgain(id)
-      } catch (e) { console.error('recovering a pending transcript failed', id, e) }
+      if (id === active || id === resumingId || !m || m.trashedAt != null) continue
+      try { await recoverMeetingTranscript(id, undefined, transcriptFollowUp) } catch (e) { console.error('recovering a pending transcript failed', id, e) }
     }
   }
-  // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
-  const catchUp = () => { if (!caughtUp && setup.state.phase === 'ready') { caughtUp = true; void rejoined.catch(e => console.warn('audio startup repair retained its files', e)).finally(() => { void recoverPendingTranscripts().finally(() => { notes.recover(); folderSuggestions.refresh(); void indexer.schedule() }) }) } }
+  // notes recovery, folder suggestions and indexing run first, as before spool recovery existed; pending remote
+  // audio is recovered after them, in the background, one meeting at a time
+  const catchUp = () => { if (!caughtUp && setup.state.phase === 'ready') { caughtUp = true
+    runCatchUp({ rejoined, notes, folders: folderSuggestions, index: indexer, recoverTranscripts: recoverPendingTranscripts }) } }
   setup.onState(catchUp)
   app.on('will-quit', killAllWatches)
   app.on('will-quit', killAllHelpers)
@@ -854,7 +869,7 @@ app.whenReady().then(() => {
   ipcMain.handle('meetings:get', (_e, id: unknown) => {
     const m = isId(id) ? getMeeting(id) : undefined
     if (m) store.noteOpened(m.id)
-    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}) }
+    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}), transcriptIncomplete: transcriptIncomplete(m.id) }
   })
   // the person's own title for a note
   ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') renameMeeting(id, title) })
@@ -890,7 +905,7 @@ app.whenReady().then(() => {
     store, dirOf: meetingDir,
     cancel: (id) => { queue.cancel(id); conversations.forgetMeeting(id); indexer.forget(id) },
     // Actual writer completion: deleteMeeting refuses deletion if this wait times out.
-    settle: async (id) => { await Promise.all([recordingFinished(id), transcriptFinished(id)]) },
+    settle: async (id) => { await pendingRecovery(id); await Promise.all([recordingFinished(id), transcriptFinished(id)]) },
     removed: (id) => {
       notes.forgetDrafts(id)
       win?.webContents.send('meetings:changed'); win?.webContents.send('folders:changed')

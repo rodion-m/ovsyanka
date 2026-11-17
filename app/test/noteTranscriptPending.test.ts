@@ -45,7 +45,7 @@ function find(node: ReactNode, id: string): ReactElement<Record<string, unknown>
 }
 beforeEach(() => {
   vi.clearAllMocks()
-  meeting = { id: 'pending-fixture', title: 'Pending fixture', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'stopped', language: null, titleSource: 'user', transcriptionPending: true }
+  meeting = { id: 'pending-fixture', title: 'Pending fixture', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'stopped', language: null, titleSource: 'user', transcriptionPending: true, transcriptIncomplete: true }
   notes = { meetingId: meeting.id, mine: '', enhanced: null, edited: false, status: 'done', draft: '', peopleChanged: false }
   retryTranscription.mockResolvedValue(undefined)
   vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), yogurt: {
@@ -64,11 +64,12 @@ it('shows the incomplete-transcript banner on a pending stopped meeting and Retr
   expect(retryTranscription).toHaveBeenCalledExactlyOnceWith(meeting.id)
 })
 
-it('hides the banner once the transcript is no longer pending, while recording, and in the Trash', async () => {
-  meeting = { ...meeting, transcriptionPending: false }
+it('hides the banner once nothing is really waiting, while recording, and in the Trash', async () => {
+  // the raw pending flag alone never shows it: the computed field decides
+  meeting = { ...meeting, transcriptIncomplete: false }
   await render(); await render()
   expect(find(tree, 'note-transcript-pending')).toBeUndefined()
-  meeting = { ...meeting, transcriptionPending: true, state: 'recording', endedAt: null }
+  meeting = { ...meeting, transcriptIncomplete: true, state: 'recording', endedAt: null }
   await render(); await render()
   expect(find(tree, 'note-transcript-pending')).toBeUndefined()
   meeting = { ...meeting, state: 'stopped', endedAt: 2, trashedAt: 3 }

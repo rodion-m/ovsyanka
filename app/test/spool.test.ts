@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { createSpool, meetingsWithSpool, SPOOL_DIR, spoolDirOf } from '../src/main/asr/spool'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSpool, meetingsWithSpool, SPOOL_DIR, spoolDirOf, spoolRounds, SPOOL_ROUND_MS, type SpooledEntry } from '../src/main/asr/spool'
 import type { Chunk } from '../src/main/asr/chunker'
 
 const dirs: string[] = []
@@ -73,5 +73,84 @@ describe('the pending-audio spool', () => {
     createSpool(spoolDirOf(b)) // made but empty
     expect(meetingsWithSpool(meetings)).toEqual(['m-a'])
     expect(SPOOL_DIR).toBe('pending-audio')
+  })
+
+  it('hasEntries is a metadata-only check: sidecars count, audio is never read', () => {
+    const d = dir(), spool = createSpool(d)
+    expect(spool.hasEntries()).toBe(false)
+    const key = spool.add(chunk('them', 0, pcm(1600)))!
+    expect(spool.hasEntries()).toBe(true)
+    spool.remove([key])
+    expect(spool.hasEntries()).toBe(false)
+    // a corrupt sidecar still counts as something waiting until it is cleaned
+    writeFileSync(join(d, 'them-9999.json'), JSON.stringify({ track: 'them', startMs: 9999, attempts: 0 }))
+    expect(spool.hasEntries()).toBe(true)
+    spool.entries()
+    expect(spool.hasEntries()).toBe(false)
+  })
+
+  it('entries carry the audio length and the frozen spoken language from the sidecar', () => {
+    const spool = createSpool(dir())
+    spool.add(chunk('them', 0, pcm(1600)), 'ru')
+    spool.add(chunk('me', 5000, pcm(800)))
+    const all = spool.entries()
+    expect(all).toHaveLength(2)
+    const ru = all.find((e) => e.track === 'them')!
+    expect(ru.spoken).toBe('ru')
+    expect(ru.durationMs).toBeCloseTo(100) // 1600 samples at 16 per ms
+    expect(all.find((e) => e.track === 'me')!.spoken).toBeUndefined()
+    expect(all.find((e) => e.track === 'me')!.durationMs).toBeCloseTo(50)
+  })
+
+  it('a sidecar without its audio is corrupt: logged once and removed, not treated as drained', () => {
+    const d = dir(), spool = createSpool(d)
+    const key = spool.add(chunk('them', 0, pcm(1600)))!
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      writeFileSync(join(d, 'them-9999.json'), JSON.stringify({ track: 'them', startMs: 9999, attempts: 0 }))
+      expect(spool.entries().map((e) => e.key)).toEqual([key])
+      expect(existsSync(join(d, 'them-9999.json'))).toBe(false)
+      expect(existsSync(join(d, 'them-9999.f32'))).toBe(false)
+      expect(err.mock.calls.filter((c) => String(c[0]).includes('lost its sound file'))).toHaveLength(1)
+      // seen again (recreated): removed silently, never logged twice
+      writeFileSync(join(d, 'them-9999.json'), JSON.stringify({ track: 'them', startMs: 9999, attempts: 0 }))
+      spool.entries()
+      expect(existsSync(join(d, 'them-9999.json'))).toBe(false)
+      expect(err.mock.calls.filter((c) => String(c[0]).includes('lost its sound file'))).toHaveLength(1)
+    } finally { err.mockRestore() }
+  })
+
+  it('entries of older spools without durationMs fall back to the audio file size', () => {
+    const d = dir(), spool = createSpool(d)
+    const key = spool.add(chunk('them', 0, pcm(1600)))!
+    // rewrite the sidecar the way the first spool version wrote it: no durationMs, no spoken
+    writeFileSync(join(d, `${key}.json`), JSON.stringify({ track: 'them', startMs: 0, attempts: 0 }))
+    const [e] = spool.entries()
+    expect(e.durationMs).toBeCloseTo(100)
+    expect(e.spoken).toBeUndefined()
+  })
+})
+
+describe('spoolRounds', () => {
+  const entry = (track: 'me' | 'them', startMs: number, durationMs: number): SpooledEntry =>
+    ({ key: `${track}-${startMs}`, track, startMs, durationMs, attempts: 0 })
+
+  it('caps each track at the round length, keeping meeting order', () => {
+    const entries = [
+      entry('them', 0, 60_000), entry('me', 1000, 60_000), entry('them', 120_000, 60_000),
+      entry('them', 240_000, 60_000), entry('me', 300_000, 60_000),
+    ]
+    const rounds = spoolRounds(entries, 120_000)
+    // them hits the cap after two minutes: the third them entry starts a new round
+    expect(rounds.map((r) => r.map((e) => e.key))).toEqual([
+      ['them-0', 'me-1000', 'them-120000'],
+      ['them-240000', 'me-300000'],
+    ])
+  })
+
+  it('a single chunk longer than the cap still gets a round of its own', () => {
+    const rounds = spoolRounds([entry('them', 0, 999_000)], 100_000)
+    expect(rounds).toHaveLength(1)
+    expect(SPOOL_ROUND_MS).toBe(15 * 60_000)
   })
 })
