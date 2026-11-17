@@ -676,5 +676,7 @@
   "Russian": "Russisch",
   "Transcribes Russian in Cyrillic": "Schreibt Russisch in kyrillischer Schrift",
   "Choose English or Russian, or let Yogurt detect the language.": "Wähle Englisch oder Russisch oder lass Yogurt die Sprache erkennen.",
-  "Yogurt detects the spoken language automatically.": "Yogurt erkennt die gesprochene Sprache automatisch."
+  "Yogurt detects the spoken language automatically.": "Yogurt erkennt die gesprochene Sprache automatisch.",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "Das Transkript ist unvollständig: Ein Teil der Aufnahme wurde noch nicht transkribiert.",
+  "Retry": "Erneut versuchen"
 }

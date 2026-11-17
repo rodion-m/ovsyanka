@@ -631,5 +631,7 @@
   "Russian": "ロシア語",
   "Transcribes Russian in Cyrillic": "ロシア語をキリル文字で文字起こし",
   "Choose English or Russian, or let Yogurt detect the language.": "英語かロシア語を選ぶか、Yogurtに言語の自動検出を任せてください。",
-  "Yogurt detects the spoken language automatically.": "Yogurtが話されている言語を自動で検出します。"
+  "Yogurt detects the spoken language automatically.": "Yogurtが話されている言語を自動で検出します。",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "文字起こしが不完全です。録音の一部がまだ文字起こしされていません。",
+  "Retry": "再試行"
 }

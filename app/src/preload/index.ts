@@ -76,6 +76,7 @@ const api: YogurtApi = {
     stop: (id) => { ipcRenderer.send('meetings:stop', id) },
     setPaused: (id, paused) => ipcRenderer.invoke('meetings:set-paused', id, paused),
     retryStopSave: (id) => ipcRenderer.invoke('meetings:retry-stop-save', id),
+    retryTranscription: (id) => ipcRenderer.invoke('meetings:retry-transcription', id),
     rename: (id, title) => ipcRenderer.invoke('meetings:rename', id, title),
     delete: (id) => ipcRenderer.invoke('meetings:delete', id),
     trash: (id) => ipcRenderer.invoke('meetings:trash', id),

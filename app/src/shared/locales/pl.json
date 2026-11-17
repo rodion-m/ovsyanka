@@ -709,5 +709,7 @@
   "Russian": "Rosyjski",
   "Transcribes Russian in Cyrillic": "Zapisuje rosyjską mowę cyrylicą",
   "Choose English or Russian, or let Yogurt detect the language.": "Wybierz angielski lub rosyjski albo pozwól Yogurt wykryć język.",
-  "Yogurt detects the spoken language automatically.": "Yogurt automatycznie wykrywa język rozmowy."
+  "Yogurt detects the spoken language automatically.": "Yogurt automatycznie wykrywa język rozmowy.",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkrypcja jest niekompletna: część nagrania nie została jeszcze przepisana.",
+  "Retry": "Ponów"
 }

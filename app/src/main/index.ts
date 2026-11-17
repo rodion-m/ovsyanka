@@ -49,7 +49,8 @@ import { isId, text } from './ipcArgs'
 import { hookMics } from './mics'
 import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
-import { hookTranscription, onWhisperGpuOff, meetingLanguage, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptPartials, transcribing } from './asr'
+import { hookTranscription, onWhisperGpuOff, meetingLanguage, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptPartials, transcribing } from './asr'
+import { meetingsWithSpool } from './asr/spool'
 import { hookCallNames, type Watch } from './callNames'
 import { helperWatch, killAllWatches } from './callNames/watch'
 import { macFullName } from './user'
@@ -542,6 +543,7 @@ app.whenReady().then(() => {
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, maxQueuedMs: 15 * 60_000 } : {}),
+    meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),
     // Apple's on-device speech for the live words (macOS 26, Apple Silicon); fake mode has a stand-in when a test asks
@@ -639,7 +641,7 @@ app.whenReady().then(() => {
     try {
       await Promise.race([
         Promise.all([recordingFinished(id), transcriptFinished(id), callNames.finished(id), analysis.settled]),
-        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Previous recording is still finishing')), 30_000) }),
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('Previous recording is still finishing')), resumeTranscriptWaitMs(!!harness)) }),
       ])
       clearTimeout(timer)
       await rejoined
@@ -659,6 +661,12 @@ app.whenReady().then(() => {
     } finally {
       clearTimeout(timer); resumingId = null; analysis.release(!started)
     }
+  })
+  // a pending remote transcript's audio is still on disk: send it again, this time including the chunks that failed enough times to be skipped
+  ipcMain.handle('meetings:retry-transcription', async (_e, id: unknown) => {
+    if (!isId(id) || !store.meeting(id)) return
+    await recoverTranscription(id, { retry: true })
+    win?.webContents.send('meetings:changed')
   })
   // Both Ask surfaces share saved conversations and the same recording-first model queue.
   const conversations = hookConversations({
@@ -759,8 +767,22 @@ app.whenReady().then(() => {
   })
   // meetings whose notes a quit or crash cut short: caught up once the models are ready, one at a time
   let caughtUp = false
+  /** remote audio a quit or crash left untranscribed, kept in each meeting's pending-audio folder: sent again, one meeting at a time */
+  const recoverPendingTranscripts = async () => {
+    const meetingsDir = join(userDataDir(), 'meetings'), active = activeMeeting()?.id
+    for (const id of meetingsWithSpool(meetingsDir)) {
+      const m = store.meeting(id)
+      if (id === active || !m || m.trashedAt != null) continue
+      try {
+        const before = store.segments(id).length
+        await recoverTranscription(id)
+        // lines recovered after the notes were written: unedited notes are written again (the person's own edits stand)
+        if (store.segments(id).length > before && !store.notes(id).edited) void notes.writeAgain(id)
+      } catch (e) { console.error('recovering a pending transcript failed', id, e) }
+    }
+  }
   // and meetings not in the library yet (or changed since) are indexed, once nothing else is waiting
-  const catchUp = () => { if (!caughtUp && setup.state.phase === 'ready') { caughtUp = true; void rejoined.catch(e => console.warn('audio startup repair retained its files', e)).finally(() => { notes.recover(); folderSuggestions.refresh(); void indexer.schedule() }) } }
+  const catchUp = () => { if (!caughtUp && setup.state.phase === 'ready') { caughtUp = true; void rejoined.catch(e => console.warn('audio startup repair retained its files', e)).finally(() => { void recoverPendingTranscripts().finally(() => { notes.recover(); folderSuggestions.refresh(); void indexer.schedule() }) }) } }
   setup.onState(catchUp)
   app.on('will-quit', killAllWatches)
   app.on('will-quit', killAllHelpers)

@@ -8,14 +8,14 @@ const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE)
 const quiet = (sec: number) => new Float32Array(Math.round(sec * RATE))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string } = {}) {
+function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string; spool?: { add(chunk: Chunk): string | undefined; remove(keys: string[]): void } } = {}) {
   const warns: string[] = []
   const saved: Array<{ track: string; text: string; speaker: string | null; meetingId: string }> = []
   const sent: string[] = []
   let inFlight = 0, maxInFlight = 0
   const p = createPipeline({
     meetingId: 'm1',
-    holdMs: opts.holdMs ?? 60, extraWaitMs: opts.extraWaitMs, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell,
+    holdMs: opts.holdMs ?? 60, extraWaitMs: opts.extraWaitMs, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell, spool: opts.spool,
     ...(opts.echo ? { echoForTests: { echo: true, correlatedAt: () => true } } : {}),
     transcribe: async (c) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); try { return await say(c) } finally { inFlight-- } },
     // hidden echo lines are saved too, but they are not what these tests look at
@@ -274,6 +274,80 @@ describe('pipeline with long remote batches', () => {
     expect(s.saved.map((x) => x.text)).not.toContain('them words at 0')
     await s.p.finish()
     expect(s.saved.map((x) => x.text)).toContain('them words at 0')
+  })
+})
+
+describe('pipeline audio spool (remote path only)', () => {
+  /** a fake on-disk spool: every add/remove is recorded */
+  function fakeSpool() {
+    const added: Chunk[] = [], removed: string[][] = []
+    let n = 0
+    return {
+      added, removed,
+      spool: {
+        add: (c: Chunk) => { added.push(c); return `k${n++}` },
+        remove: (keys: string[]) => { removed.push(keys) },
+      },
+    }
+  }
+
+  it('keeps every queued chunk on disk and drops them only once the batch lines are saved', async () => {
+    const f = fakeSpool()
+    const s = setup((c) => [line(c, `words at ${c.startMs}`)], { batchMs: 60_000, spool: f.spool })
+    s.speak('them', 0); s.speak('them', 5000)
+    // queued for the end-of-meeting batch: on disk, nothing removed yet
+    expect(f.added.length).toBeGreaterThan(0)
+    expect(f.removed).toEqual([])
+    await s.p.finish()
+    expect(s.saved.length).toBeGreaterThan(0)
+    expect(f.removed.flat()).toEqual(f.added.map((_, i) => `k${i}`))
+  })
+
+  it('keeps the audio when the batch fails even after its retry', async () => {
+    vi.useFakeTimers()
+    try {
+      const f = fakeSpool()
+      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
+      s.speak('them', 0)
+      const done = s.p.finish()
+      await vi.advanceTimersByTimeAsync(5000)
+      await done
+      expect(s.warns).toEqual(['transcribe-failed'])
+      expect(f.removed).toEqual([])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('keeps the audio when the batch is aborted', async () => {
+    const f = fakeSpool()
+    const s = setup(() => { const e = new Error('AI request cancelled'); e.name = 'AbortError'; throw e }, { batchMs: 60_000, spool: f.spool })
+    s.speak('them', 0)
+    await s.p.finish()
+    expect(f.removed).toEqual([])
+  })
+
+  it('keeps the audio of a chunk dropped by the queue-overflow cap', async () => {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((r) => { release = r })
+    const f = fakeSpool()
+    const s = setup(async (c) => { await gate; return [line(c, 'late words')] }, { batchMs: 60_000, maxQueuedMs: 3000, spool: f.spool })
+    // enough speech to overflow the 3 s cap while the first batch is still in flight
+    for (let i = 0; i < 8; i++) s.speak('them', i * 3000)
+    expect(s.warns).toContain('falling-behind')
+    expect(s.p.stats().dropped.length).toBeGreaterThan(0)
+    release()
+    await s.p.finish()
+    // dropped chunks were spooled like the rest, but their entries were never removed: they stay for recovery
+    expect(f.added.length).toBeGreaterThan(f.removed.flat().length)
+  })
+
+  it('the local path (no batchMs) never touches the spool', async () => {
+    const f = fakeSpool()
+    const s = setup((c) => [line(c, 'local words')], { spool: f.spool })
+    s.speak('them', 0); s.speak('me', 5000)
+    await s.p.finish()
+    expect(f.added).toEqual([])
+    expect(f.removed).toEqual([])
+    expect(s.saved).toHaveLength(2)
   })
 })
 

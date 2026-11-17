@@ -667,5 +667,7 @@
   "Russian": "রুশ",
   "Transcribes Russian in Cyrillic": "রুশ কথা সিরিলিক হরফে লেখে",
   "Choose English or Russian, or let Yogurt detect the language.": "ইংরেজি বা রুশ বেছে নিন, অথবা Yogurt-কে ভাষা শনাক্ত করতে দিন।",
-  "Yogurt detects the spoken language automatically.": "Yogurt স্বয়ংক্রিয়ভাবে কথ্য ভাষা শনাক্ত করে।"
+  "Yogurt detects the spoken language automatically.": "Yogurt স্বয়ংক্রিয়ভাবে কথ্য ভাষা শনাক্ত করে।",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "ট্রান্সক্রিপ্ট অসম্পূর্ণ: রেকর্ডিংয়ের 일부 এখনও ট্রান্সক্রাইব হয়নি।",
+  "Retry": "পুনরায় চেষ্টা করুন"
 }

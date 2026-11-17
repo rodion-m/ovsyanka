@@ -3,6 +3,9 @@ import type { Chunk } from './chunker'
 /** Pauses between queued chunks longer than this are sent as this much silence, so speech packs densely. */
 export const MAX_GAP_MS = 1000
 
+/** a packed batch also knows the queued chunks it was made of, so the audio spool drops exactly those once saved */
+export type Batch = Chunk & { sources?: Chunk[] }
+
 /**
  * Amortize remote CLI startup over speech that accumulated while the previous request was running.
  * Queued chunks of one track are packed in order; a pause longer than MAX_GAP_MS becomes exactly
@@ -10,7 +13,7 @@ export const MAX_GAP_MS = 1000
  * packed offset back to the meeting clock. A pause/resume boundary (overlap) or a different track
  * must never be stitched together. maxMs caps the packed audio length, not the meeting span.
  */
-export function takeBatch(queue: Chunk[], maxMs = 0): Chunk | undefined {
+export function takeBatch(queue: Chunk[], maxMs = 0): Batch | undefined {
   const first = queue.shift()
   if (!first || maxMs <= 0) return first
   const parts = [first]
@@ -38,6 +41,7 @@ export function takeBatch(queue: Chunk[], maxMs = 0): Chunk | undefined {
     track: first.track, startMs: first.startMs, samples,
     parts: parts.map((part, i) => ({ atMs: offsets[i] / 16, startMs: part.startMs, durationMs: part.samples.length / 16 })),
     ...(parts.every(p => p.clearMs !== undefined) ? { clearMs: parts.reduce((n, p) => n + p.clearMs!, 0) } : {}),
+    sources: parts,
   }
 }
 

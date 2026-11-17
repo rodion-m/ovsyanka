@@ -73,6 +73,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   }, [footer])
   useEffect(() => { if (m) onTitleChange({ id: m.id, title: m.title }) }, [m?.id, m?.title, onTitleChange])
   const [retryingStop, setRetryingStop] = useState(false)
+  const [retryingTranscript, setRetryingTranscript] = useState(false)
   const [starting, setStarting] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [startFailed, setStartFailed] = useState(false)
@@ -226,6 +227,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const recording = m.state === 'recording'
   /** in the Trash: it can be read and restored, not recorded into */
   const trashed = m.trashedAt != null
+  /** remote audio a quit or crash left untranscribed is still on disk: the transcript is incomplete until it is sent again */
+  const transcriptPending = m.transcriptionPending === true && (m.state === 'stopped' || m.state === 'done') && !trashed
+  const retryTranscript = () => {
+    if (retryingTranscript) return
+    setRetryingTranscript(true)
+    void window.yogurt.meetings.retryTranscription(id).catch(() => {}).finally(() => setRetryingTranscript(false))
+  }
   const minutes = m.endedAt ? Math.max(1, Math.round((m.durationMs ?? (m.endedAt - m.startedAt)) / 60_000)) : null
   const shown = hasEnhanced ? view : 'mine'
 
@@ -360,6 +368,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                 <Trash2 size={16} aria-hidden="true" className="shrink-0 text-muted" />
                 <p className="min-w-48 flex-1">{t('This note is in the Trash.')}</p>
                 <button data-testid="note-restore" onClick={() => void window.yogurt.meetings.restore(id)} className="workspace-button"><RotateCcw size={13} aria-hidden="true" />{t('Restore')}</button>
+              </div>
+            )}
+            {transcriptPending && (
+              <div data-testid="note-transcript-pending" role="status" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed">
+                <TriangleAlert size={16} aria-hidden="true" className="shrink-0 text-muted" />
+                <p className="min-w-48 flex-1">{t('The transcript is incomplete: part of the recording is not transcribed yet.')}</p>
+                <button data-testid="note-transcript-retry" disabled={retryingTranscript} onClick={retryTranscript} className="workspace-button"><RotateCcw size={13} aria-hidden="true" />{t('Retry')}</button>
               </div>
             )}
 

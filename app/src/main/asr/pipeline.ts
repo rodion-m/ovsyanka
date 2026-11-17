@@ -6,7 +6,7 @@ import { chunker, type Chunk } from './chunker'
 import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
-import { takeBatch } from './batch'
+import { takeBatch, type Batch } from './batch'
 
 type Out = Omit<Segment, 'id'>
 
@@ -33,6 +33,8 @@ export function createPipeline(p: {
   maxQueuedMs?: number
   /** Combine queued speech for a remote provider into packed batches of up to this much audio, sent once the oldest queued chunk is this old in meeting time or at the end. Local reads stay unchanged. */
   batchMs?: number
+  /** remote path only (batchMs > 0): every queued chunk is kept on disk until its lines are saved, so a quit or crash can send it again */
+  spool?: { add(chunk: Chunk): string | undefined; remove(keys: string[]): void }
   /** for tests: stand in for the echo detector */
   echoForTests?: EchoCheck
   /** trouble worth telling the person about; each kind is reported once */
@@ -46,6 +48,10 @@ export function createPipeline(p: {
   const extraWait = p.extraWaitMs ?? EXTRA_WAIT_MS
   const maxQueued = ((p.maxQueuedMs ?? MAX_QUEUED_MS) * 16)
   const batchMs = p.batchMs ?? 0
+  /** the remote path keeps queued audio on disk; the local one never touches a spool */
+  const spooling = batchMs > 0 && !!p.spool
+  /** queued chunk → its spool entry, so a saved batch drops exactly its own files */
+  const spoolKeys = new Map<Chunk, string>()
   const waiting: Record<Track, Chunk[]> = { me: [], them: [] }
   const running: Record<Track, boolean> = { me: false, them: false }
   const queued = (t: Track) => waiting[t].length + (running[t] ? 1 : 0)
@@ -57,7 +63,7 @@ export function createPipeline(p: {
   /** is their voice reaching the mic in this meeting (no headphones)? only then are echo lines hidden */
   const echo = new EchoDetector()
   const echoCheck = (): EchoCheck => p.echoForTests ?? { echo: echo.present(), correlatedAt: (ms) => echo.correlatedAt(ms), over: (a, b) => echo.over(a, b) }
-  let held: Array<{ line: Line; readyAt: number; chunkStartMs: number; chunkEndMs: number }> = []
+  let held: Array<{ line: Line; readyAt: number; chunkStartMs: number; chunkEndMs: number; sources?: Chunk[] }> = []
   let timer: NodeJS.Timeout | undefined
   let echoDropped = 0
   let closed = false
@@ -102,17 +108,28 @@ export function createPipeline(p: {
   // the mic is always the person using Yogurt
   const speakerOf = (l: Line) => { if (l.track === 'me') return 'me'; try { return p.nameOf?.(l.startMs, l.endMs) ?? null } catch { return null } }
   const out = (l: Line, hidden = false): Out => ({ meetingId: p.meetingId, track: l.track, startMs: l.startMs, endMs: l.endMs, text: spell(l.text), speaker: speakerOf(l), ...(hidden ? { hidden: true } : {}) })
-  const give = (lines: Line[]) => {
-    if (!lines.length) return
+  /** a batch's chunks leave the spool only once its lines are saved; a failed save keeps them for the next launch */
+  const unspool = (sources: Chunk[] | undefined) => {
+    if (!spooling || !sources?.length) return
+    const keys = sources.map((s) => spoolKeys.get(s)).filter((k): k is string => k !== undefined)
+    for (const s of sources) spoolKeys.delete(s)
+    if (!keys.length) return
+    try { p.spool!.remove(keys) } catch (e) { console.error('dropping saved audio from the spool failed', e) }
+  }
+  const give = (lines: Line[]): boolean => {
+    if (!lines.length) return true
     const segs = lines.map((l) => out(l))
-    try { p.save(segs) } catch (e) { console.error('saving transcript lines failed', e) }
+    let saved = true
+    try { p.save(segs) } catch (e) { saved = false; console.error('saving transcript lines failed', e) }
     for (const s of segs) { try { p.emit(s) } catch (e) { console.error('sending a transcript line failed', e) } }
     for (const s of segs) timing(s.track, false, s.endMs)
+    return saved
   }
   /** echo lines are kept too, hidden: out of the transcript and search, there to be shown again */
-  const keepHidden = (lines: Array<{ line: Line; confidence: false | 'high' | 'uncertain' }>) => {
-    if (!lines.length) return
-    try { p.save(lines.map(({ line, confidence }) => ({ ...out(line, true), ...(confidence === 'high' ? { echoConfident: true } : {}) }))) } catch (e) { console.error('saving hidden lines failed', e) }
+  const keepHidden = (lines: Array<{ line: Line; confidence: false | 'high' | 'uncertain' }>): boolean => {
+    if (!lines.length) return true
+    try { p.save(lines.map(({ line, confidence }) => ({ ...out(line, true), ...(confidence === 'high' ? { echoConfident: true } : {}) }))) } catch (e) { console.error('saving hidden lines failed', e); return false }
+    return true
   }
 
   /** me lines whose hold is over (all of them when forced) are checked against what them said, then given out */
@@ -130,18 +147,20 @@ export function createPipeline(p: {
     const matches = mine.map(line => ({ line, confidence: echoConfidence(line, them, check) }))
     const kept = matches.filter(m => !m.confidence).map(m => m.line)
     echoDropped += mine.length - kept.length
-    give(kept)
-    keepHidden(matches.filter(m => m.confidence))
+    const saved = give(kept)
+    const hidden = keepHidden(matches.filter(m => m.confidence))
+    // their audio leaves the spool only once every line of the batch is saved (kept or hidden)
+    if (saved && hidden) for (const h of due) unspool(h.sources)
     // the chunks' live words go once their lines are shown, kept or hidden: their lines are decided
     for (const h of due) settle('me', h.chunkEndMs, h.line.text)
     if (!held.length && timer) { clearInterval(timer); timer = undefined }
   }
 
-  const onLines = (track: Track, lines: Line[], chunkStartMs: number, chunkEndMs: number) => {
-    if (track === 'them') { them.push(...lines); give(lines); settle('them', chunkEndMs, lines.map((l) => l.text).join(' ')); return }
+  const onLines = (track: Track, lines: Line[], chunkStartMs: number, chunkEndMs: number, sources?: Chunk[]) => {
+    if (track === 'them') { them.push(...lines); if (give(lines)) unspool(sources); settle('them', chunkEndMs, lines.map((l) => l.text).join(' ')); return }
     const readyAt = Date.now() + hold
-    if (!lines.length) settle('me', chunkEndMs)
-    for (const line of lines) held.push({ line, readyAt, chunkStartMs, chunkEndMs })
+    if (!lines.length) { settle('me', chunkEndMs); unspool(sources) }
+    for (const line of lines) held.push({ line, readyAt, chunkStartMs, chunkEndMs, sources })
     if (held.length && !timer && !closed) timer = setInterval(() => release(false), 200)
   }
 
@@ -166,19 +185,23 @@ export function createPipeline(p: {
     run(t, c, batchMs > 0 ? 1 : 0)
   }
 
-  const run = (t: Track, c: Chunk, retries: number) => {
+  const run = (t: Track, c: Batch, retries: number) => {
     running[t] = true
     const chunkEnd = endMsOf(c)
+    /** the queued chunks this batch was packed from (a single chunk is its own source): their spool entries go when its lines are saved */
+    const sources = c.sources ?? [c]
     let retrying = false
     // the call is deferred to a microtask so a synchronous throw takes the same failure path as a rejection
     Promise.resolve().then(() => p.transcribe(c))
-      .then((lines) => onLines(t, lines, c.startMs, chunkEnd))
+      .then((lines) => onLines(t, lines, c.startMs, chunkEnd, sources))
       // its quick reading goes too: nothing final will replace it
       .catch((e) => {
         console.error(`transcribing a ${t} chunk failed`, e)
         // a closed pipeline or an aborted request (the app is going away) is never retried
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
         if (retries > 0 && !cancelled) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        // its audio stays in the spool for the next launch or a Retry; only the map entry can go
+        for (const s of sources) spoolKeys.delete(s)
         warn('transcribe-failed'); settle(t, chunkEnd)
       })
       .finally(() => { if (!retrying) { running[t] = false; pump(t) } })
@@ -187,10 +210,17 @@ export function createPipeline(p: {
   const queue = (c: Chunk) => {
     const q = waiting[c.track]
     q.push(c)
+    // kept on disk before anything can drop it: a failed or aborted batch, and a queue-overflow drop, all stay for recovery
+    if (spooling) {
+      let key: string | undefined
+      try { key = p.spool!.add(c) } catch (e) { console.error('keeping queued audio failed', e) }
+      if (key !== undefined) spoolKeys.set(c, key)
+    }
     let size = q.reduce((n, x) => n + x.samples.length, 0)
     while (size > maxQueued && q.length) {
       const old = q.shift()!
       size -= old.samples.length
+      spoolKeys.delete(old)
       dropped.push({ track: old.track, startMs: old.startMs, endMs: Math.round(old.startMs + old.samples.length / 16) })
       settle(old.track, old.startMs + old.samples.length / 16)
       warn('falling-behind')
@@ -238,6 +268,17 @@ export function createPipeline(p: {
       cut.push(track, ms, samples)
       // a full remote batch can be ready while its last chunk is still being collected
       if (batchMs > 0) pump(track)
+    },
+    /**
+     * Audio already cut into chunks (recovering the spool): queued for transcription as-is — no chunker, no batch wait,
+     * and past the queue cap, since the spool itself is the bound. finish() sends it; the batch packing still applies.
+     */
+    enqueue(c: Chunk, spoolKey?: string) {
+      if (closed) return
+      if (spoolKey !== undefined) spoolKeys.set(c, spoolKey)
+      waiting[c.track].push(c)
+      newest[c.track] = Math.max(newest[c.track], c.startMs + c.samples.length / 16)
+      pump(c.track)
     },
     /** the meeting is over: what is left is transcribed, held lines are checked and saved now */
     finish(): Promise<void> {

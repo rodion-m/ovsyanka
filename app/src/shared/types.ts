@@ -93,6 +93,8 @@ export type YogurtApi = {
     setPaused(id: string, paused: boolean): Promise<boolean>
     /** retries saving the original stop time without stopping or finalizing the capture again */
     retryStopSave(id: string): Promise<boolean>
+    /** sends the meeting's kept remote audio through transcription again, including chunks that failed enough times to be skipped */
+    retryTranscription(id: string): Promise<void>
     /** the person's own title (tidied; blank keeps the old one) */
     rename(id: string, title: string): Promise<void>
     /** gone for good, audio too; refused while it records */

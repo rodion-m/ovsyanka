@@ -694,5 +694,7 @@
   "Russian": "Rusă",
   "Transcribes Russian in Cyrillic": "Transcrie rusa cu caractere chirilice",
   "Choose English or Russian, or let Yogurt detect the language.": "Alegeți engleza sau rusa sau lăsați Yogurt să detecteze limba.",
-  "Yogurt detects the spoken language automatically.": "Yogurt detectează automat limba vorbită."
+  "Yogurt detects the spoken language automatically.": "Yogurt detectează automat limba vorbită.",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "Transcrierea este incompletă: o parte din înregistrare nu a fost încă transcrisă.",
+  "Retry": "Reîncearcă"
 }

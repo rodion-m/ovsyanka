@@ -667,5 +667,7 @@
   "Russian": "रूसी",
   "Transcribes Russian in Cyrillic": "रूसी बोलचाल को सिरिलिक लिपि में लिखता है",
   "Choose English or Russian, or let Yogurt detect the language.": "अंग्रेज़ी या रूसी चुनें, या Yogurt को भाषा पहचानने दें।",
-  "Yogurt detects the spoken language automatically.": "Yogurt बोली जाने वाली भाषा अपने आप पहचानता है।"
+  "Yogurt detects the spoken language automatically.": "Yogurt बोली जाने वाली भाषा अपने आप पहचानता है।",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "ट्रांसक्रिप्ट अधूरा है: रिकॉर्डिंग का एक हिस्सा अभी तक ट्रांसक्राइब नहीं हुआ है।",
+  "Retry": "पुनः प्रयास करें"
 }

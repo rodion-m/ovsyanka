@@ -667,5 +667,7 @@
   "Russian": "Rusça",
   "Transcribes Russian in Cyrillic": "Rusça konuşmayı Kiril alfabesiyle yazıya döker",
   "Choose English or Russian, or let Yogurt detect the language.": "İngilizce veya Rusça seçin ya da dili Yogurt algılasın.",
-  "Yogurt detects the spoken language automatically.": "Yogurt konuşulan dili otomatik olarak algılar."
+  "Yogurt detects the spoken language automatically.": "Yogurt konuşulan dili otomatik olarak algılar.",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkript eksik: kaydın bir bölümü henüz metne dökülmedi.",
+  "Retry": "Yeniden dene"
 }

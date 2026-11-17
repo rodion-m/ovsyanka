@@ -710,5 +710,7 @@
   "Russian": "Ruština",
   "Transcribes Russian in Cyrillic": "Přepisuje ruštinu v azbuce",
   "Choose English or Russian, or let Yogurt detect the language.": "Vyberte angličtinu nebo ruštinu, nebo nechte Yogurt rozpoznat jazyk.",
-  "Yogurt detects the spoken language automatically.": "Yogurt automaticky rozpozná mluvený jazyk."
+  "Yogurt detects the spoken language automatically.": "Yogurt automaticky rozpozná mluvený jazyk.",
+  "The transcript is incomplete: part of the recording is not transcribed yet.": "Přepis je neúplný: část nahrávky ještě není přepsána.",
+  "Retry": "Zkusit znovu"
 }
