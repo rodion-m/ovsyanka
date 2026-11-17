@@ -34,6 +34,8 @@ export function createPipeline(p: {
   maxQueuedMs?: number
   /** Combine queued speech for a remote provider into packed batches of up to this much audio, sent once the oldest queued chunk is this old in meeting time or at the end. Local reads stay unchanged. */
   batchMs?: number
+  /** remote path only (batchMs > 0): each track's first batch goes once its oldest queued chunk is this old in meeting time; every later batch waits batchMs. Local reads stay unchanged. */
+  firstBatchMs?: number
   /** remote path only (batchMs > 0): every queued chunk is kept on disk until its lines are saved, so a quit or crash can send it again */
   spool?: { add(chunk: Chunk, spoken?: Spoken): string | undefined; remove(keys: string[]): void; bump?(key: string): void }
   /** the meeting's spoken language setting as its sidecars should remember it; read each time a chunk is queued */
@@ -51,6 +53,9 @@ export function createPipeline(p: {
   const extraWait = p.extraWaitMs ?? EXTRA_WAIT_MS
   const maxQueued = ((p.maxQueuedMs ?? MAX_QUEUED_MS) * 16)
   const batchMs = p.batchMs ?? 0
+  const firstBatchMs = p.firstBatchMs ?? 0
+  /** whether each track's first batch was already taken from its queue: the shorter firstBatchMs wait ends there */
+  const firstSent: Record<Track, boolean> = { me: false, them: false }
   /** the remote path keeps queued audio on disk; the local one never touches a spool */
   const spooling = batchMs > 0 && !!p.spool
   /** queued chunk → its spool entry, so a saved batch drops exactly its own files */
@@ -182,9 +187,12 @@ export function createPipeline(p: {
   const pump = (t: Track) => {
     if (running[t]) return
     const q = waiting[t]
-    if (batchMs > 0 && !ending && q.length && newest[t] - q[0].startMs < batchMs) return
+    // until a track's first batch is taken it waits only firstBatchMs of meeting time; after that batchMs as before
+    const waitMs = firstBatchMs > 0 && !firstSent[t] ? firstBatchMs : batchMs
+    if (batchMs > 0 && !ending && q.length && newest[t] - q[0].startMs < waitMs) return
     const c = takeBatch(q, p.batchMs)
     if (!c) { if (!queued('me') && !queued('them')) { const w = idle; idle = []; w.forEach((f) => f()) } return }
+    firstSent[t] = true
     run(t, c, batchMs > 0 ? 1 : 0)
   }
 

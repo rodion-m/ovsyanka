@@ -548,7 +548,7 @@ app.whenReady().then(() => {
     resuming: (id) => resumingId === id,
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
-    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, maxQueuedMs: 15 * 60_000 } : {}),
+    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, firstBatchMs: 60_000, maxQueuedMs: 15 * 60_000 } : {}),
     meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),

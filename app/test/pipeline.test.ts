@@ -8,14 +8,14 @@ const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE)
 const quiet = (sec: number) => new Float32Array(Math.round(sec * RATE))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string; spool?: { add(chunk: Chunk, spoken?: string): string | undefined; remove(keys: string[]): void; bump?(key: string): void } } = {}) {
+function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: number; extraWaitMs?: number; maxQueuedMs?: number; batchMs?: number; firstBatchMs?: number; echo?: boolean; nameOf?: (a: number, b: number) => string | null; respell?: (text: string) => string; spool?: { add(chunk: Chunk, spoken?: string): string | undefined; remove(keys: string[]): void; bump?(key: string): void } } = {}) {
   const warns: string[] = []
   const saved: Array<{ track: string; text: string; speaker: string | null; meetingId: string }> = []
   const sent: string[] = []
   let inFlight = 0, maxInFlight = 0
   const p = createPipeline({
     meetingId: 'm1',
-    holdMs: opts.holdMs ?? 60, extraWaitMs: opts.extraWaitMs, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell, spool: opts.spool,
+    holdMs: opts.holdMs ?? 60, extraWaitMs: opts.extraWaitMs, maxQueuedMs: opts.maxQueuedMs, batchMs: opts.batchMs, firstBatchMs: opts.firstBatchMs, onWarn: (k) => warns.push(k), nameOf: opts.nameOf, respell: opts.respell, spool: opts.spool,
     ...(opts.echo ? { echoForTests: { echo: true, correlatedAt: () => true } } : {}),
     transcribe: async (c) => { inFlight++; maxInFlight = Math.max(maxInFlight, inFlight); try { return await say(c) } finally { inFlight-- } },
     // hidden echo lines are saved too, but they are not what these tests look at
@@ -274,6 +274,53 @@ describe('pipeline with long remote batches', () => {
     expect(s.saved.map((x) => x.text)).not.toContain('them words at 0')
     await s.p.finish()
     expect(s.saved.map((x) => x.text)).toContain('them words at 0')
+  })
+
+  it('sends a track\'s first batch once its oldest chunk is firstBatchMs old, then waits batchMs', async () => {
+    const calls: number[] = []
+    const s = setup(async (c) => { calls.push(c.startMs); return [line(c, 'words')] }, { batchMs: 300_000, firstBatchMs: 60_000 })
+    s.speak('them', 0); s.speak('them', 30_000); s.speak('them', 55_000)
+    await wait(0)
+    // the newest audio ends at 57 s of meeting time: the oldest queued chunk is 57 s old, under the 60 s first wait
+    expect(calls).toEqual([])
+    s.speak('them', 58_000) // its last sample ends at 60 s: the first batch goes
+    await wait(0)
+    expect(calls).toEqual([0])
+    // later batches wait batchMs again: chunks at 100 s and 200 s leave the oldest queued chunk under 5 min old
+    s.speak('them', 100_000); s.speak('them', 200_000)
+    await wait(0)
+    expect(calls).toEqual([0])
+    s.speak('them', 399_000) // the chunk at 100 s is now over 5 min old in meeting time
+    await wait(0)
+    expect(calls).toEqual([0, 100_000])
+    await s.p.finish()
+  })
+
+  it('waits for firstBatchMs on each track separately', async () => {
+    const calls: string[] = []
+    const s = setup(async (c) => { calls.push(c.track); return [line(c, 'words')] }, { batchMs: 300_000, firstBatchMs: 60_000 })
+    s.speak('them', 0); s.speak('me', 0)
+    s.speak('them', 30_000); s.speak('me', 30_000)
+    s.speak('them', 58_000) // their oldest queued chunk reaches 60 s of meeting time
+    await wait(0)
+    expect(calls).toEqual(['them'])
+    s.speak('me', 58_000) // the me track's own first batch is still owed its 60 s
+    await wait(0)
+    expect(calls).toEqual(['them', 'me'])
+    await s.p.finish()
+  })
+
+  it('without firstBatchMs the first batch still waits the full batchMs', async () => {
+    const calls: number[] = []
+    const s = setup(async (c) => { calls.push(c.startMs); return [line(c, 'words')] }, { batchMs: 300_000 })
+    s.speak('them', 0); s.speak('them', 60_000); s.speak('them', 120_000); s.speak('them', 200_000)
+    await wait(0)
+    // the oldest queued chunk is 200 s old: past a 60 s first wait, still under batchMs — nothing goes
+    expect(calls).toEqual([])
+    s.speak('them', 299_000)
+    await wait(0)
+    expect(calls).toEqual([0])
+    await s.p.finish()
   })
 })
 

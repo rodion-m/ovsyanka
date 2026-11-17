@@ -175,6 +175,8 @@ export function hookTranscription(p: {
   /** Remote providers receive finished speech only, never the high-frequency local previews. */
   quickReads?: boolean
   batchMs?: number
+  /** remote path only (batchMs > 0): each track's first batch goes once its oldest queued chunk is this old in meeting time; later batches wait batchMs. Spool recovery keeps batchMs. */
+  firstBatchMs?: number
   maxQueuedMs?: number
   onStart?: (fn: (m: Meeting) => void) => unknown
   onStop?: (fn: (m: Meeting) => void) => unknown
@@ -266,6 +268,8 @@ export function hookTranscription(p: {
         if (segs.some(s => s.hidden)) { try { p.refresh?.(id) } catch (e) { console.error('refreshing the transcript failed', e) } }
       }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce,
         batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
+        // a recovery session only drains what the spool already holds: the shorter first-batch wait is for live audio
+        firstBatchMs: o?.recovery ? undefined : p.firstBatchMs,
         // recovered lines get no call-participant names: the call watch is gone by then, and a name guessed late is worse than Them
         nameOf: o?.recovery ? undefined : p.nameOf && ((a, b) => p.nameOf!(id, a, b)),
         respell: (t) => { const m = p.store.meeting?.(id); return m ? respell(t, meetingWords(m)) : t } }) : null,

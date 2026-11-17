@@ -95,6 +95,21 @@ describe('transcript validation', () => {
     expect(() => parseTranscript(output, 2)).toThrow()
     try { parseTranscript(output, 2) } catch (error) { expect(String(error)).not.toContain('secret') }
   })
+  it('strips backslashes around quoted names and drops a segment left empty', async () => {
+    const tempDir = await directory()
+    const transcribe = createHarnessTranscriber({
+      settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async () => JSON.stringify({ segments: [
+        { start: 0, end: 0.5, text: 'сказал \\Бархатный дирижёр\\  и мы  ушли' },
+        { start: 0.5, end: 1, text: '\\\\' },
+        { start: 1, end: 1.5, text: 'обычная реплика' },
+      ] }),
+    }, callbacks())
+    expect(await transcribe(chunk())).toEqual([
+      { track: 'them', startMs: 12_000, endMs: 12_500, text: 'сказал Бархатный дирижёр и мы ушли' },
+      { track: 'them', startMs: 13_000, endMs: 13_500, text: 'обычная реплика' },
+    ])
+  })
 })
 
 describe('packed batch segment times', () => {

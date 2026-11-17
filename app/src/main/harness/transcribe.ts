@@ -51,7 +51,8 @@ export function parseTranscript(text: string, duration: number): Transcript {
     }
     previousStart = start
     if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The AI harness returned invalid transcript text.')
-    const clean = said.replace(/\s+/g, ' ').trim()
+    // models sometimes escape quoted names with backslashes (\Имя\); they never belong in speech
+    const clean = said.replace(/\\/g, '').replace(/\s+/g, ' ').trim()
     if (clean) segments.push({ start: Math.min(start, duration), end: Math.min(end, duration), text: clean })
   }
   return { ...(typeof object.language === 'string' ? { language: object.language.trim() } : {}), segments }
