@@ -51,27 +51,31 @@ export function parseTranscript(text: string, duration: number): Transcript {
     }
     previousStart = start
     if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The AI harness returned invalid transcript text.')
-    // models sometimes escape quoted names with backslashes (\Имя\); they never belong in speech
-    const clean = said.replace(/\\/g, '').replace(/\s+/g, ' ').trim()
+    // models sometimes wrap quoted names in backslashes (\Имя\, \\Имя\\) or leave a lone \ between spaces;
+    // they never belong in speech. Windows paths (C:\dir\file) keep theirs: only runs at word edges or between spaces go
+    const clean = said
+      .replace(/(^|[\s(\[\{"'«„“])\\+(?=\p{L})/gu, '$1')
+      .replace(/(?<=\p{L})\\+(?=$|[\s)\]}"'»”’.,;:!?…])/gu, '')
+      .replace(/(^|\s)\\+(?=\s|$)/g, '$1')
+      .replace(/\s+/g, ' ')
+      .trim()
     if (clean) segments.push({ start: Math.min(start, duration), end: Math.min(end, duration), text: clean })
   }
   return { ...(typeof object.language === 'string' ? { language: object.language.trim() } : {}), segments }
 }
 
-/** Live probe on synthetic noise with no speech (9 requests): gemini-3.8-flash invented sentences from the vocabulary line on 2 (15 s of clicks, 90 s of room tone), reporting SUCCESS. */
+/**
+ * Live probe on synthetic noise with no speech (9 requests): gemini-3.8-flash invented sentences from the vocabulary
+ * line on 2 (15 s of clicks, 90 s of room tone), reporting SUCCESS; the same noise without the vocabulary line came
+ * back empty. Audio is never skipped — the skip dropped real far-field speech — so a batch under this much clear
+ * speech is sent without the vocabulary line instead.
+ */
 export const MIN_CLEAR_SPEECH_MS = 300
-/** Only chunks shorter than this are skipped for lack of clear speech; longer noise-only stretches are still sent and can rarely produce invented text. */
-export const SKIP_MAX_SAMPLES = 30 * 16_000
 
 export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: string; signal: AbortSignal; transcribe: (request: AudioRequest) => Promise<string> }, callbacks: TranscribeOptions): Transcribe {
   return async (chunk, options) => {
     // Speculative reads of every partial would multiply remote requests. Only completed VAD chunks are sent.
     if (options?.partial) return []
-    // A short chunk with almost no clear speech is the noise case where the model invents text; don't spend a CLI call on it.
-    if (chunk.clearMs !== undefined && chunk.clearMs < MIN_CLEAR_SPEECH_MS && chunk.samples.length < SKIP_MAX_SAMPLES) {
-      console.log(`transcriber skipped ${chunk.track} chunk at ${chunk.startMs} ms: ${(chunk.samples.length / 16_000).toFixed(1)} s of audio with ${chunk.clearMs} ms of clear speech`)
-      return []
-    }
     assertRunning(o.signal)
     if (!Number.isFinite(chunk.startMs) || chunk.startMs < 0 || chunk.samples.length > 16_000 * 15 * 60) throw new HarnessError('Invalid or oversized recording chunk.')
     if (!chunk.samples.length) return []
@@ -82,10 +86,12 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
     if (language && (language.length > 80 || /[\0\r\n]/.test(language))) throw new HarnessError('Invalid transcription language.')
     const vocabulary = callbacks.prompt()
     if (Buffer.byteLength(vocabulary, 'utf8') > 16_384) throw new HarnessError('The transcription vocabulary is too large.')
+    // almost no clear speech is the noise case where the model invents text from the vocabulary; the audio still goes
+    const lowClear = chunk.clearMs !== undefined && chunk.clearMs < MIN_CLEAR_SPEECH_MS
     const instructions = [
       `The recording is exactly ${duration} seconds long. All timestamps must stay between 0 and ${duration} seconds.`,
       'Transcribe speech verbatim in its original language, including Russian. Do not translate. Preserve Russian spelling and punctuation.',
-      ...(vocabulary ? [`Names and vocabulary (context only; never invent speech from them): ${vocabulary}`] : []),
+      ...(vocabulary && !lowClear ? [`Names and vocabulary (context only; never invent speech from them): ${vocabulary}`] : []),
     ].join('\n')
     const prompt = [
       'Transcribe the audio file ./audio.wav.',
@@ -95,6 +101,7 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
       'If you cannot hear the audio, return an empty segments array and a nonempty error. Return an empty array without error only for silence or no speech. Never guess.',
       ...(language ? [`Expected spoken language: ${language}.`] : []), instructions,
     ].join('\n')
+    if (lowClear) console.log(`transcriber sending ${chunk.track} chunk at ${chunk.startMs} ms: ${duration.toFixed(1)} s of audio with ${chunk.clearMs} ms of clear speech, without the vocabulary line`)
     const response = await inStage(o.tempDir, o.signal, async directory => {
       await writeFile(join(directory, 'audio.wav'), wavBytes(chunk.samples), { mode: 0o600 })
       assertRunning(o.signal)

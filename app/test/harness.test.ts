@@ -10,7 +10,7 @@ import { createPorch, exactProfile, porchInstallation } from '../src/main/harnes
 import { executablePath, HarnessProcesses, inStage } from '../src/main/harness/process'
 import { createHarnessTranscriber, parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
 import { takeBatch } from '../src/main/asr/batch'
-import type { Chunk } from '../src/main/asr/chunker'
+import { chunker, type Chunk } from '../src/main/asr/chunker'
 import { wavBytes } from '../src/main/asr/transcribe'
 import { enhance, partBudget, splitForContext, summaryPrompt, type Llm } from '../src/main/notes/enhance'
 
@@ -95,7 +95,7 @@ describe('transcript validation', () => {
     expect(() => parseTranscript(output, 2)).toThrow()
     try { parseTranscript(output, 2) } catch (error) { expect(String(error)).not.toContain('secret') }
   })
-  it('strips backslashes around quoted names and drops a segment left empty', async () => {
+  it('strips backslashes around quoted names, keeps paths, and drops a segment left empty', async () => {
     const tempDir = await directory()
     const transcribe = createHarnessTranscriber({
       settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
@@ -103,11 +103,18 @@ describe('transcript validation', () => {
         { start: 0, end: 0.5, text: 'сказал \\Бархатный дирижёр\\  и мы  ушли' },
         { start: 0.5, end: 1, text: '\\\\' },
         { start: 1, end: 1.5, text: 'обычная реплика' },
+        { start: 1.5, end: 2, text: 'крикнул \\\\Медные куранты\\\\ тише' },
+        { start: 2, end: 2.5, text: 'пакет \\ латунный горизонт \\ закрывает' },
+        { start: 2.5, end: 3, text: 'сохранил C:\\проект\\файл' },
       ] }),
     }, callbacks())
-    expect(await transcribe(chunk())).toEqual([
+    const clip = { track: 'them' as const, startMs: 12_000, samples: new Float32Array(16_000 * 4) }
+    expect(await transcribe(clip)).toEqual([
       { track: 'them', startMs: 12_000, endMs: 12_500, text: 'сказал Бархатный дирижёр и мы ушли' },
       { track: 'them', startMs: 13_000, endMs: 13_500, text: 'обычная реплика' },
+      { track: 'them', startMs: 13_500, endMs: 14_000, text: 'крикнул Медные куранты тише' },
+      { track: 'them', startMs: 14_000, endMs: 14_500, text: 'пакет латунный горизонт закрывает' },
+      { track: 'them', startMs: 14_500, endMs: 15_000, text: 'сохранил C:\\проект\\файл' },
     ])
   })
 })
@@ -236,18 +243,62 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     await expect(stat(fixture.log)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(fixture.tempDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
-  it('skips a short chunk with almost no clear speech without a CLI call', async () => {
+  it('sends a chunk with almost no clear speech without the vocabulary line, and never skips audio', async () => {
     const fixture = await agyFixture(), cb = callbacks(), transcribe = fixture.harness.transcriber(cb)
+    cb.prompt = () => 'Родион, Yogurt'
     const clip = (seconds: number, clearMs?: number): Chunk => ({ track: 'them', startMs: 12_000, samples: new Float32Array(seconds * 16_000), ...(clearMs === undefined ? {} : { clearMs }) })
     const heard_line = [{ track: 'them' as const, startMs: 12_250, endMs: 13_500, text: heard.segments[0].text }]
-    // 10 s with 200 ms clear: the noise case where the model invents text — no request, no lines
-    expect(await transcribe(clip(10, 200))).toEqual([])
-    await expect(stat(fixture.log)).rejects.toMatchObject({ code: 'ENOENT' })
-    // at the 0.3 s clear-speech bound, past the 30 s audio bound, and with no clearMs at all: sent as before
-    for (const c of [clip(10, 300), clip(40, 0), clip(10)]) {
+    // under 30 s with no clear speech: still sent — skipping it dropped real quiet speech — but without the vocabulary
+    for (const c of [clip(10, 0), clip(40, 0)]) {
       expect(await transcribe(c)).toEqual(heard_line)
     }
-    expect(await fixture.calls()).toHaveLength(3)
+    // at the 0.3 s clear-speech bound and with no clearMs at all: sent with the vocabulary as before
+    for (const c of [clip(10, 300), clip(10)]) {
+      expect(await transcribe(c)).toEqual(heard_line)
+    }
+    const calls = await fixture.calls()
+    expect(calls).toHaveLength(4)
+    const prompts = calls.map(call => call.input.message.content as string)
+    for (const prompt of prompts.slice(0, 2)) {
+      expect(prompt).not.toContain('Names and vocabulary')
+      expect(prompt).not.toContain('Родион, Yogurt')
+      expect(prompt).toContain('Transcribe the audio file ./audio.wav.')
+    }
+    expect(prompts[0]).toContain('The recording is exactly 10 seconds long')
+    expect(prompts[1]).toContain('The recording is exactly 40 seconds long')
+    for (const prompt of prompts.slice(2)) {
+      expect(prompt).toContain('Names and vocabulary')
+      expect(prompt).toContain('Родион, Yogurt')
+    }
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('sends every chunk the chunker produces for far-field speech, the faint ones without the vocabulary', async () => {
+    const RATE = 16_000
+    const room = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE) }, (_, i) => 0.003 * Math.sqrt(2) * Math.sin(i * 1.3))
+    const far = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE) }, (_, i) => 0.007 * Math.sqrt(2) * Math.sin(i / 10))
+    const near = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE) }, (_, i) => 0.04 * Math.sqrt(2) * Math.sin(i / 10))
+    const cat = (...xs: Float32Array[]) => { const o = new Float32Array(xs.reduce((n, x) => n + x.length, 0)); let p = 0; for (const x of xs) { o.set(x, p); p += x.length } return o }
+    const parts = [room(4), near(3), room(0.3), far(3), room(1), far(3), room(2), near(2), room(1)]
+    const all = cat(...parts), out: Chunk[] = []
+    const c = chunker(x => out.push(x))
+    for (let i = 0; i < all.length; i += RATE / 10) c.push('them', i / 16, all.subarray(i, i + RATE / 10))
+    c.flush()
+    // the far-field stretch is a 3.2 s chunk with no clear speech: the removed gate used to drop it unsent
+    expect(out.map(x => x.startMs)).toEqual([4000, 11300, 16300])
+    expect(out.map(x => x.clearMs)).toEqual([3000, 0, 2000])
+    expect(out[1].samples.length / RATE).toBeCloseTo(3.2, 1)
+    const fixture = await agyFixture(), cb = callbacks()
+    cb.prompt = () => 'Родион, Yogurt'
+    const transcribe = fixture.harness.transcriber(cb)
+    for (const queued of out) {
+      expect(await transcribe(queued)).toEqual([{ track: 'them', startMs: queued.startMs + 250, endMs: queued.startMs + 1500, text: heard.segments[0].text }])
+    }
+    const calls = await fixture.calls()
+    expect(calls).toHaveLength(out.length)
+    const prompts = calls.map(call => call.input.message.content as string)
+    expect(prompts[0]).toContain('Names and vocabulary')
+    expect(prompts[1]).not.toContain('Names and vocabulary')
+    expect(prompts[2]).toContain('Names and vocabulary')
     expect(await readdir(fixture.tempDir)).toEqual([])
   })
   it('accepts silence without a language callback', async () => {

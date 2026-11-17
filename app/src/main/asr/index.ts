@@ -268,7 +268,7 @@ export function hookTranscription(p: {
         if (segs.some(s => s.hidden)) { try { p.refresh?.(id) } catch (e) { console.error('refreshing the transcript failed', e) } }
       }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce,
         batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
-        // a recovery session only drains what the spool already holds: the shorter first-batch wait is for live audio
+        // recovery drains everything at finish; the first-batch wait does not apply
         firstBatchMs: o?.recovery ? undefined : p.firstBatchMs,
         // recovered lines get no call-participant names: the call watch is gone by then, and a name guessed late is worse than Them
         nameOf: o?.recovery ? undefined : p.nameOf && ((a, b) => p.nameOf!(id, a, b)),
