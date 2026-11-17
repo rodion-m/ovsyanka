@@ -1,16 +1,21 @@
 import type { AiCheck, AiSettings } from '../../shared/ai'
 import { createAgy } from './agy'
+import { agyStoreRoot, forgetJournalPath, processForgetJournal } from './agyStore'
 import { createHarnessModel } from './model'
 import { createPorch, exactProfile, porchInstallation, PORCH_CONTRACT } from './porch'
 import { executablePath, HarnessError, HarnessProcesses } from './process'
 import { createHarnessTranscriber, TRANSCRIPT_SCHEMA } from './transcribe'
 
-export function createSubscriptionHarness({ settings, tempDir }: { settings: AiSettings; tempDir: string }) {
+export function createSubscriptionHarness({ settings, tempDir, storeRoot = agyStoreRoot() }: { settings: AiSettings; tempDir: string; storeRoot?: string }) {
   if (settings.backend === 'local') throw new HarnessError('Local models use Yogurt\'s existing local engine.')
   const selected = { ...settings }
   if (selected.backend === 'porch') { exactProfile(selected.textProfile); exactProfile(selected.transcriptionProfile) }
   const processes = new HarnessProcesses()
-  const agy = createAgy(selected, processes)
+  const journalPath = forgetJournalPath(tempDir)
+  // A quit or crash mid-request leaves journal entries; replay them under the same ownership rule.
+  void processForgetJournal(journalPath, storeRoot)
+    .catch(error => console.warn('Yogurt could not replay pending agy conversation cleanup.', error))
+  const agy = createAgy(selected, processes, { storeRoot, journalPath })
   const porch = createPorch(selected, processes)
   const common = { settings: selected, tempDir, signal: processes.signal }
   return {

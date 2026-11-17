@@ -72,6 +72,11 @@ export function aiSettings(value: unknown): AiSettings {
   }
 }
 
+/** low silently truncates long audio; clamp it even when a caller bypassed aiSettings. */
+export function clampTranscriptionEffort(effort: AiEffort): AiEffort {
+  return effort === 'low' ? 'medium' : effort
+}
+
 /** Reject malformed IPC input instead of saving a different configuration than the screen showed. */
 export function validAiSettings(value: unknown): value is AiSettings {
   if (!isRecord(value)) return false

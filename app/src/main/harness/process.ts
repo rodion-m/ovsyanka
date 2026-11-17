@@ -26,9 +26,10 @@ export async function executablePath(value: string, label: string, env: NodeJS.P
   const expanded = value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
   const explicit = isAbsolute(expanded) || /[/\\]/.test(expanded)
   const names = process.platform === 'win32' && !/\.[^/\\]+$/.test(expanded) ? [expanded, `${expanded}.exe`, `${expanded}.com`] : [expanded]
+  const home = env.HOME || env.USERPROFILE || homedir()
   // A GUI launch (Finder) gets a minimal PATH; well-known install dirs are the fallback, in this order.
-  const directories = explicit ? [] : [join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
-  const paths = explicit ? names.map(n => resolve(n)) : (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean).concat(directories).flatMap(dir => names.map(n => join(dir, n)))
+  const directories = explicit ? [] : [join(home, '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+  const paths = explicit ? names.map(n => resolve(n)) : (env.PATH || env.Path || '').split(delimiter).filter(Boolean).concat(directories).flatMap(dir => names.map(n => join(dir, n)))
   for (const candidate of paths) {
     try {
       const path = await realpath(candidate)
@@ -43,6 +44,16 @@ export async function executablePath(value: string, label: string, env: NodeJS.P
     }
   }
   throw new HarnessError(`${label} was not found. Install it and select its executable path in AI settings.`)
+}
+
+/** Prepend directories to a child environment's PATH so a Finder launch finds what the checks resolved. */
+export function prependPath(env: NodeJS.ProcessEnv, directories: string[]): NodeJS.ProcessEnv {
+  const dirs = [...new Set(directories)]
+  if (!dirs.length) return env
+  const key = 'PATH' in env ? 'PATH' : 'Path' in env ? 'Path' : 'PATH'
+  const current = env[key]
+  env[key] = [...dirs, ...(typeof current === 'string' && current ? current.split(delimiter) : [])].join(delimiter)
+  return env
 }
 
 type ProcessOptions = {
@@ -100,6 +111,23 @@ export class HarnessProcesses {
       this.children.add(child)
       const stdout: Buffer[] = [], stderr: Buffer[] = []
       const stdoutText = new StringDecoder('utf8')
+      const stdoutHandler = options.onStdout
+      let stdoutHandlerFailed = false
+      const emitStdout = (text: string) => {
+        if (!stdoutHandler || stdoutHandlerFailed) return
+        try { stdoutHandler(text) }
+        catch (error) {
+          // A throwing callback must not hang or crash the run; the buffered output still owns it.
+          stdoutHandlerFailed = true
+          console.warn(`${options.label} output handler failed.`, error)
+        }
+      }
+      let stdoutFlushed = false
+      const flushStdout = () => {
+        if (stdoutFlushed) return
+        stdoutFlushed = true
+        emitStdout(stdoutText.end())
+      }
       let outBytes = 0, errBytes = 0
       let error: Error | undefined
       let finished = false, closed = false, code: number | null = null
@@ -132,6 +160,7 @@ export class HarnessProcesses {
           if (closed) finish()
           else forceTimer = setTimeout(() => {
             child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy()
+            flushStdout()
             closed = true
             finish()
           }, 250)
@@ -151,7 +180,7 @@ export class HarnessProcesses {
         finish()
       })
       child.stdout.on('data', (chunk: Buffer) => {
-        if (options.onStdout) options.onStdout(stdoutText.write(chunk))
+        emitStdout(stdoutText.write(chunk))
         outBytes += chunk.length
         if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`))
         else if (!error) stdout.push(chunk)
@@ -162,7 +191,7 @@ export class HarnessProcesses {
         else if (!error) stderr.push(chunk)
       })
       child.stdin.on('error', () => cancel(new HarnessError(`${options.label} closed its input before accepting the request.`)))
-      child.on('close', exitCode => { if (options.onStdout) options.onStdout(stdoutText.end()); closed = true; code = exitCode; finish() })
+      child.on('close', exitCode => { flushStdout(); closed = true; code = exitCode; finish() })
       // Register EPIPE handling before writing; an auth/startup failure may close stdin immediately.
       child.stdin.end(options.input ?? '')
       if (signal.aborted) onAbort()

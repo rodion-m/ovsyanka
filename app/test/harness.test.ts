@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AI_SETTINGS, type AiSettings } from '../src/shared/ai'
 import { agyAnswer, createAgy } from '../src/main/harness/agy'
@@ -29,6 +29,7 @@ async function script(directory: string, name: string, source: string) {
   return path
 }
 const successful = (response: string) => JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response } })
+const INIT = JSON.stringify({ event: 'init', conversation_id: '11111111-2222-4333-8444-555555555555', init: { model: 'fake' } })
 const heard = { language: 'ru', segments: [{ start: 0.25, end: 1.5, text: 'Обсудили запуск в пятницу.' }] }
 async function agyFixture(response: string | { summary: string; notes: string; nextSteps: string; title: string } = JSON.stringify(heard), result: Record<string, unknown> = {}) {
   const root = await directory(), log = join(root, 'calls.jsonl'), tempDir = join(root, 'staging')
@@ -49,12 +50,13 @@ process.stdin.on('end', () => {
   const latest = messages.at(-1)?.content ?? '';
   const response = typeof answers === 'string' ? answers : latest.startsWith('Now give this meeting a title') ? answers.title
     : latest.startsWith('Now write only') ? answers.nextSteps : latest.includes('Write compact notes on this part only') ? answers.summary : answers.notes;
+  console.log(${JSON.stringify(INIT)});
   console.log(JSON.stringify({event:'step_update',step_update:{step_type:'agent_response',text_delta:'UNTRUSTED PARTIAL'}}));
   console.log(JSON.stringify({event:'step_update',step_update:{thinking_delta:'PRIVATE THOUGHT'}}));
   console.log(JSON.stringify({event:'result',result:{status:'SUCCESS',response,...${JSON.stringify(result)}}}));
 });`)
   const settings: AiSettings = { ...DEFAULT_AI_SETTINGS, agyPath }
-  const harness = createSubscriptionHarness({ settings, tempDir })
+  const harness = createSubscriptionHarness({ settings, tempDir, storeRoot: join(root, 'agy-store') })
   stoppers.push(harness.stop)
   return { root, log, tempDir, settings, harness, calls: async () => (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line)) }
 }
@@ -196,12 +198,22 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     const fixture = await agyFixture()
     const processes = new HarnessProcesses()
     stoppers.push(() => processes.stop())
-    const run = vi.spyOn(processes, 'run').mockResolvedValue({ stdout: successful('ok'), stderr: '', exitCode: 0 })
+    const run = vi.spyOn(processes, 'run').mockResolvedValue({ stdout: `${INIT}\n${successful('ok')}`, stderr: '', exitCode: 0 })
     const dir = await directory()
-    const agy = createAgy({ ...fixture.settings, timeoutSeconds: 180 }, processes)
+    const agy = createAgy({ ...fixture.settings, timeoutSeconds: 180 }, processes, { storeRoot: join(fixture.root, 'agy-store') })
     await agy({ prompt: 'text request', directory: dir })
     await agy({ prompt: 'audio request', directory: dir, audio: true, schema: TRANSCRIPT_SCHEMA })
     expect(run.mock.calls.map(([options]) => options.timeoutMs)).toEqual([180_000, 600_000])
+  })
+  it('clamps a low transcription effort to medium at the agy boundary', async () => {
+    const fixture = await agyFixture()
+    const processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    const run = vi.spyOn(processes, 'run').mockResolvedValue({ stdout: `${INIT}\n${successful('ok')}`, stderr: '', exitCode: 0 })
+    const agy = createAgy({ ...fixture.settings, transcriptionEffort: 'low' }, processes, { storeRoot: join(fixture.root, 'agy-store') })
+    await agy({ prompt: 'audio request', directory: await directory(), audio: true, schema: TRANSCRIPT_SCHEMA })
+    const options = run.mock.calls[0][0]
+    expect(options.args[options.args.indexOf('--effort') + 1]).toBe('medium')
   })
   it('does not make remote requests or even create staging files for partial chunks', async () => {
     const fixture = await agyFixture()
@@ -221,7 +233,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   })
   it('preserves before roles, Russian output preference and final callback consistency', async () => {
     const fixture = await agyFixture('## Решения\n- Запускаем в пятницу.\n')
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, outputLanguage: 'ru' }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, outputLanguage: 'ru' }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const llm = await harness.model.llm(), pieces: string[] = []
     expect(llm.readAhead).toBeUndefined()
@@ -241,7 +253,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   })
   it('places the explicitly chosen output language after any contradictory conversation instruction', async () => {
     const fixture = await agyFixture('Готово.')
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, outputLanguage: 'ru' }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, outputLanguage: 'ru' }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     await (await harness.model.llm()).chat('Write the answer in English.', () => {})
     const [call] = await fixture.calls()
@@ -260,7 +272,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   })
   it('splits long Cyrillic, quotes and newlines against encoded budgets before summary completion', async () => {
     const fixture = await agyFixture('Краткое содержание.')
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, contextTokens: 8192 }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, contextTokens: 8192 }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const llm = await harness.model.llm()
     const estimate = (llm as typeof llm & { estimate: typeof countTokens }).estimate
@@ -281,7 +293,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     const notes = '## Подготовка запуска\n' + Array.from({ length: bullets }, (_, i) => `- Этап ${i}: проверили "сборку", путь C:\\проект и готовность команды; запуск согласовали на пятницу.`).join('\n')
     const next = '## Следующие шаги\n- **Елена:** проверить сборку до пятницы.'
     const fixture = await agyFixture({ summary: '### Запуск\n- Команда проверила сборку и согласовала запуск на пятницу.', notes, nextSteps: next, title: 'Подготовка запуска к пятнице' })
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, contextTokens, outputLanguage: 'ru' }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, contextTokens, outputLanguage: 'ru' }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const llm = await harness.model.llm(), shown: string[] = []
     let title: ((llm: Llm) => Promise<string>) | undefined
@@ -315,7 +327,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   it('can retry a previously missing executable after it is installed', async () => {
     const fixture = await agyFixture('Установлено.')
     const missing = join(fixture.root, 'installed-later')
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: missing }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: missing }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const llm = await harness.model.llm()
     await expect(llm.chat('Проверка', () => {})).rejects.toThrow('was not found')
@@ -325,8 +337,8 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   })
   it('aborts an active model request without final callbacks and removes its prompt stage', async () => {
     const fixture = await agyFixture(), abort = new AbortController(), ready = join(fixture.root, 'active')
-    const binary = await script(fixture.root, 'waiting-agy', `require('node:fs').writeFileSync(${JSON.stringify(ready)},'1');process.stdin.resume();setInterval(()=>{},1000)`)
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: binary }, tempDir: fixture.tempDir })
+    const binary = await script(fixture.root, 'waiting-agy', `console.log(${JSON.stringify(INIT)});require('node:fs').writeFileSync(${JSON.stringify(ready)},'1');process.stdin.resume();setInterval(()=>{},1000)`)
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: binary }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const llm = await harness.model.llm(abort.signal), callback = vi.fn()
     const result = llm.chat('Прервать этот запрос', callback).catch(error => error as Error)
@@ -351,7 +363,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
 })
 
 const CONVERSATION = 'b32e1fb5-0eef-4b17-a4b9-d1408fed4f7b'
-async function agyConversationFixture(mode: 'success' | 'failure' | 'hang') {
+async function agyConversationFixture(mode: 'success' | 'failure' | 'hang' | 'stubborn' | 'noinit', settings: Partial<AiSettings> = {}) {
   const root = await directory(), store = join(root, 'agy-store'), ready = join(root, 'ready')
   const agyPath = await script(root, 'store-agy', `
 const fs=require('node:fs'),path=require('node:path');
@@ -361,14 +373,15 @@ fs.mkdirSync(path.join(store,'brain',id),{recursive:true});fs.writeFileSync(path
 fs.writeFileSync(ready,'1');
 let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>input+=c);
 process.stdin.on('end',()=>{
-  console.log(JSON.stringify({event:'init',conversation_id:id,init:{model:'fake'}}));
-  ${mode === 'hang' ? "fs.writeFileSync(ready,'streamed');setInterval(()=>{},1000)" : mode === 'failure'
-    ? "console.log(JSON.stringify({event:'result',result:{status:'ERROR',response:'PRIVATE FAILURE'}}));"
+  ${mode === 'noinit' ? '' : "console.log(JSON.stringify({event:'init',conversation_id:id,init:{model:'fake'}}));"}
+  ${mode === 'hang' ? "fs.writeFileSync(ready,'streamed');setInterval(()=>{},1000)"
+    : mode === 'stubborn' ? "process.on('SIGTERM',()=>{});fs.writeFileSync(ready,'streamed');setInterval(()=>{},1000)"
+    : mode === 'failure' ? "console.log(JSON.stringify({event:'result',result:{status:'ERROR',response:'PRIVATE FAILURE'}}));"
     : "console.log(JSON.stringify({event:'result',result:{status:'SUCCESS',response:'done'}}));"}
 });`)
   const processes = new HarnessProcesses()
   stoppers.push(() => processes.stop())
-  const agy = createAgy({ ...DEFAULT_AI_SETTINGS, agyPath }, processes, store)
+  const agy = createAgy({ ...DEFAULT_AI_SETTINGS, agyPath, ...settings }, processes, { storeRoot: store, journalPath: join(root, 'agy-forget.json') })
   return { store, ready, agy, processes, directory: await directory() }
 }
 const storeEntries = (store: string, id: string) => [
@@ -397,6 +410,66 @@ describe.skipIf(isWindows)('agy conversation cleanup on the direct route', () =>
     expect(await result).toMatchObject({ name: 'AbortError' })
     for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
   })
+  it('deletes the conversation copy when the timeout force-kills agy', async () => {
+    const fixture = await agyConversationFixture('stubborn', { timeoutSeconds: 1 })
+    await expect(fixture.agy({ prompt: 'ping', directory: fixture.directory })).rejects.toMatchObject({ name: 'TimeoutError' })
+    for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('warns and deletes nothing when agy never reports a conversation id', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fixture = await agyConversationFixture('noinit')
+    await expect(fixture.agy({ prompt: 'ping', directory: fixture.directory })).resolves.toBe('done')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('conversation id'))
+    for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).resolves.toBeTruthy()
+  })
+  it('prepends the resolved agy directory to the child PATH', async () => {
+    const root = await directory(), seen = join(root, 'path')
+    const agyPath = await script(root, 'path-agy', `
+require('node:fs').writeFileSync(${JSON.stringify(seen)}, process.env.PATH);
+process.stdin.resume();
+process.stdin.on('end',()=>{console.log(${JSON.stringify(INIT)});console.log(JSON.stringify({event:'result',result:{status:'SUCCESS',response:'ok'}}))});`)
+    const processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    const agy = createAgy({ ...DEFAULT_AI_SETTINGS, agyPath }, processes, { storeRoot: join(root, 'agy-store'), journalPath: join(root, 'agy-forget.json') })
+    await agy({ prompt: 'ping', directory: await directory() })
+    expect((await readFile(seen, 'utf8')).split(delimiter)[0]).toBe(dirname(await realpath(agyPath)))
+  })
+})
+
+async function seedAgyStore(store: string, id: string) {
+  for (const [dir, name] of [['conversations', `${id}.db`], ['presence', `${id}.lock`], ['annotations', `${id}.pbtxt`]] as const) {
+    await mkdir(join(store, dir), { recursive: true })
+    await writeFile(join(store, dir, name), 'x')
+  }
+  await mkdir(join(store, 'brain', id), { recursive: true })
+  await writeFile(join(store, 'brain', id, 'audio.wav'), 'x')
+}
+
+describe.skipIf(isWindows)('agy forget journal replay at harness creation', () => {
+  const journaled = async (notBefore: number) => {
+    const root = await directory(), store = join(root, 'agy-store'), tempDir = join(root, 'harness-tmp')
+    const journal = join(tempDir, 'agy-forget.json')
+    await mkdir(tempDir, { recursive: true })
+    await seedAgyStore(store, CONVERSATION)
+    await writeFile(journal, JSON.stringify([{ id: CONVERSATION, notBefore }]))
+    const harness = createSubscriptionHarness({ settings: { ...DEFAULT_AI_SETTINGS, agyPath: join(root, 'missing-agy') }, tempDir, storeRoot: store })
+    stoppers.push(harness.stop)
+    return { store, journal }
+  }
+  it('deletes a conversation copy left behind by a killed run', async () => {
+    const { store, journal } = await journaled(Date.now() - 60_000)
+    await vi.waitFor(async () => {
+      await expect(stat(journal)).rejects.toMatchObject({ code: 'ENOENT' })
+    }, { timeout: 3000, interval: 20 })
+    for (const path of storeEntries(store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('does not delete a journaled database older than its spawn', async () => {
+    const { store, journal } = await journaled(Date.now() + 60_000)
+    await vi.waitFor(async () => {
+      await expect(stat(journal)).rejects.toMatchObject({ code: 'ENOENT' })
+    }, { timeout: 3000, interval: 20 })
+    for (const path of storeEntries(store, CONVERSATION)) await expect(stat(path)).resolves.toBeTruthy()
+  })
 })
 
 describe.skipIf(isWindows)('bounded process lifecycle', () => {
@@ -420,6 +493,16 @@ describe.skipIf(isWindows)('bounded process lifecycle', () => {
     const early = await script(root, 'early', 'process.stdin.destroy(); process.exit(2)')
     await expect(processes.run({ label: 'Fake', executable: early, args: [], timeoutMs: 2000, input: 'x'.repeat(8 * 1024 * 1024) })).rejects.toThrow()
   })
+  it('settles the run even when the stdout callback throws', async () => {
+    const root = await directory(), processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const binary = await script(root, 'chatty', `console.log('one'); console.log('two')`)
+    const result = await processes.run({ label: 'Fake', executable: binary, args: [], timeoutMs: 2000, onStdout: () => { throw new Error('callback bug') } })
+    expect(result.stdout).toContain('one')
+    expect(result.stdout).toContain('two')
+    expect(warn).toHaveBeenCalled()
+  })
   it('finds a bare executable name in ~/.local/bin when PATH lacks it, as under Finder', async () => {
     const root = await directory(), home = join(root, 'home'), bin = join(home, '.local', 'bin')
     await mkdir(bin, { recursive: true })
@@ -428,6 +511,16 @@ describe.skipIf(isWindows)('bounded process lifecycle', () => {
     await chmod(binary, 0o700)
     vi.stubEnv('HOME', home)
     const found = await executablePath('agy', 'Fake agy', { PATH: join(root, 'empty-path') })
+    expect(found).toBe(await realpath(binary))
+  })
+  it('uses env.HOME for ~/.local/bin when the passed environment provides it', async () => {
+    const root = await directory(), home = join(root, 'home'), bin = join(home, '.local', 'bin')
+    await mkdir(bin, { recursive: true })
+    const binary = join(bin, 'agy')
+    await writeFile(binary, `#!${process.execPath}\nprocess.exit(0)`, { mode: 0o700 })
+    await chmod(binary, 0o700)
+    vi.stubEnv('HOME', join(root, 'other-home'))
+    const found = await executablePath('agy', 'Fake agy', { HOME: home, PATH: join(root, 'empty-path') })
     expect(found).toBe(await realpath(binary))
   })
   it('times out and removes the private staging directory on failure', async () => {
@@ -468,7 +561,7 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const prompt=args.includes('--prompt-file')?fs.readFileSync(field('--prompt-file'),'utf8'):undefined;
 const schema=process.env.PORCH_OUTPUT_SCHEMA?JSON.parse(fs.readFileSync(process.env.PORCH_OUTPUT_SCHEMA,'utf8')):undefined;
 const audioPath=path.join(process.cwd(),'audio.wav'),wav=fs.existsSync(audioPath)?fs.readFileSync(audioPath):undefined;
-fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV,GEMINI_API_KEY:'GEMINI_API_KEY' in process.env,GOOGLE_API_KEY:'GOOGLE_API_KEY' in process.env,AGY_ADC_AUTH:'AGY_ADC_AUTH' in process.env,ANTHROPIC_API_KEY:'ANTHROPIC_API_KEY' in process.env,OPENAI_API_KEY:'OPENAI_API_KEY' in process.env,present:{PORCH_BIN_AGY:'PORCH_BIN_AGY' in process.env,AGY_MODEL:'AGY_MODEL' in process.env,AGY_EFFORT:'AGY_EFFORT' in process.env,CLAUDE_MODEL:'CLAUDE_MODEL' in process.env,CODEX_MODEL:'CODEX_MODEL' in process.env,PORCH_BIN_CODEX:'PORCH_BIN_CODEX' in process.env,PORCH_BIN_CLAUDE:'PORCH_BIN_CLAUDE' in process.env}}})+'\\n');
+fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,prompt,schema,cwd:process.cwd(),audio:wav?{hash:crypto.createHash('sha256').update(wav).digest('hex'),header:Array.from(wav.subarray(0,44))}:undefined,env:{PATH:process.env.PATH,AGY_MODEL:process.env.AGY_MODEL,AGY_EFFORT:process.env.AGY_EFFORT,PORCH_BIN_AGY:process.env.PORCH_BIN_AGY,PORCH_SINGLE_AGENT:process.env.PORCH_SINGLE_AGENT,TMPDIR:process.env.TMPDIR,PORCH_RUN_DIR:process.env.PORCH_RUN_DIR,PORCH_DUMP_ARGV:process.env.PORCH_DUMP_ARGV,GEMINI_API_KEY:'GEMINI_API_KEY' in process.env,GOOGLE_API_KEY:'GOOGLE_API_KEY' in process.env,AGY_ADC_AUTH:'AGY_ADC_AUTH' in process.env,ANTHROPIC_API_KEY:'ANTHROPIC_API_KEY' in process.env,OPENAI_API_KEY:'OPENAI_API_KEY' in process.env,present:{PORCH_BIN_AGY:'PORCH_BIN_AGY' in process.env,AGY_MODEL:'AGY_MODEL' in process.env,AGY_EFFORT:'AGY_EFFORT' in process.env,CLAUDE_MODEL:'CLAUDE_MODEL' in process.env,CODEX_MODEL:'CODEX_MODEL' in process.env,PORCH_BIN_CODEX:'PORCH_BIN_CODEX' in process.env,PORCH_BIN_CLAUDE:'PORCH_BIN_CLAUDE' in process.env}}})+'\\n');
 if(args[0]==='media' && args[1]==='capabilities' && args[2]==='--json') process.stdout.write(fs.readFileSync(${JSON.stringify(capabilities)},'utf8'));
 else if(args[0]==='media') { console.error('public media must not transcode this WAV'); process.exit(9); }
 else if(schema) process.stdout.write(${JSON.stringify(options.response ?? JSON.stringify(heard))});
@@ -479,7 +572,7 @@ ${options.textExit === undefined ? `else process.stdout.write('## Итоги\\n-
   await writeFile(join(lib, 'backend_run.sh'), source, { mode: 0o700 })
   const link = join(fixture.root, 'porch-link'); await symlink(porch, link)
   const settings: AiSettings = { ...fixture.settings, backend: 'porch', porchPath: link, textProfile: 'claude-sonnet', transcriptionProfile: profile }
-  const harness = createSubscriptionHarness({ settings, tempDir: fixture.tempDir }); stoppers.push(harness.stop)
+  const harness = createSubscriptionHarness({ settings, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') }); stoppers.push(harness.stop)
   return { ...fixture, settings, harness, capabilities, porchCalls: async () => (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line)) }
 }
 
@@ -527,9 +620,29 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     expect(call.env.PORCH_BIN_AGY).toBe(await realpath(fixture.settings.agyPath))
     expect(await readdir(fixture.tempDir)).toEqual([])
   })
+  it('prepends the resolved bash and agy directories to the Porch child PATH', async () => {
+    const fixture = await porchFixture()
+    await (await fixture.harness.model.llm()).chat('Сделай заметки.', () => {})
+    const [call] = await fixture.porchCalls()
+    const path = String(call.env.PATH).split(delimiter)
+    expect(path.slice(0, 2)).toEqual([
+      dirname(await executablePath('bash', 'Bash')),
+      dirname(await realpath(fixture.settings.agyPath)),
+    ])
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('clamps a low transcription effort to medium for the audio route', async () => {
+    const fixture = await porchFixture()
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, transcriptionEffort: 'low' }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
+    stoppers.push(harness.stop)
+    await harness.transcriber(callbacks())(chunk())
+    const audio = (await fixture.porchCalls()).find(call => call.schema)
+    expect(audio.env.AGY_EFFORT).toBe('medium')
+    expect(await readdir(fixture.tempDir)).toEqual([])
+  })
   it('still runs the text route without PORCH_BIN_AGY when agy cannot be resolved', async () => {
     const fixture = await porchFixture()
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     await expect((await harness.model.llm()).chat('Сделай заметки.', () => {})).resolves.toBe('## Итоги\n- Всё готово.\n')
     const [call] = await fixture.porchCalls()
@@ -540,7 +653,7 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     vi.stubEnv('PORCH_BIN_AGY', '/foreign/agy')
     vi.stubEnv('AGY_MODEL', 'wrong'); vi.stubEnv('AGY_EFFORT', 'high'); vi.stubEnv('CLAUDE_MODEL', 'wrong')
     const fixture = await porchFixture()
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: join(fixture.root, 'missing-agy') }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     await expect((await harness.model.llm()).chat('Сделай заметки.', () => {})).resolves.toBe('## Итоги\n- Всё готово.\n')
     const [call] = await fixture.porchCalls()
@@ -550,7 +663,7 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
   it('reports the missing agy path instead of sign-in advice when an unresolved text run fails', async () => {
     const fixture = await porchFixture({ textExit: 4 })
     const missing = join(fixture.root, 'missing-agy')
-    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: missing }, tempDir: fixture.tempDir })
+    const harness = createSubscriptionHarness({ settings: { ...fixture.settings, agyPath: missing }, tempDir: fixture.tempDir, storeRoot: join(fixture.root, 'agy-store') })
     stoppers.push(harness.stop)
     const error = await (await harness.model.llm()).chat('Сделай заметки.', () => {}).catch(error => error)
     expect(error).toBeInstanceOf(Error)
