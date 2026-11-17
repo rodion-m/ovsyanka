@@ -23,6 +23,18 @@ describe('AI settings fields', () => {
     expect(html).toContain('No shell commands or extra arguments')
   })
 
+  it('offers only medium and high for transcription effort while text keeps low', () => {
+    const html = fields('agy')
+    const select = (id: string) => html.match(new RegExp(`<select[^>]*id="${id}"[\\s\\S]*?</select>`))?.[0] ?? ''
+    const transcription = select('ai-transcriptionEffort'), text = select('ai-textEffort')
+    expect(transcription).toContain('value="medium"')
+    expect(transcription).toContain('value="high"')
+    expect(transcription).not.toContain('value="low"')
+    expect(text).toContain('value="low"')
+    expect(text).toContain('value="medium"')
+    expect(text).toContain('value="high"')
+  })
+
   it('keeps Porch profile text settings distinct from the agy audio override', () => {
     const html = fields('porch')
     expect(html).toContain('id="ai-transcriptionProfile"')

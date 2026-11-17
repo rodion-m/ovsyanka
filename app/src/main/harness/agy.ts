@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AiSettings } from '../../shared/ai'
+import { conversationId, forgetConversation } from './agyStore'
 import { assertRunning, executablePath, HarnessError, HarnessProcesses } from './process'
 import { MIN_AUDIO_TIMEOUT_SECONDS } from './transcribe'
 
@@ -37,7 +38,7 @@ export function agyAnswer(stdout: string): string {
   return answer
 }
 
-export function createAgy(settings: AiSettings, processes: HarnessProcesses) {
+export function createAgy(settings: AiSettings, processes: HarnessProcesses, storeRoot?: string) {
   let resolved: Promise<string> | undefined
   return async (request: Request): Promise<string> => {
     assertRunning(request.signal)
@@ -64,9 +65,32 @@ export function createAgy(settings: AiSettings, processes: HarnessProcesses) {
     delete env.GOOGLE_API_KEY
     delete env.AGY_ADC_AUTH
     assertRunning(request.signal)
-    const result = await processes.run({ label: 'agy', executable: binary, args, cwd: request.directory, env,
-      input: `${JSON.stringify({ event: 'user', message: { content: request.prompt } })}\n`,
-      signal: request.signal, timeoutMs: (request.audio ? Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) : settings.timeoutSeconds) * 1000 })
-    return agyAnswer(result.stdout)
+    // agy keeps a private copy of every conversation, audio included. Its id arrives in the
+    // stream, so it must be caught while stdout flows: a failed request discards the buffered output.
+    let conversation: string | undefined
+    let pending = ''
+    const scan = (chunk: string) => {
+      if (conversation) return
+      pending += chunk
+      const cut = pending.lastIndexOf('\n')
+      if (cut < 0) return
+      const ready = pending.slice(0, cut + 1)
+      pending = pending.slice(cut + 1)
+      conversation = conversationId(ready)
+    }
+    try {
+      const result = await processes.run({ label: 'agy', executable: binary, args, cwd: request.directory, env,
+        input: `${JSON.stringify({ event: 'user', message: { content: request.prompt } })}\n`,
+        signal: request.signal, timeoutMs: (request.audio ? Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) : settings.timeoutSeconds) * 1000,
+        onStdout: scan })
+      return agyAnswer(result.stdout)
+    } finally {
+      // The process has exited by now, on success, failure, and abort alike.
+      conversation ??= conversationId(pending)
+      if (conversation) {
+        try { await forgetConversation(conversation, storeRoot) }
+        catch (error) { console.warn('Yogurt could not remove the agy conversation copy.', error) }
+      }
+    }
   }
 }

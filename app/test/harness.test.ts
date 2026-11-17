@@ -7,7 +7,7 @@ import { agyAnswer, createAgy } from '../src/main/harness/agy'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
 import { countTokens } from '../src/main/harness/model'
 import { createPorch, exactProfile, porchInstallation } from '../src/main/harness/porch'
-import { HarnessProcesses, inStage } from '../src/main/harness/process'
+import { executablePath, HarnessProcesses, inStage } from '../src/main/harness/process'
 import { createHarnessTranscriber, parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
 import { takeBatch } from '../src/main/asr/batch'
 import type { Chunk } from '../src/main/asr/chunker'
@@ -350,6 +350,55 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
   })
 })
 
+const CONVERSATION = 'b32e1fb5-0eef-4b17-a4b9-d1408fed4f7b'
+async function agyConversationFixture(mode: 'success' | 'failure' | 'hang') {
+  const root = await directory(), store = join(root, 'agy-store'), ready = join(root, 'ready')
+  const agyPath = await script(root, 'store-agy', `
+const fs=require('node:fs'),path=require('node:path');
+const id=${JSON.stringify(CONVERSATION)},store=${JSON.stringify(store)},ready=${JSON.stringify(ready)};
+for(const [dir,name] of [['conversations',id+'.db'],['presence',id+'.lock'],['annotations',id+'.pbtxt']]){fs.mkdirSync(path.join(store,dir),{recursive:true});fs.writeFileSync(path.join(store,dir,name),'x')}
+fs.mkdirSync(path.join(store,'brain',id),{recursive:true});fs.writeFileSync(path.join(store,'brain',id,'audio.wav'),'x');
+fs.writeFileSync(ready,'1');
+let input='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>input+=c);
+process.stdin.on('end',()=>{
+  console.log(JSON.stringify({event:'init',conversation_id:id,init:{model:'fake'}}));
+  ${mode === 'hang' ? "fs.writeFileSync(ready,'streamed');setInterval(()=>{},1000)" : mode === 'failure'
+    ? "console.log(JSON.stringify({event:'result',result:{status:'ERROR',response:'PRIVATE FAILURE'}}));"
+    : "console.log(JSON.stringify({event:'result',result:{status:'SUCCESS',response:'done'}}));"}
+});`)
+  const processes = new HarnessProcesses()
+  stoppers.push(() => processes.stop())
+  const agy = createAgy({ ...DEFAULT_AI_SETTINGS, agyPath }, processes, store)
+  return { store, ready, agy, processes, directory: await directory() }
+}
+const storeEntries = (store: string, id: string) => [
+  join(store, 'conversations', `${id}.db`), join(store, 'brain', id),
+  join(store, 'presence', `${id}.lock`), join(store, 'annotations', `${id}.pbtxt`),
+]
+
+describe.skipIf(isWindows)('agy conversation cleanup on the direct route', () => {
+  it('deletes the conversation copy after a successful request', async () => {
+    const fixture = await agyConversationFixture('success')
+    await expect(fixture.agy({ prompt: 'ping', directory: fixture.directory })).resolves.toBe('done')
+    for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('deletes the conversation copy after a failed answer', async () => {
+    const fixture = await agyConversationFixture('failure')
+    await expect(fixture.agy({ prompt: 'ping', directory: fixture.directory })).rejects.toThrow('did not complete')
+    for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('deletes the conversation copy after the harness stops a request in flight', async () => {
+    const fixture = await agyConversationFixture('hang')
+    const result = fixture.agy({ prompt: 'ping', directory: fixture.directory }).catch(error => error as Error)
+    await vi.waitFor(async () => expect((await stat(fixture.ready)).size).toBe(8), { timeout: 1000, interval: 20 })
+    // The init event precedes the ready marker in the child's output; let the parent consume it.
+    await new Promise(resolve => setTimeout(resolve, 100))
+    fixture.processes.stop()
+    expect(await result).toMatchObject({ name: 'AbortError' })
+    for (const path of storeEntries(fixture.store, CONVERSATION)) await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+})
+
 describe.skipIf(isWindows)('bounded process lifecycle', () => {
   it('preserves argv literally and reports nonzero failures without diagnostics', async () => {
     const root = await directory(), processes = new HarnessProcesses()
@@ -370,6 +419,16 @@ describe.skipIf(isWindows)('bounded process lifecycle', () => {
     }
     const early = await script(root, 'early', 'process.stdin.destroy(); process.exit(2)')
     await expect(processes.run({ label: 'Fake', executable: early, args: [], timeoutMs: 2000, input: 'x'.repeat(8 * 1024 * 1024) })).rejects.toThrow()
+  })
+  it('finds a bare executable name in ~/.local/bin when PATH lacks it, as under Finder', async () => {
+    const root = await directory(), home = join(root, 'home'), bin = join(home, '.local', 'bin')
+    await mkdir(bin, { recursive: true })
+    const binary = join(bin, 'agy')
+    await writeFile(binary, `#!${process.execPath}\nprocess.exit(0)`, { mode: 0o700 })
+    await chmod(binary, 0o700)
+    vi.stubEnv('HOME', home)
+    const found = await executablePath('agy', 'Fake agy', { PATH: join(root, 'empty-path') })
+    expect(found).toBe(await realpath(binary))
   })
   it('times out and removes the private staging directory on failure', async () => {
     const root = await directory(), processes = new HarnessProcesses()

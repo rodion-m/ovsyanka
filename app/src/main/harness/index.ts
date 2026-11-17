@@ -32,12 +32,12 @@ export async function checkHarness(settings: AiSettings): Promise<AiCheck> {
   const version = async (path: string, label: string, args: string[]) => {
     const executable = await executablePath(path, label)
     const result = await processes.run({ label, executable, args, timeoutMs: 5000, stdoutLimit: 128 * 1024, stderrLimit: 128 * 1024 })
-    return result.stdout || result.stderr
+    return { executable, output: result.stdout || result.stderr }
   }
   try {
     if (settings.backend === 'porch') { exactProfile(settings.textProfile); exactProfile(settings.transcriptionProfile); await porchInstallation(settings.porchPath) }
-    const output = await version(settings.agyPath, 'Antigravity CLI (agy)', ['--version'])
-    const match = output.match(/\b(\d+)\.(\d+)\.(\d+)\b/)
+    const agy = await version(settings.agyPath, 'Antigravity CLI (agy)', ['--version'])
+    const match = agy.output.match(/\b(\d+)\.(\d+)\.(\d+)\b/)
     if (!match) throw new HarnessError('Could not determine the agy version. Install Antigravity CLI 1.5.4 or newer.')
     const [major, minor, patch] = match.slice(1).map(Number)
     if (major < 1 || (major === 1 && (minor < 5 || (minor === 5 && patch < 4)))) throw new HarnessError('Antigravity CLI 1.5.4 or newer is required for native audio and stream-json input.')
@@ -45,9 +45,9 @@ export async function checkHarness(settings: AiSettings): Promise<AiCheck> {
       await Promise.all([
         version('bash', 'Bash', ['--version']), version('python3', 'Python 3', ['--version']),
       ])
-      return { ok: true, message: `Porch's raw adapter, Bash and Python 3 are installed (contract ${PORCH_CONTRACT.slice(0, 7)}; agy ${match[0]}). Profiles keep their own permissions; Yogurt removes provider API keys and inherited model/effort overrides, so each profile must work through its CLI's subscription sign-in. Authentication and model access have not been tested.` }
+      return { ok: true, message: `Porch's raw adapter, Bash and Python 3 are installed (contract ${PORCH_CONTRACT.slice(0, 7)}; agy ${match[0]} at ${agy.executable}). Profiles keep their own permissions; Yogurt removes provider API keys and inherited model/effort overrides, so each profile must work through its CLI's subscription sign-in. Authentication and model access have not been tested.` }
     }
-    return { ok: true, message: `Antigravity CLI ${match[0]} is installed. Sign in with your Google account by running agy in a terminal. Authentication and model access have not been tested.` }
+    return { ok: true, message: `Antigravity CLI ${match[0]} is installed at ${agy.executable}. Sign in with your Google account by running agy in a terminal. Authentication and model access have not been tested.` }
   } catch (error) {
     return { ok: false, message: error instanceof HarnessError ? error.message : 'Could not check the AI harness installation. Verify the executable paths.' }
   } finally { processes.stop() }

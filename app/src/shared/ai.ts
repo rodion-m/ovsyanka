@@ -60,7 +60,8 @@ export function aiSettings(value: unknown): AiSettings {
     agyPath: text(v.agyPath, d.agyPath, 4096),
     porchPath: text(v.porchPath, d.porchPath, 4096),
     transcriptionModel: text(v.transcriptionModel, d.transcriptionModel, 200),
-    transcriptionEffort: oneOf(v.transcriptionEffort, ['low', 'medium', 'high'], d.transcriptionEffort),
+    // low silently truncates long audio, so transcription never offers it; a saved low loads as medium.
+    transcriptionEffort: oneOf(v.transcriptionEffort, ['medium', 'high'], d.transcriptionEffort),
     textModel: text(v.textModel, d.textModel, 200),
     textEffort: oneOf(v.textEffort, ['low', 'medium', 'high'], d.textEffort),
     transcriptionProfile: profile(v.transcriptionProfile, d.transcriptionProfile),

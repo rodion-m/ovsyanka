@@ -39,6 +39,13 @@ describe('AI configuration', () => {
     expect(aiSettings(undefined)).toMatchObject({ backend: 'agy', transcriptionModel: 'gemini-3.8-flash', transcriptionEffort: 'medium' })
   })
 
+  it('never allows low effort for transcription while text keeps it', () => {
+    expect(aiSettings({ transcriptionEffort: 'low' }).transcriptionEffort).toBe('medium')
+    expect(aiSettings({ transcriptionEffort: 'high' }).transcriptionEffort).toBe('high')
+    expect(aiSettings({ transcriptionEffort: 'extreme' }).transcriptionEffort).toBe('medium')
+    expect(aiSettings({ textEffort: 'low' }).textEffort).toBe('low')
+  })
+
   it('keeps upstream fake fixtures local and honors an explicitly selected subscription backend', () => {
     expect(configuredAi({}, {}, true).backend).toBe('local')
     expect(configuredAi({ ai: aiSettings({ backend: 'porch' }) }, {}, true).backend).toBe('porch')

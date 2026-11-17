@@ -34,8 +34,8 @@ export function AiSettingsFields({ value, change }: { value: Configuration; chan
         {options.map(([v, title]) => <option key={v} value={v}>{title}</option>)}
       </select><ChevronDown size={14} aria-hidden="true" />
     </span></Row>
-  const effort = (key: 'transcriptionEffort' | 'textEffort', label: AiCopyKey) => select(`ai-${key}`, aiText(label), value[key],
-    (['low', 'medium', 'high'] as const).map(v => [v, aiText(v)]), v => change({ [key]: v as AiEffort }))
+  const effort = (key: 'transcriptionEffort' | 'textEffort', label: AiCopyKey, options: readonly AiEffort[] = ['low', 'medium', 'high']) =>
+    select(`ai-${key}`, aiText(label), value[key], options.map(v => [v, aiText(v)]), v => change({ [key]: v as AiEffort }))
   return <>
     {select('ai-backend', aiText('backend'), value.backend, (['agy', 'porch', 'local'] as const).map(v => [v, backendName(v)]), v => change({ backend: v as AiBackend }))}
     <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(value.backend === 'local' ? 'localHelp' : 'subscription')}</p>
@@ -47,7 +47,7 @@ export function AiSettingsFields({ value, change }: { value: Configuration; chan
         <p className="ai-settings-note">{aiText('porchAudio')}</p>
       </>}
       {input('transcriptionModel', 'audioModel')}
-      {effort('transcriptionEffort', 'audioEffort')}
+      {effort('transcriptionEffort', 'audioEffort', ['medium', 'high'])}
       {value.backend === 'agy' && <>
         {input('textModel', 'textModel', 'textHelp')}
         {effort('textEffort', 'textEffort')}

@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { access, chmod, mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join, resolve } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 
 /** Errors deliberately omit provider diagnostics: they can contain meeting text or credentials. */
 export class HarnessError extends Error {
@@ -25,7 +26,9 @@ export async function executablePath(value: string, label: string, env: NodeJS.P
   const expanded = value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
   const explicit = isAbsolute(expanded) || /[/\\]/.test(expanded)
   const names = process.platform === 'win32' && !/\.[^/\\]+$/.test(expanded) ? [expanded, `${expanded}.exe`, `${expanded}.com`] : [expanded]
-  const paths = explicit ? names.map(n => resolve(n)) : (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean).flatMap(dir => names.map(n => join(dir, n)))
+  // A GUI launch (Finder) gets a minimal PATH; well-known install dirs are the fallback, in this order.
+  const directories = explicit ? [] : [join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+  const paths = explicit ? names.map(n => resolve(n)) : (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean).concat(directories).flatMap(dir => names.map(n => join(dir, n)))
   for (const candidate of paths) {
     try {
       const path = await realpath(candidate)
@@ -51,6 +54,8 @@ type ProcessOptions = {
   input?: string
   signal?: AbortSignal
   timeoutMs: number
+  /** Called with each stdout chunk as text arrives; the buffered result still owns the full output. */
+  onStdout?: (chunk: string) => void
   stdoutLimit?: number
   stderrLimit?: number
   acceptExitCodes?: number[]
@@ -94,6 +99,7 @@ export class HarnessProcesses {
       })
       this.children.add(child)
       const stdout: Buffer[] = [], stderr: Buffer[] = []
+      const stdoutText = new StringDecoder('utf8')
       let outBytes = 0, errBytes = 0
       let error: Error | undefined
       let finished = false, closed = false, code: number | null = null
@@ -145,6 +151,7 @@ export class HarnessProcesses {
         finish()
       })
       child.stdout.on('data', (chunk: Buffer) => {
+        if (options.onStdout) options.onStdout(stdoutText.write(chunk))
         outBytes += chunk.length
         if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`))
         else if (!error) stdout.push(chunk)
@@ -155,7 +162,7 @@ export class HarnessProcesses {
         else if (!error) stderr.push(chunk)
       })
       child.stdin.on('error', () => cancel(new HarnessError(`${options.label} closed its input before accepting the request.`)))
-      child.on('close', exitCode => { closed = true; code = exitCode; finish() })
+      child.on('close', exitCode => { if (options.onStdout) options.onStdout(stdoutText.end()); closed = true; code = exitCode; finish() })
       // Register EPIPE handling before writing; an auth/startup failure may close stdin immediately.
       child.stdin.end(options.input ?? '')
       if (signal.aborted) onAbort()
