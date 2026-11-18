@@ -14,7 +14,7 @@ export function ThemSilence({ view }: { view: WidgetView }) {
     return (
       <div data-testid="them-muted" role="status" className="pointer-events-auto mx-auto mt-3 flex w-fit max-w-[640px] items-center gap-2.5 rounded-xl border border-line bg-float px-4 py-2 text-[13px] leading-snug text-muted shadow-[var(--shadow)]">
         <span>{t('Warnings are off for this meeting')}</span>
-        <button data-testid="them-unmute" onClick={() => void window.yogurt.meetings.unmuteThemSilence()} className="workspace-button shrink-0">{t('Undo')}</button>
+        <button data-testid="them-unmute" onClick={() => void window.yogurt.meetings.unmuteThemSilence(view.meetingId)} className="workspace-button shrink-0">{t('Undo')}</button>
       </div>
     )
   }
@@ -33,7 +33,7 @@ export function ThemSilence({ view }: { view: WidgetView }) {
   const failed = phase === 'failed'
   const restart = () => {
     setBusy(true)
-    void window.yogurt.meetings.restartSoundCapture().finally(() => setBusy(false))
+    void window.yogurt.meetings.restartSoundCapture(view.meetingId).finally(() => setBusy(false))
   }
   return (
     <div data-testid="them-silent" data-phase={phase} role="status" aria-live="polite" className="pointer-events-auto mx-auto mt-3 flex w-fit max-w-[640px] flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-float px-4 py-3 text-[13px] leading-snug shadow-[var(--shadow)]">
@@ -50,7 +50,7 @@ export function ThemSilence({ view }: { view: WidgetView }) {
         <button data-testid="them-restart" disabled={restarting || busy} onClick={restart} className="workspace-button primary">
           {restarting || busy ? t('Restarting sound capture…') : t('Restart sound capture')}
         </button>
-        <button data-testid="them-mute" disabled={restarting} onClick={() => void window.yogurt.meetings.muteThemSilence()} className="workspace-button">
+        <button data-testid="them-mute" disabled={restarting} onClick={() => void window.yogurt.meetings.muteThemSilence(view.meetingId)} className="workspace-button">
           {t("Don't warn for this meeting")}
         </button>
       </div>

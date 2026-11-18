@@ -682,5 +682,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Arama sırasında bilgisayarın sesi kaydedilmediğinde bir şerit ve bildirim gösterir.",
   "from {start} to {end}": "{start}–{end}",
   "and {n} more": "ve {n} tane daha",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Karşı tarafın sesi {ranges} kaydedilmedi — bu sürelerdeki sözleri transkriptte yok."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Karşı tarafın sesi {ranges} kaydedilmedi. O sırada biri konuştuysa, söyledikleri konuşma dökümünde yer almaz."
 }

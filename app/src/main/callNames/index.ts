@@ -40,7 +40,7 @@ const APP_LAG_MS = 750
 const LOGGED_CHANGES = 30
 
 type Sample = Omit<CallSample, 'ms'> & { t: number }
-type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number
+type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number; lastCallSample?: CallSample
   /** for the silent-"them" watchdog: the last headcount, whether it ever read speakers, when someone else last talked */
   lastParticipants: number | null; sawSpeakers: boolean; otherTalkedAt: number | null }
 
@@ -72,16 +72,18 @@ export function hookCallNames(p: {
 
   const onLine = (id: string, s: Session, l: WatchLine) => {
     if (l.error || !l.app || !l.windows) {
+      s.lastCallSample = undefined
       const why = l.error ?? 'nothing read'
       if (!s.errors.has(why)) { s.errors.add(why); log(`call names: ${why}${why === 'not-trusted' ? ' (no Accessibility permission): the other side stays Them' : ''}`) }
       s.samples.push({ t: l.t, speaking: [], participants: [], me: null, ok: false })
       return
     }
     const kind = kindOf(l.app)
-    if (!kind) return
+    if (!kind) { s.lastCallSample = undefined; return }
     // the first reading of each meeting goes to the log in short, so a real call shows what its app gives
     if (!s.pictured) { s.pictured = true; log(`call names: reading ${l.app} (${kind}), its window in short:\n${summarize(l.windows)}`) }
     const r = readCall(kind, l.windows)
+    s.lastCallSample = { ms: l.t - (s.offset ?? s.startedAt) - APP_LAG_MS, ...r }
     s.samples.push({ t: l.t, ...r })
     s.lastParticipants = r.participants.length || null
     if (r.speaking.length) {
@@ -148,9 +150,12 @@ export function hookCallNames(p: {
     /** resolves when the names after the meeting are in */
     finished: (id: string): Promise<void> => finals.get(id) ?? Promise.resolve(),
     /** the call reader's view for the silent-"them" watchdog; null when it reads nothing for this meeting */
-    themWatch(meetingId: string): { participants: number | null; sawSpeakers: boolean; otherTalkedAt: number | null } | null {
+    themWatch(meetingId: string): { callApp: boolean; participants: string[]; me: boolean; other: boolean; speakingMe: boolean; speakingOther: boolean } | null {
       const s = sessions.get(meetingId)
-      return s ? { participants: s.lastParticipants, sawSpeakers: s.sawSpeakers, otherTalkedAt: s.otherTalkedAt } : null
+      const r = s?.lastCallSample
+      if (!r) return null
+      const names = { myNames: p.myNames() }
+      return { callApp: true, participants: r.participants, me: r.participants.some(n => isMe(n, r, names)), other: r.participants.some(n => !isMe(n, r, names)), speakingMe: r.speaking.some(n => isMe(n, r, names)), speakingOther: r.speaking.some(n => !isMe(n, r, names)) }
     },
   }
 }

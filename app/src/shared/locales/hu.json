@@ -682,5 +682,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Sávot és értesítést jelenít meg, ha a számítógép hangja hívás közben nem rögzül.",
   "from {start} to {end}": "{start}–{end} között",
   "and {n} more": "és még {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "A másik fél hangja nem rögzült {ranges} — az ott elhangzott megnyilvánulásai hiányoznak az átiratból."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "A másik fél hangja nem rögzült {ranges}. Ha valaki akkor beszélt, a szavai nem szerepelnek az átiratban."
 }

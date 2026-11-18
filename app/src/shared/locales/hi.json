@@ -682,5 +682,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "कॉल के दौरान कंप्यूटर की आवाज़ रिकॉर्ड न होने पर बैनर और सूचना दिखाता है।",
   "from {start} to {end}": "{start} से {end} तक",
   "and {n} more": "और {n} और",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "दूसरी तरफ़ की आवाज़ {ranges} रिकॉर्ड नहीं हुई — उन समयों में उनके वाक्य ट्रांसक्रिप्ट में नहीं हैं।"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "दूसरी तरफ़ की आवाज़ {ranges} रिकॉर्ड नहीं हुई. अगर उस समय किसी ने बात की, तो उसकी बातें प्रतिलेख में नहीं होंगी।"
 }

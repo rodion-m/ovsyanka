@@ -706,5 +706,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Mostra um banner e uma notificação quando o som do computador não é gravado durante uma chamada.",
   "from {start} to {end}": "de {start} a {end}",
   "and {n} more": "e mais {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "O som da outra pessoa não foi gravado {ranges} — as falas dela não aparecem na transcrição nesse período."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "O som da outra pessoa não foi gravado {ranges}. Se alguém falou nesse período, essas palavras não aparecem na transcrição."
 }

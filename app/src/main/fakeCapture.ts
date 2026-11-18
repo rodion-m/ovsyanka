@@ -140,7 +140,7 @@ export function fakeCaptureProc(meetingDir: string, startMs = 0, o: { speech?: b
         played[track].push(samples)
         stdout.write(encodeFrame({ t: 'pcm', track, ms, samples }))
       }
-      stdout.write(encodeFrame({ t: 'level', ...lv }))
+      stdout.write(encodeFrame({ t: 'level', ...lv, themZero: played.them.at(-1)?.every(x => Math.abs(x) < 1e-5) ?? true, ms: startMs + (sent / RATE) * 1000 }))
       speechAt(ms - startMs)
     }
   }, 50)

@@ -21,6 +21,17 @@ afterEach(() => {
 const base = { title: 'Standup', endedAt: null, eventId: null, app: null, attendees: [], state: 'recording' as const }
 
 describe('store', () => {
+  it('reads v2 silent ranges and drops malformed stored JSON', () => {
+    const s = fresh()
+    const m = s.createMeeting({ ...base, startedAt: 1 })
+    const value = { v: 2 as const, ranges: [[60_000, 120_000] as [number, number]], muted: true }
+    s.updateMeeting(m.id, { themSilent: value })
+    expect(s.meeting(m.id)?.themSilent).toEqual(value)
+    s.db.prepare('UPDATE meetings SET them_silent = ? WHERE id = ?').run('{broken', m.id)
+    expect(() => s.meeting(m.id)).not.toThrow()
+    expect(s.meeting(m.id)?.themSilent).toBeUndefined()
+  })
+
   it('creates meetings and lists newest first', () => {
     const s = fresh()
     const a = s.createMeeting({ ...base, title: 'A', startedAt: 1000, attendees: [{ name: 'Ada', email: 'ada@x.io' }] })

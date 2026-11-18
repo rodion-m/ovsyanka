@@ -694,5 +694,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Näyttää bannerin ja ilmoituksen, kun tietokoneen ääntä ei tallenneta puhelun aikana.",
   "from {start} to {end}": "{start}–{end}",
   "and {n} more": "ja vielä {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Toisen osapuolen ääntä ei tallennettu {ranges} — sen repliikit puuttuvat litteroinnista sinä aikana."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Toisen osapuolen ääntä ei tallennettu {ranges}. Jos joku puhui silloin, hänen sanansa eivät ole litteraatissa."
 }

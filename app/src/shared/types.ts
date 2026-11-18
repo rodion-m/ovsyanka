@@ -97,11 +97,11 @@ export type YogurtApi = {
     /** sends the meeting's kept remote audio through transcription again, including chunks that failed enough times to be skipped */
     retryTranscription(id: string): Promise<void>
     /** the banner's primary button: rebuild the system-sound tap now */
-    restartSoundCapture(): Promise<boolean>
+    restartSoundCapture(id: string): Promise<boolean>
     /** "don't warn for this meeting": quiet for this meeting only */
-    muteThemSilence(): Promise<boolean>
+    muteThemSilence(id: string): Promise<boolean>
     /** undo "don't warn for this meeting" */
-    unmuteThemSilence(): Promise<boolean>
+    unmuteThemSilence(id: string): Promise<boolean>
     /** the person's own title (tidied; blank keeps the old one) */
     rename(id: string, title: string): Promise<void>
     /** gone for good, audio too; refused while it records */

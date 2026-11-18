@@ -37,7 +37,7 @@ export type Meeting = {
   /** Some recorded audio still needs a saved transcript, including earlier sessions. */
   transcriptionPending?: boolean
   /** stretches where the other side's track was silent during a call (recording ms), for the after-meeting note */
-  themSilent?: { ranges: Array<[number, number]> }
+  themSilent?: { v: 2; ranges: Array<[number, number]>; muted?: boolean; notified?: boolean }
   /** when it was moved to the Trash; there it is out of every list, search and chat until restored */
   trashedAt?: number
 }
@@ -50,6 +50,17 @@ export type Segment = { id: number; meetingId: string; track: 'me' | 'them'; sta
   /** Shared display-only palette index, supplied by the transcript bridge. */
   speakerColor?: number }
 export type Notes = { mine: string; enhanced: string | null; edited: boolean }
+
+function themSilentOf(raw: unknown): Meeting['themSilent'] | undefined {
+  if (raw == null) return undefined
+  try {
+    const value = JSON.parse(String(raw)) as unknown
+    const ranges = Array.isArray(value) ? value : (value && typeof value === 'object' && Array.isArray((value as { ranges?: unknown }).ranges) ? (value as { ranges: unknown[] }).ranges : null)
+    if (!ranges || !ranges.every(x => Array.isArray(x) && x.length === 2 && Number.isFinite(x[0]) && Number.isFinite(x[1]) && x[1] > x[0])) return undefined
+    const record = !Array.isArray(value) && value && typeof value === 'object' ? value as Record<string, unknown> : {}
+    return { v: 2, ranges: ranges as Array<[number, number]>, ...(record.muted === true ? { muted: true } : {}), ...(record.notified === true ? { notified: true } : {}) }
+  } catch { return undefined }
+}
 
 const toMeeting = (r: Row): Meeting => ({
   ...(r.transcription_pending ? { transcriptionPending: true } : {}),
@@ -66,7 +77,7 @@ const toMeeting = (r: Row): Meeting => ({
   ...(r.event_calendar_source == null ? {} : { eventCalendarSource: String(r.event_calendar_source) }),
   ...(r.duration_ms == null ? {} : { durationMs: Number(r.duration_ms) }),
   ...(r.trashed_at == null ? {} : { trashedAt: Number(r.trashed_at) }),
-  ...(r.them_silent == null ? {} : { themSilent: JSON.parse(String(r.them_silent)) as Meeting['themSilent'] }),
+  ...(themSilentOf(r.them_silent) ? { themSilent: themSilentOf(r.them_silent)! } : {}),
 })
 const toSegment = (r: Row): Segment => ({
   id: Number(r.id), meetingId: String(r.meeting_id), track: r.track as Segment['track'], startMs: Number(r.start_ms), endMs: Number(r.end_ms),

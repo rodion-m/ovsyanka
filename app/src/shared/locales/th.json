@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "แสดงแบนเนอร์และการแจ้งเตือนเมื่อเสียงคอมพิวเตอร์ไม่ได้ถูกบันทึกระหว่างการโทร",
   "from {start} to {end}": "ตั้งแต่ {start} ถึง {end}",
   "and {n} more": "และอีก {n} ช่วง",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "เสียงของอีกฝ่ายไม่ได้ถูกบันทึก {ranges} — คำพูดของเขาไม่มีในบทถอดความช่วงเวลานั้น"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "เสียงของอีกฝ่ายไม่ได้ถูกบันทึก {ranges}. หากมีใครพูดในช่วงนั้น คำพูดของคนนั้นจะไม่มีในบทถอดเสียง"
 }

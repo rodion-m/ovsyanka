@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "通話中にコンピューターの音声が録音されないとき、バナーと通知を表示します。",
   "from {start} to {end}": "{start}〜{end}",
   "and {n} more": "ほか{n}件",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "相手の音声は{ranges}録音されていませんでした — その間の発言は文字起こしにありません。"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "相手の音声は{ranges}録音されていませんでした. その間に誰かが話していた場合、その発言は文字起こしに含まれていません。"
 }

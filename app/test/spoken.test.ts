@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -29,14 +29,26 @@ describe('the spoken language setting', () => {
     expect(spokenSetting({ spoken: 'ru' })).toBe('ru')
     expect(spokenSetting({ spoken: 'multi' })).toBe('multi')
   })
-  it('persists explicit choices; Multi-language is the unwritten default', () => {
+  it('persists every explicit choice, including Multi-language', () => {
     const file = settingsFile()
     updateSettings(file, { spoken: 'ru' })
     expect(spokenSetting(loadSettings(file))).toBe('ru')
     updateSettings(file, { spoken: 'multi' })
     expect(loadSettings(file).spoken).toBe('multi')
-    updateSettings(file, { spoken: undefined })
-    expect(JSON.parse(readFileSync(file, 'utf8'))).not.toHaveProperty('spoken')
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({ spoken: 'multi' })
+  })
+  it('migrates an old profile without spoken once, leaves a new profile on multi, and keeps explicit values', () => {
+    const old = settingsFile()
+    writeFileSync(old, JSON.stringify({ language: 'ru' }))
+    expect(loadSettings(old)).toMatchObject({ language: 'ru', spoken: 'en', spokenMigrated: 2 })
+    expect(loadSettings(old).spoken).toBe('en')
+    const fresh = settingsFile()
+    expect(loadSettings(fresh)).toEqual({})
+    expect(spokenSetting(loadSettings(fresh))).toBe('multi')
+    updateSettings(fresh, { language: 'ru' })
+    expect(loadSettings(fresh)).toMatchObject({ spoken: 'multi', spokenMigrated: 2 })
+    updateSettings(fresh, { spoken: 'ru', spokenMigrated: 2 })
+    expect(loadSettings(fresh).spoken).toBe('ru')
   })
   it('passes English and Russian directly to Whisper, and lets Multi-language detect', () => {
     expect(whisperLanguage('en')).toBe('en')
@@ -63,7 +75,7 @@ describe('the spoken language setting', () => {
     expect(get().spoken).toBe('ru')
     set('multi')
     expect(get().spoken).toBe('multi')
-    expect(loadSettings(file).spoken).toBeUndefined()
+    expect(loadSettings(file).spoken).toBe('multi')
     set('en')
     expect(get().spoken).toBe('en')
     // English is no longer the default: the explicit choice is written down

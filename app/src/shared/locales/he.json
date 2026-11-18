@@ -703,5 +703,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "מציג באנר והתראה כשצליל המחשב לא מוקלט במהלך שיחה.",
   "from {start} to {end}": "מ-{start} עד {end}",
   "and {n} more": "ועוד {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "צליל הצד השני לא הוקלט {ranges} — הדיווחים שלו חסרים בתמלול בתקופה הזו."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "צליל הצד השני לא הוקלט {ranges}. אם מישהו דיבר בזמן הזה, דבריו לא יופיעו בתמלול."
 }

@@ -694,5 +694,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Εμφανίζει banner και ειδοποίηση όταν ο ήχος του υπολογιστή δεν ηχογραφείται κατά τη διάρκεια κλήσης.",
   "from {start} to {end}": "από {start} έως {end}",
   "and {n} more": "και άλλα {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges} — οι απαντήσεις του λείπουν από τη μεταγραφή εκείνη την περίοδο."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges}. Αν μιλούσε κάποιος τότε, τα λόγια του δεν υπάρχουν στην απομαγνητοφώνηση."
 }

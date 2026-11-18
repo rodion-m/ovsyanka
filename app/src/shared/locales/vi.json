@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Hiển thị biểu ngữ và thông báo khi âm thanh máy tính không được ghi trong cuộc gọi.",
   "from {start} to {end}": "từ {start} đến {end}",
   "and {n} more": "và {n} khoảng nữa",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Âm thanh của người đối diện không được ghi {ranges} — lời của họ không có trong bản ghi trong khoảng thời gian đó."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Âm thanh của người đối diện không được ghi {ranges}. Nếu có ai nói trong khoảng thời gian đó, lời nói của họ sẽ không có trong bản chép lời."
 }

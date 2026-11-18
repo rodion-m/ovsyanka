@@ -288,6 +288,7 @@ let indexerRef: { schedule(): Promise<unknown> } | undefined
 /** the call reader's view for the silent-"them" watchdog, and the watchdog itself (made with the widget) */
 let callNamesRef: CallNames | undefined
 let themSilence: ThemSilence | undefined
+let themWarningNotification: Notification | undefined
 /** Settings → "Warn when the other side can't be heard"; the recorder's own healing ignores it */
 let themWarnOn = true
 
@@ -326,25 +327,29 @@ function startDetection() {
   // the silent-"them" watchdog: levels in, rebuild requests and at most one notification out; the
   // recorder keeps healing itself even when this is muted or off in Settings
   const them = createThemSilence({
-    warnEnabled: () => themWarnOn,
-    callOn: () => watcher.onCall(),
+    enabled: () => !isFake() || process.env.YOGURT_FAKE_THEM_SILENCE === '1',
+    warnEnabled: () => themWarnOn && (!isFake() || process.env.YOGURT_FAKE_THEM_SILENCE === '1'),
     watch: (id) => callNamesRef?.themWatch(id) ?? null,
     rebuild: (id) => rebuildSystemCapture(id),
     notify: (id) => {
       if (!themWarnOn || isFake() || !Notification.isSupported()) return
+      themWarningNotification?.close()
       const n = new Notification({ title: t("Can't hear the other side"), body: t("The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine."), silent: true })
-      n.on('click', () => goTo(`/note/${id}`))
+      themWarningNotification = n
+      n.on('click', () => { if (themWarningNotification === n) themWarningNotification = undefined; goTo(`/note/${id}`) })
+      n.on('close', () => { if (themWarningNotification === n) themWarningNotification = undefined })
       n.show()
     },
     publish: (id) => { const v = them.view(id); widget.themSilent(id, v.phase, v.muted) },
-    loadRanges: (id) => storeRef?.meeting(id)?.themSilent?.ranges ?? [],
-    saveRanges: (id, ranges) => { if (storeRef?.meeting(id)) storeRef.updateMeeting(id, { themSilent: { ranges } }) },
-    log: (msg) => console.warn('them-silence:', msg),
+    loadRanges: (id) => storeRef?.meeting(id)?.themSilent ?? { v: 2, ranges: [] },
+    saveRanges: (id, value) => { if (storeRef?.meeting(id)) storeRef.updateMeeting(id, { themSilent: value }) },
+    log: (msg) => console.info('them-silence:', msg),
   })
   themSilence = them
   onRecordingEvent((e) => {
-    if (e.t === 'level') them.level(e.meetingId, e.me, e.them)
-    else if (e.t === 'paused') them.paused(e.meetingId, e.paused, e.at)
+    if (e.t === 'level') them.level(e.meetingId, e)
+    else if (e.t === 'paused') them.paused(e.meetingId, e.paused)
+    else if (e.t === 'warn' && e.code === 'no-system-audio') them.permission(activeMeeting()?.id ?? '', false)
   })
   onMeetingStart((m) => them.started(m))
   onMeetingStop((m) => them.stopped(m.id))
@@ -721,21 +726,17 @@ app.whenReady().then(() => {
     win?.webContents.send('meetings:changed')
   })
   // the silent-"them" banner's buttons: one rebuild now, and quiet for this meeting only
-  ipcMain.handle('meetings:restart-sound', () => {
-    const id = activeMeeting()?.id
-    return !!id && !!themSilence?.restart(id)
+  ipcMain.handle('meetings:restart-sound', (_e, id: unknown) => {
+    if (!isId(id) || activeMeeting()?.id !== id || !themSilence?.hasSession(id)) return false
+    return themSilence.restart(id)
   })
-  ipcMain.handle('meetings:mute-them-silence', () => {
-    const id = activeMeeting()?.id
-    if (!id) return false
-    themSilence?.mute(id)
-    return true
+  ipcMain.handle('meetings:mute-them-silence', (_e, id: unknown) => {
+    if (!isId(id) || activeMeeting()?.id !== id || !themSilence?.hasSession(id)) return false
+    return themSilence.mute(id)
   })
-  ipcMain.handle('meetings:unmute-them-silence', () => {
-    const id = activeMeeting()?.id
-    if (!id) return false
-    themSilence?.unmute(id)
-    return true
+  ipcMain.handle('meetings:unmute-them-silence', (_e, id: unknown) => {
+    if (!isId(id) || activeMeeting()?.id !== id || !themSilence?.hasSession(id)) return false
+    return themSilence.unmute(id)
   })
   // Both Ask surfaces share saved conversations and the same recording-first model queue.
   const conversations = hookConversations({

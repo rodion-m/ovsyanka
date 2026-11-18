@@ -694,5 +694,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Visar en banderoll och ett meddelande när datorns ljud inte spelas in under ett samtal.",
   "from {start} to {end}": "från {start} till {end}",
   "and {n} more": "och {n} till",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Den andra personens ljud spelades inte in {ranges} — hens repliker saknas i transkriptionen under den tiden."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Den andra personens ljud spelades inte in {ranges}. Om någon talade då finns orden inte med i transkriptionen."
 }

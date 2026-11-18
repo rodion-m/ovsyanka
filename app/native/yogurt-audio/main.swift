@@ -114,7 +114,7 @@ final class Track {
   var pending: [Float] = []
   /// meeting time the device's last buffer ended at, when it says (the computer's sound does)
   var lastHeardEnd: Double?
-  var sumSq: Double = 0, count = 0
+  var sumSq: Double = 0, count = 0, zeroCount = 0
   /// false: no pcm frames out (speech-file --live feeds Apple's speech only)
   var stream = true
 
@@ -177,7 +177,7 @@ final class Track {
     if let c = conv16, let b = convert(c, buf), b.frameLength > 0 {
       onPcm16?(b, (baseMs ?? 0) + Double(sentSince + Int64(pending.count)) / 16)
       let p = b.floatChannelData![0]
-      for i in 0..<Int(b.frameLength) { let x = p[i]; pending.append(x); sumSq += Double(x * x) }
+      for i in 0..<Int(b.frameLength) { let x = p[i]; pending.append(x); sumSq += Double(x * x); if abs(x) < 1e-5 { zeroCount += 1 } }
       count += Int(b.frameLength)
       // 100 ms frames
       while pending.count >= 1600 { emit(1600) }
@@ -226,12 +226,14 @@ final class Track {
   }
 
   /// 0..1 from -60 dB to 0 dB over what came in since the last call
-  func level() -> Double {
-    defer { sumSq = 0; count = 0 }
-    guard count > 0 else { return 0 }
+  func levelFrame() -> (Double, Bool) {
+    defer { sumSq = 0; count = 0; zeroCount = 0 }
+    guard count > 0 else { return (0, false) }
     let db = 20 * log10(sqrt(sumSq / Double(count)) + 1e-9)
-    return min(1, max(0, (db + 60) / 60)).rounded(toPlaces: 3)
+    return (min(1, max(0, (db + 60) / 60)).rounded(toPlaces: 3), zeroCount == count)
   }
+
+  var audioMs: Double { startOffsetMs + (baseMs ?? 0) + Double(sentSince) / 16 }
 
   var writerCompleted: Bool { writer?.status == .completed }
   func cancel() { writer?.cancelWriting(); try? FileManager.default.removeItem(at: url) }
@@ -387,6 +389,7 @@ final class SystemAudio {
   /// the sample rate the buffers are labelled with, and the listeners watching for it to change
   var rate: Float64 = 0
   var listeners: [(AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyListenerBlock)] = []
+  var lastProcessChangeLogAt = -10_000.0
   init(onBuffer: @escaping (AVAudioPCMBuffer, Double?) -> Void) { self.onBuffer = onBuffer }
 
   /// the rate the device actually runs at: a headset's hands-free mode is 16 kHz while the tap may still say 48
@@ -446,7 +449,8 @@ final class SystemAudio {
         var a = address(kAudioProcessPropertyIsRunningOutput), v: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
         if AudioObjectGetPropertyData(obj, &a, 0, nil, &size, &v) == noErr, v != 0 { playing += 1 }
       }
-      log("audio processes changed: \(audioProcesses().count) processes, \(playing) playing output")
+      let t = nowMs()
+      if t - self.lastProcessChangeLogAt >= 10_000 { self.lastProcessChangeLogAt = t; log("audio processes changed: \(audioProcesses().count) processes, \(playing) playing output") }
     }
     if let out = defaultOutputDevice() {
       watch(out, kAudioDevicePropertyStreamConfiguration) { log("output device stream configuration changed: \(streamBuffers(out)) buffers") }
@@ -740,8 +744,10 @@ final class Recorder {
   /// the microphone the person chose (its UID); nil is Auto, the Mac's default input, followed as it changes
   var micUID: String? = argValue("--mic")
   /// the "them" tap's health, all on the work queue: the exact-zero stretch, the self-heal's backoff, per-minute stats
-  var zeroSince: Double?, zeroLogged = false
+  var zeroSince: Double?, zeroLogged = false, nonZeroSince: Double?
   var autoRebuilds = 0, nextAutoRebuildAt = 0.0
+  var lastOutputCheckAt = -1000.0, cachedOutputProcesses = 0
+  var lastThemHeardAt: Double?
   var themCallbacks = 0, themPeakDb = -Double.infinity
   var minuteTimer: DispatchSourceTimer?
   /// Apple's live speech per track (macOS 26, when asked for with --speech), as Any so older Macs never see the type
@@ -752,7 +758,7 @@ final class Recorder {
     mic = Mic { [unowned self] b in if !self.paused && !self.finishing { self.me.append(b) } }
     sys = SystemAudio { [unowned self] b, heard in
       guard !self.paused && !self.finishing else { return }
-      self.noteThemBuffer(b)
+      self.noteThemBuffer(b, heardMs: heard)
       self.them.append(b, heardMs: heard)
     }
     sys.onRateChange = { [unowned self] in self.rebuildSystem() }
@@ -801,7 +807,9 @@ final class Recorder {
     t.schedule(deadline: .now() + 0.1, repeating: 0.1)
     t.setEventHandler { [unowned self] in
       if self.finishing { return }
-      send(["t": "level", "me": self.paused ? 0 : self.me.level(), "them": self.paused ? 0 : self.them.level()])
+      let me = self.me.levelFrame(), them = self.them.levelFrame()
+      send(["t": "level", "me": self.paused ? 0 : me.0, "them": self.paused ? 0 : them.0,
+            "themZero": !self.paused && them.1, "ms": Int(self.them.audioMs.rounded())])
     }
     t.resume(); timer = t
 
@@ -850,7 +858,7 @@ final class Recorder {
   /// Every "them" buffer, on the work queue (never the IO thread): the per-minute stats, the exact-zero stretch
   /// logs, and the tap's own self-heal — a full rebuild after 20 s of zeros while other audio plays, backing off
   /// 40 s, 80 s, ... up to 5 minutes, reset by the first non-zero buffer.
-  func noteThemBuffer(_ b: AVAudioPCMBuffer) {
+  func noteThemBuffer(_ b: AVAudioPCMBuffer, heardMs: Double?) {
     themCallbacks += 1
     var peak: Float = 0, silent = true
     if let data = b.floatChannelData {
@@ -858,40 +866,52 @@ final class Recorder {
         let p = data[c]
         for i in 0..<Int(b.frameLength) {
           let v = p[i]
-          if v != 0 { silent = false }
+          if abs(v) >= 1e-5 { silent = false }
           let a = abs(v); if a > peak { peak = a }
         }
       }
     } else { silent = false }
     if peak > 0 { let db = 20 * log10(Double(peak)); if db > themPeakDb { themPeakDb = db } }
-    let t = nowMs()
+    guard let t = heardMs else { zeroSince = nil; lastThemHeardAt = nil; return }
+    if let last = lastThemHeardAt, t - last > 250 { zeroSince = nil; nonZeroSince = nil; zeroLogged = false }
+    lastThemHeardAt = t
     if silent {
+      nonZeroSince = nil
       if zeroSince == nil { zeroSince = t }
       let stretch = t - zeroSince!
       if stretch >= 10_000 && !zeroLogged { zeroLogged = true; log("them: exact zeros for 10 s") }
-      if stretch >= 20_000 && t >= nextAutoRebuildAt {
-        let playing = playingOutputProcesses()
-        if playing > 0 {
-          autoRebuilds += 1
-          nextAutoRebuildAt = t + min(300_000, 40_000 * pow(2, Double(autoRebuilds - 1)))
-          log("rebuilding the system tap: 20 s of exact zeros while \(playing) processes play")
-          rebuildSystem()
+      if stretch >= 60_000 && t >= nextAutoRebuildAt && autoRebuilds < 5 {
+        if t - lastOutputCheckAt >= 1000 {
+          cachedOutputProcesses = playingOutputProcesses()
+          lastOutputCheckAt = t
         }
+        if cachedOutputProcesses > 0 {
+          autoRebuilds += 1
+          nextAutoRebuildAt = t + min(300_000, 60_000 * pow(2, Double(autoRebuilds - 1)))
+          log("rebuilding the system tap: 60 s of exact zeros while \(cachedOutputProcesses) processes play (automatic rebuild \(autoRebuilds)/5)")
+          if autoRebuilds == 5 { log("system tap automatic rebuild cap reached (5 per recording)") }
+          rebuildSystem(announceDeviceChange: false)
+        }
+      } else if autoRebuilds == 5 && stretch >= 60_000 && t >= nextAutoRebuildAt {
+        log("system tap automatic rebuild cap reached (5 per recording)")
+        nextAutoRebuildAt = t + 86_400_000
       }
     } else {
+      if nonZeroSince == nil { nonZeroSince = t }
       if let z = zeroSince, t - z >= 10_000 { log("them: sound is back after \(Int((t - z) / 1000)) s of exact zeros") }
-      zeroSince = nil; zeroLogged = false; autoRebuilds = 0; nextAutoRebuildAt = 0
+      zeroSince = nil; zeroLogged = false
+      if let sound = nonZeroSince, t - sound >= 10_000 { autoRebuilds = 0; nextAutoRebuildAt = 0 }
     }
   }
 
   // device changes come in bursts; rebuild once they settle, without stopping the recording
-  func rebuildSystem() {
+  func rebuildSystem(announceDeviceChange: Bool = true) {
     sysRebuild?.cancel()
     let item = DispatchWorkItem { [unowned self] in
       guard !self.finishing, self.sysAllowed else { return }
       self.sys.stop(); self.them.resync()
       if !self.sys.start() { send(["t": "warn", "code": "no-system-audio"]) }
-      send(["t": "warn", "code": "device-changed"])
+      if announceDeviceChange { send(["t": "warn", "code": "device-changed"]) }
     }
     sysRebuild = item
     work.asyncAfter(deadline: .now() + 0.3, execute: item)
@@ -963,8 +983,8 @@ final class Recorder {
 
   func command(_ c: String) {
     switch c {
-    case "pause": paused = true; me.flushPending(); them.flushPending()
-    case "resume": paused = false; me.resync(); them.resync()
+    case "pause": paused = true; zeroSince = nil; nonZeroSince = nil; lastThemHeardAt = nil; nextAutoRebuildAt = 0; me.flushPending(); them.flushPending()
+    case "resume": paused = false; zeroSince = nil; nonZeroSince = nil; lastThemHeardAt = nil; nextAutoRebuildAt = 0; me.resync(); them.resync()
     case "stop": finish()
     case "rebuild-system": log("rebuilding the system tap: requested by the app"); rebuildSystem()
     case _ where c.hasPrefix("mic "): chooseMic(String(c.dropFirst(4)).trimmingCharacters(in: .whitespaces))

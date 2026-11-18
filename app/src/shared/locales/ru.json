@@ -721,5 +721,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Показывает баннер и уведомление, когда звук компьютера не записывается во время звонка.",
   "from {start} to {end}": "с {start} до {end}",
   "and {n} more": "и ещё {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Звук собеседника не записывался {ranges} — его реплик в расшифровке за это время нет."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Звук собеседника не записывался {ranges}. Если в это время кто-то говорил, этих реплик нет в расшифровке."
 }

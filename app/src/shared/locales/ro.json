@@ -709,5 +709,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Afișează un banner și o notificare când sunetul computerului nu este înregistrat în timpul unui apel.",
   "from {start} to {end}": "de la {start} la {end}",
   "and {n} more": "și încă {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Sunetul celeilalte părți nu a fost înregistrat {ranges} — replicile ei lipsesc din transcriere în acea perioadă."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Sunetul celeilalte părți nu a fost înregistrat {ranges}. Dacă cineva a vorbit atunci, cuvintele sale nu apar în transcriere."
 }

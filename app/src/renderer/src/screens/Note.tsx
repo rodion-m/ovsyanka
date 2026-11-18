@@ -124,7 +124,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const [recorder, setRecorder] = useState<WidgetView | null>(null)
   const hint = recorder?.note
   /** stretches where the other side's track was silent during a call, over two minutes in all */
-  const themSilentNote = themSilentText(m?.themSilent)
+  const themSilentNote = themSilentText(m?.themSilent, m?.state !== 'recording' && m?.endedAt != null)
   const sourceDone = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (!at || !notes || !m || sourceDone.current === at.seq) return

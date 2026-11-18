@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "통화 중 컴퓨터 소리가 녹음되지 않으면 배너와 알림을 표시합니다.",
   "from {start} to {end}": "{start}~{end}",
   "and {n} more": "외 {n}개",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "상대방 소리가 {ranges} 녹음되지 않았습니다 — 그 시간의 발언은 전사에 없습니다."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "상대방 소리가 {ranges} 녹음되지 않았습니다. 그때 누군가 말했다면, 그 말은 대화록에 없습니다."
 }

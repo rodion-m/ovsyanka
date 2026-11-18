@@ -43,6 +43,7 @@ export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what t
   jargon?: string[]
   /** The spoken language: Multi-language by default, explicit English or Russian (shared/spoken.ts). */
   spoken?: Spoken
+  spokenMigrated?: number
   /** The selected subscription harness or the original local models. Applied at the next launch. */
   ai?: AiSettings
   /** new versions download by themselves; on unless turned off */
@@ -75,7 +76,17 @@ export function configuredAi(s: Settings, env: NodeJS.ProcessEnv = process.env, 
 }
 
 export function loadSettings(path: string): Settings {
-  try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {} } catch { return {} }
+  let parsed: Settings
+  try {
+    if (!existsSync(path)) return {}
+    parsed = JSON.parse(readFileSync(path, 'utf8')) as Settings
+  } catch { return {} }
+  if (parsed && typeof parsed === 'object' && !('spoken' in parsed) && !('spokenMigrated' in parsed) && Object.keys(parsed).some(k => k !== 'spokenMigrated')) {
+    const upgraded = { ...parsed, spoken: 'en' as const, spokenMigrated: 2 }
+    saveSettings(path, upgraded)
+    return upgraded
+  }
+  return parsed
 }
 export function saveSettings(path: string, s: Settings) {
   // write-then-rename so a crash mid-save never leaves a half-written file
@@ -85,7 +96,10 @@ export function saveSettings(path: string, s: Settings) {
 
 /** Merge a patch into the saved settings; undefined values remove a key. */
 export function updateSettings(path: string, patch: Partial<Settings>): Settings {
-  const next = { ...loadSettings(path), ...patch }
+  const current = loadSettings(path)
+  const next = { ...current, ...patch,
+    ...(patch.spoken !== undefined ? { spokenMigrated: 2 } : Object.keys(current).length === 0 ? { spoken: 'multi' as const, spokenMigrated: 2 } : {}),
+  }
   saveSettings(path, next)
   return next
 }

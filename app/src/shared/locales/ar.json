@@ -752,5 +752,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "يعرض لافتة وإشعارًا عندما لا يتم تسجيل صوت الكمبيوتر أثناء مكالمة.",
   "from {start} to {end}": "من {start} إلى {end}",
   "and {n} more": "و{n} أخرى",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "لم يتم تسجيل صوت الطرف الآخر {ranges} — ردوده غير موجودة في النص خلال ذلك الوقت."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "لم يتم تسجيل صوت الطرف الآخر {ranges}. إذا كان أحد يتحدث آنذاك، فلن تجد كلامه في النص."
 }

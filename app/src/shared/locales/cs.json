@@ -725,5 +725,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Zobrazuje banner a oznámení, když se zvuk počítače během hovoru nenahrává.",
   "from {start} to {end}": "od {start} do {end}",
   "and {n} more": "a dalších {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Zvuk druhého účastníka se nenahrával {ranges} — jeho repliky za tuto dobu v přepisu chybí."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Zvuk druhého účastníka se nenahrával {ranges}. Pokud v tu dobu někdo mluvil, jeho slova v přepisu nejsou."
 }

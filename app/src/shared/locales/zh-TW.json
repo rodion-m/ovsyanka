@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "通話期間電腦聲音未被錄製時顯示橫幅和通知。",
   "from {start} to {end}": "{start} 至 {end}",
   "and {n} more": "以及另外 {n} 段",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "對方聲音在 {ranges} 未被錄製——該時段的發言在逐字稿中缺失。"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "對方聲音在 {ranges} 未被錄製. 如果當時有人說話，這些內容不會出現在逐字稿中。"
 }

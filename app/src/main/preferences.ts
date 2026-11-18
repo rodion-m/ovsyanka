@@ -96,7 +96,7 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
   // Multi-language is the default; explicit English or Russian is written down.
   ipcMain.handle('settings:spoken', (_e, v: unknown) => {
     if (!SPOKEN.includes(v as Spoken)) return
-    updateSettings(d.file, { spoken: v === 'multi' ? undefined : v as Spoken })
+    updateSettings(d.file, { spoken: v as Spoken, spokenMigrated: 2 })
     d.onSpoken?.(v as Spoken)
   })
   // on is the default, so only off is written down; the recorder's own healing stays on either way

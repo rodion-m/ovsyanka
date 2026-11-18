@@ -691,5 +691,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Toont een banner en een melding als het computergeluid tijdens een gesprek niet wordt opgenomen.",
   "from {start} to {end}": "van {start} tot {end}",
   "and {n} more": "en nog {n}",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Het geluid van de ander is {ranges} niet opgenomen — zijn of haar uitspraken ontbreken dan in de transcriptie."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Het geluid van de ander is {ranges} niet opgenomen. Als iemand toen sprak, staan die woorden niet in de transcriptie."
 }

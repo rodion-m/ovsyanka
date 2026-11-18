@@ -13,14 +13,14 @@ const pcm = (track: 'me' | 'them', ms: number, xs: number[]): Frame => ({ t: 'pc
 
 describe('frame parser', () => {
   it('reads a pcm frame split across chunk boundaries, one byte at a time', () => {
-    const bytes = Buffer.concat([encodeFrame(pcm('me', 120, [0.5, -0.25, 1])), encodeFrame({ t: 'level', me: 0.2, them: 0.4 })])
+    const bytes = Buffer.concat([encodeFrame(pcm('me', 120, [0.5, -0.25, 1])), encodeFrame({ t: 'level', me: 0.2, them: 0.4, themZero: false, ms: 140 })])
     const p = new FrameParser()
     const out: Frame[] = []
     for (let i = 0; i < bytes.length; i++) out.push(...p.push(bytes.subarray(i, i + 1)))
     expect(out).toHaveLength(2)
     expect(out[0]).toMatchObject({ t: 'pcm', track: 'me', ms: 120 })
     expect(Array.from((out[0] as Extract<Frame, { t: 'pcm' }>).samples)).toEqual([0.5, -0.25, 1])
-    expect(out[1]).toEqual({ t: 'level', me: 0.2, them: 0.4 })
+    expect(out[1]).toEqual({ t: 'level', me: 0.2, them: 0.4, themZero: false, ms: 140 })
   })
 
   it('keeps two interleaved tracks apart', () => {
@@ -78,9 +78,9 @@ describe('Capture', () => {
     const f = fakeProc(); const c = new Capture(f.proc)
     const got: unknown[] = []
     c.on('level', (lv) => got.push(lv))
-    f.out.write(encodeFrame({ t: 'level', me: 0.3, them: 0 }))
+    f.out.write(encodeFrame({ t: 'level', me: 0.3, them: 0, themZero: true, ms: 100 }))
     await tick()
-    expect(got).toEqual([{ me: 0.3, them: 0 }])
+    expect(got).toEqual([{ me: 0.3, them: 0, themZero: true, ms: 100 }])
   })
 
   it('a warn message emits warn', async () => {

@@ -25,7 +25,7 @@ export type TranscribeWarn = 'transcribe-failed' | 'no-speech-model' | 'falling-
 const WARN_CODES: readonly string[] = ['no-system-audio', 'device-changed', 'no-mic', 'mic-gone'] satisfies WarnCode[]
 /** The mic recording now, after each start or switch: uid null is Auto (the Mac's default input), name the device's */
 export type MicInUse = { uid: string | null; name: string | null }
-export type Level = { me: number; them: number }
+export type Level = { me: number; them: number; themZero: boolean; ms: number }
 /** Apple's on-device speech (macOS 26): words as they are said (final false, they still change) and once settled, on meeting time */
 export type SpeechFrame = { t: 'speech'; track: Track; final: boolean; startMs: number; endMs: number; text: string
   /** each word's time (a volatile reading is one run for all its words) */
@@ -87,7 +87,7 @@ function readLine(line: string): Header | null {
   try { m = JSON.parse(line) } catch { console.error('capture: unreadable line', line.slice(0, 200)); return null }
   if (m.t === 'pcm' && (m.track === 'me' || m.track === 'them') && Number.isInteger(m.n) && (m.n as number) >= 0)
     return { t: 'pcm', track: m.track, ms: Number(m.ms), n: m.n as number }
-  if (m.t === 'level') return { t: 'level', me: Number(m.me) || 0, them: Number(m.them) || 0 }
+  if (m.t === 'level' && Number.isFinite(Number(m.ms)) && typeof m.themZero === 'boolean') return { t: 'level', me: Number(m.me) || 0, them: Number(m.them) || 0, themZero: m.themZero, ms: Number(m.ms) }
   if (m.t === 'warn' && typeof m.code === 'string' && WARN_CODES.includes(m.code)) return { t: 'warn', code: m.code as WarnCode }
   if (m.t === 'speech-off') return { t: 'speech-off' }
   const orNull = (x: unknown) => (typeof x === 'string' ? x : x === null ? null : undefined)
@@ -122,6 +122,7 @@ export class Capture extends EventEmitter {
   private exited = false
   private done: Promise<void>
   private end: number
+  get currentMs() { return this.end }
 
   /** startMs: where meeting time stands when this run starts (a restart picks up after the one before) */
   constructor(private proc: CaptureProc, opts: { startMs?: number } = {}) {
@@ -131,7 +132,7 @@ export class Capture extends EventEmitter {
     proc.stdout.on('data', (d: Buffer) => {
       for (const f of parser.push(d)) {
         if (f.t === 'pcm') { this.end = Math.max(this.end, f.ms + f.samples.length / 16); this.emit('pcm', f.track, f.ms, f.samples) }
-        else if (f.t === 'level') this.emit('level', { me: f.me, them: f.them })
+        else if (f.t === 'level') this.emit('level', { me: f.me, them: f.them, themZero: f.themZero, ms: f.ms })
         else if (f.t === 'speech') this.emit('speech', f)
         else if (f.t === 'speech-off') this.emit('speech-off')
         else if (f.t === 'speech-ready') this.emit('speech-ready', f.tracks)
@@ -203,7 +204,7 @@ export function startCapture(meetingDir: string, o?: CaptureOpts): Capture {
   if (isFake()) return new Capture(fakeCaptureProc(meetingDir, o?.startMs ?? 0, { speech: !!o?.speech, part: o?.part, mic: o?.mic }), { startMs: o?.startMs })
   // straight from Yogurt, never through a shell: Windows leaves the helper's parent's process tree (Yogurt) out of the call audio
   const child = spawn(audioHelperPath(), captureArgs(meetingDir, o), { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
-  child.stderr.on('data', (d: Buffer) => console.error('yogurt-audio:', d.toString().trim()))
+  child.stderr.on('data', (d: Buffer) => console.info('yogurt-audio:', d.toString().trim()))
   // a missing or broken helper is a crash, not an exception in the main process
   child.on('error', (e) => { console.error('yogurt-audio failed to start', e); child.emit('exit', null, null) })
   return new Capture(child, { startMs: o?.startMs })
@@ -214,7 +215,7 @@ export function joinParts(meetingDir: string): Promise<void> {
   if (isFake()) { joinFakeParts(meetingDir); return Promise.resolve() }
   return new Promise((resolve, reject) => {
     const child = spawn(audioHelperPath(), ['join', '--dir', meetingDir], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
-    child.stderr.on('data', (d: Buffer) => console.error('yogurt-audio join:', d.toString().trim()))
+    child.stderr.on('data', (d: Buffer) => console.info('yogurt-audio join:', d.toString().trim()))
     child.on('error', reject)
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`yogurt-audio join exited with ${code}`))))
   })
@@ -247,7 +248,7 @@ export function rebuildSystemCapture(id: string): boolean {
 
 /** What the recording widget hears about: levels, warnings, and the helper's restarts */
 export type RecordingEvent =
-  | { t: 'level'; me: number; them: number; meetingId: string }
+  | { t: 'level'; me: number; them: number; themZero: boolean; ms: number; meetingId: string }
   | { t: 'warn'; code: WarnCode | TranscribeWarn }
   | { t: 'hiccup' }
   | { t: 'gave-up' }
@@ -276,7 +277,7 @@ export function setRecordingPaused(id: string, paused: boolean): boolean {
     try { restart(); delete session.restart } catch { session.paused = true; return false }
   } else if (!(paused ? active.pause() : active.resume())) return false
   session.paused = paused
-  if (paused) tell({ t: 'level', me: 0, them: 0, meetingId: id })
+  if (paused) tell({ t: 'level', me: 0, them: 0, themZero: false, ms: active.currentMs, meetingId: id })
   tell({ t: 'paused', meetingId: id, paused, at: Date.now() })
   return true
 }
@@ -384,7 +385,7 @@ export function hookCapture(p: {
     const attach = (c: Capture) => {
       active = c
       c.on('warn', (code) => { console.warn('capture warning', code); tell({ t: 'warn', code }) })
-      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them, meetingId: s.id }))
+      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them, themZero: !s.paused && lv.themZero, ms: lv.ms, meetingId: s.id }))
       c.on('ended', (e) => {
         // a capture that was stopped on purpose or replaced is not ours to judge
         if (active !== c) return

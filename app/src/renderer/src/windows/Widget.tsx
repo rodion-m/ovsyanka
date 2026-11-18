@@ -116,10 +116,10 @@ function Recording({ view }: { view: WidgetView }) {
 }
 
 /** The compact silent-"them" warning: icon + short text, both actions a real button away. */
-function ThemSilentNote({ note }: { note: NonNullable<WidgetView['note']> }) {
+function ThemSilentNote({ note, meetingId }: { note: NonNullable<WidgetView['note']>; meetingId: string }) {
   const phase = note.them ?? 'warn'
   const [busy, setBusy] = useState(false)
-  const restart = () => { setBusy(true); void window.yogurt.meetings.restartSoundCapture().finally(() => setBusy(false)) }
+  const restart = () => { setBusy(true); void window.yogurt.meetings.restartSoundCapture(meetingId).finally(() => setBusy(false)) }
   const warn = phase === 'warn' || phase === 'failed'
   return <>
     <p data-testid="widget-note" data-tone={note.tone} data-them={phase}>{warn ? t("Can't hear the other side") : note.text}</p>
@@ -129,7 +129,7 @@ function ThemSilentNote({ note }: { note: NonNullable<WidgetView['note']> }) {
       <button data-testid="widget-them-restart" className="widget-settings" disabled={phase === 'restarting' || busy} onClick={restart}>
         {phase === 'restarting' || busy ? t('Restarting sound capture…') : t('Restart sound capture')}
       </button>
-      <button data-testid="widget-them-mute" className="widget-settings" disabled={phase === 'restarting'} onClick={() => void window.yogurt.meetings.muteThemSilence()}>
+      <button data-testid="widget-them-mute" className="widget-settings" disabled={phase === 'restarting'} onClick={() => void window.yogurt.meetings.muteThemSilence(meetingId)}>
         {t("Don't warn for this meeting")}
       </button>
     </div>}
@@ -219,7 +219,7 @@ function Preview({ view, open }: { view: WidgetView; open: boolean }) {
   const permission = widgetSettings(note)
   return <div data-testid="widget-preview" className="widget-preview" role="region" aria-label={t('Live transcript')} inert={!open} aria-hidden={!open}>
     {note && <div className="widget-preview-warning" role="status" aria-live="polite">
-      {note.code === 'them-silent' ? <ThemSilentNote note={note} /> : <>
+      {note.code === 'them-silent' ? <ThemSilentNote note={note} meetingId={view.meetingId} /> : <>
         <p data-testid="widget-note" data-tone={note.tone}>{note.text}</p>
         {permission && <button className="widget-settings" onClick={() => { void window.yogurt.permissions.open(permission) }}>{t('Open Settings')}</button>}
       </>}

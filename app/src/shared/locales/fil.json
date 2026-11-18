@@ -691,5 +691,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Nagpapakita ng banner at notification kapag hindi nare-record ang tunog ng computer sa gitduring ng tawag.",
   "from {start} to {end}": "mula {start} hanggang {end}",
   "and {n} more": "at {n} pa",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Hindi naire-record ang tunog ng kabilang panig {ranges} — wala ang kanilang mga linya sa transcript sa panahong iyon."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Hindi naire-record ang tunog ng kabilang panig {ranges}. Kung may nagsalita noon, wala sa transcript ang kanilang mga sinabi."
 }

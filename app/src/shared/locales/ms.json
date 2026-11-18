@@ -646,5 +646,5 @@
   "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Menunjukkan sepanduk dan pemberitahuan apabila bunyi komputer tidak dirakam semasa panggilan.",
   "from {start} to {end}": "dari {start} hingga {end}",
   "and {n} more": "dan {n} lagi",
-  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Bunyi pihak sebelah tidak dirakam {ranges} — kata-katanya tiada dalam transkrip pada masa itu."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Bunyi pihak sebelah tidak dirakam {ranges}. Jika seseorang bercakap pada waktu itu, kata-katanya tiada dalam transkrip."
 }
