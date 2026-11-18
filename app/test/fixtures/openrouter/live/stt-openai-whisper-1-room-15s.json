@@ -1,0 +1,11 @@
+{
+  "text": "",
+  "usage": {
+    "seconds": 15,
+    "cost": 0
+  },
+  "task": "transcribe",
+  "language": "russian",
+  "duration": 15,
+  "segments": []
+}

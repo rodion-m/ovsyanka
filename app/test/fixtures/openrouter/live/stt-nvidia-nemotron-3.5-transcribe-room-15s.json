@@ -1,0 +1,24 @@
+{
+  "text": "The.",
+  "usage": {
+    "seconds": 15,
+    "cost": 0.0004995
+  },
+  "task": "transcribe",
+  "language": "ru",
+  "duration": 15,
+  "segments": [
+    {
+      "id": 0,
+      "seek": 0,
+      "start": 0,
+      "end": 15,
+      "text": "The.",
+      "tokens": [],
+      "temperature": 0,
+      "avg_logprob": 0,
+      "compression_ratio": 0,
+      "no_speech_prob": 0
+    }
+  ]
+}

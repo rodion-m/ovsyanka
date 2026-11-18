@@ -8,6 +8,7 @@ import { aborted, assertRunning, HarnessError } from './process'
 import type { OpenRouterKeyFetch, OpenRouterKeyStore } from './openrouterKey'
 import type { OpenRouterUsage } from './openrouterUsage'
 import { validatedOpenRouterModelsCache } from './openrouterModels'
+import { languageCode } from '../asr/appleSpeech'
 
 export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 export const OPENROUTER_CHAT_URL = `${OPENROUTER_API_BASE}/chat/completions`
@@ -161,16 +162,18 @@ function numeric(value: unknown): number | undefined {
   return undefined
 }
 
-function usageOf(body: Body | undefined): { costUsd?: number; promptTokens?: number; completionTokens?: number } {
+function usageOf(body: Body | undefined): { costUsd?: number; promptTokens?: number; completionTokens?: number; seconds?: number } {
   const usage = record(body?.usage)
   if (!usage) return {}
   const cost = numeric(usage.cost)
   const promptTokens = numeric(usage.prompt_tokens)
   const completionTokens = numeric(usage.completion_tokens)
+  const seconds = numeric(usage.seconds)
   return {
     ...(cost !== undefined && cost >= 0 ? { costUsd: cost } : {}),
     ...(promptTokens !== undefined && promptTokens >= 0 ? { promptTokens } : {}),
     ...(completionTokens !== undefined && completionTokens >= 0 ? { completionTokens } : {}),
+    ...(seconds !== undefined && seconds >= 0 ? { seconds } : {}),
   }
 }
 
@@ -268,8 +271,8 @@ export class OpenRouterAdapter {
     return cache ?? (model === RECOMMENDED_CAPABILITIES.id ? RECOMMENDED_CAPABILITIES : undefined)
   }
 
-  private async fetchWithTimeout<T>(url: string, init: RequestInit, signal: AbortSignal, audio: boolean, consume: (response: Response) => Promise<T>): Promise<T> {
-    const timeoutMs = Math.max(this.dependencies.settings.timeoutSeconds, audio ? 600 : 0) * 1_000
+  private async fetchWithTimeout<T>(url: string, init: RequestInit, signal: AbortSignal, audio: boolean, consume: (response: Response) => Promise<T>, timeoutOverrideMs?: number): Promise<T> {
+    const timeoutMs = timeoutOverrideMs ?? Math.max(this.dependencies.settings.timeoutSeconds, audio ? 600 : 0) * 1_000
     const controller = new AbortController()
     let timedOut = false
     const relay = () => controller.abort()
@@ -291,7 +294,7 @@ export class OpenRouterAdapter {
     }
   }
 
-  private async request(model: string, body: Record<string, unknown>, signal: AbortSignal, audio: boolean, task: 'text' | 'transcription', seconds: number, costUnknown = false): Promise<string> {
+  private async request(model: string, body: Record<string, unknown>, signal: AbortSignal, audio: boolean, task: 'text' | 'transcription', seconds: number, costUnknown = false, endpoint = '/chat/completions', stt = false, timeoutOverrideMs?: number): Promise<string> {
     let lastError: HarnessError | undefined
     let requestBody = body
     let optionalFallbackUsed = false
@@ -303,7 +306,7 @@ export class OpenRouterAdapter {
       try {
         const key = await this.dependencies.key.read()
         const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
-        const result = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+        const result = await this.fetchWithTimeout(`${this.baseUrl}${endpoint}`, {
           method: 'POST', headers, body: JSON.stringify(requestBody),
         }, signal, audio, async received => {
           response = received
@@ -321,7 +324,7 @@ export class OpenRouterAdapter {
             chunks.push(part.value)
           }
           return new TextDecoder().decode(Buffer.concat(chunks.map(chunk => Buffer.from(chunk))))
-        })
+        }, timeoutOverrideMs)
         const text = result
         if (!response) throw new HarnessError('OpenRouter did not return a response.', 'bad-response')
         status = response.status
@@ -333,7 +336,7 @@ export class OpenRouterAdapter {
         const usage = usageOf(object)
         costUsd = usage.costUsd
         errorType = safeDiagnostic(errorTypeOf(object), key)
-        if (responseOk(response) && !object?.error) await this.dependencies.usage?.record({ model, task, costUsd: usage.costUsd ?? 0, audioSeconds: seconds, costUnknown: costUnknown && usage.costUsd === 0 && seconds > 0, costMissing: usage.costUsd === undefined }).catch(() => undefined)
+        if (responseOk(response) && !object?.error) await this.dependencies.usage?.record({ model, task, costUsd: usage.costUsd ?? 0, audioSeconds: usage.seconds ?? seconds, costUnknown: costUnknown && usage.costUsd === 0 && (usage.seconds ?? seconds) > 0, costMissing: usage.costUsd === undefined }).catch(() => undefined)
         const errorBody = object?.error != null && object.error !== ''
         if (!responseOk(response) || errorBody) {
           const classified = classifyOpenRouterError(status, object)
@@ -357,6 +360,19 @@ export class OpenRouterAdapter {
           logAttempt()
           await this.sleep(retryAfterMs ?? (attempt === 0 ? 2_000 : 8_000), signal)
           continue
+        }
+        if (stt) {
+          if (!Array.isArray(object?.segments)) throw new HarnessError('OpenRouter returned no timestamped segments.', 'no-timestamps', attempt + 1, safeModel(model), true)
+          const segments = object.segments.flatMap(value => {
+            const segment = record(value)
+            if (!segment) return [value]
+            const text = typeof segment.text === 'string' ? segment.text.trim() : segment.text
+            return text === ''
+              ? [] : [{ start: segment.start, end: segment.end, text }]
+          })
+          const transcript = JSON.stringify({ ...(typeof object.language === 'string' ? { language: object.language } : {}), segments })
+          logAttempt()
+          return transcript
         }
         const content = contentOf(object)
         const message = record(object?.choices instanceof Array ? record(object.choices[0])?.message : undefined)
@@ -416,12 +432,25 @@ export class OpenRouterAdapter {
 
   async transcribe(request: AudioRequest): Promise<string> {
     assertRunning(request.signal)
-    if (this.dependencies.settings.openrouterTranscriptionKind !== 'chat') throw new HarnessError('OpenRouter STT transcription is not available yet.', 'unavailable')
     const modelId = this.dependencies.settings.openrouterTranscriptionModel
     const model = await this.model(modelId)
     let audio: Buffer
     try { audio = await readFile(join(request.directory, 'audio.wav')) }
     catch { throw new HarnessError('The staged recording could not be read.', 'local-audio', 0, undefined, true) }
+    if (audio.length > 25 * 1024 * 1024) throw new HarnessError('The recording exceeds the 25 MB OpenRouter upload limit.', 'too-large', 0, undefined, true)
+    if (this.dependencies.settings.openrouterTranscriptionKind === 'stt') {
+      const code = request.language ? languageCode(request.language) : null
+      const body = {
+        model: modelId,
+        input_audio: { data: audio.toString('base64'), format: 'wav' },
+        ...(code ? { language: code } : {}),
+        temperature: 0,
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment'],
+        ...(providerFor(this.dependencies.settings.openrouterDataPolicy, false) ? { provider: providerFor(this.dependencies.settings.openrouterDataPolicy, false) } : {}),
+      }
+      return this.request(modelId, body, request.signal, true, 'transcription', audioSeconds(audio), paidModel(model, modelId), '/audio/transcriptions', true, 60_000)
+    }
     const language = request.language ? `Expected spoken language: ${request.language}.` : ''
     const body: Record<string, unknown> = {
       model: modelId,

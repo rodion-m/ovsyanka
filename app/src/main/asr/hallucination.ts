@@ -29,7 +29,7 @@ export function isPromptEcho(text: string, prompt: string): boolean {
 
 /** whisper's stock lines on quiet audio, from video subtitles; whole lines only */
 const GUESSES = new Set([
-  'you', 'thank you', 'thank you very much', 'thanks', 'thanks for watching', 'thank you for watching', 'thanks for watching bye',
+  'you', 'the', 'thank you', 'thank you very much', 'thanks', 'thanks for watching', 'thank you for watching', 'thanks for watching bye',
   'thank you bye', 'bye', 'bye bye', 'please subscribe', 'like and subscribe', 'for more information visit www fema org',
   'subtitles by the amara org community', 'untertitel der amara org community', 'sous titres réalisés para la communauté d amara org',
   'sous titres réalisés par la communauté d amara org', 'ご視聴ありがとうございました', 'продолжение следует',

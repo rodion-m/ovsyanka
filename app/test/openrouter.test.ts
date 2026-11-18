@@ -110,6 +110,86 @@ describe('OpenRouter text adapter', () => {
 })
 
 describe('OpenRouter audio adapter', () => {
+  it('sends STT JSON with ISO language, consumes verbose segments and records provider seconds and unknown zero cost', async () => {
+    const rootPath = await root(), samples: Record<string, unknown>[] = [], usage = { record: vi.fn(async () => {}) }
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionModel: 'openai/whisper-1', openrouterTranscriptionKind: 'stt' }), key: key(),
+      fetch: async (url, init) => { expect(String(url)).toBe('https://openrouter.ai/api/v1/audio/transcriptions'); samples.push(JSON.parse(String(init?.body))); return answer(await liveFixture('stt-openai-whisper-1-speech-60s.json')) },
+      lookupModel: async () => model({ id: 'openai/whisper-1' }), usage, log: () => {} })
+    const raw = await adapter.transcribe({ directory: rootPath, language: 'russian', clearMs: 600, instructions: '', prompt: '', signal: signal() })
+    const transcript = parseTranscript(raw, 60)
+    expect(transcript.segments).toHaveLength(11)
+    expect(transcript.segments.at(-1)?.end).toBe(60)
+    expect(samples[0]).toMatchObject({ model: 'openai/whisper-1', language: 'ru', temperature: 0, response_format: 'verbose_json', timestamp_granularities: ['segment'], provider: { data_collection: 'deny' } })
+    expect(samples[0]).toHaveProperty('input_audio.data')
+    expect(usage.record).toHaveBeenCalledWith(expect.objectContaining({ audioSeconds: 60, costUsd: 0, costUnknown: true }))
+  })
+
+  it.each([
+    ['openai/whisper-1', 'stt-openai-whisper-1-speech-60s.json'],
+    ['google/gemini-3.5-transcribe', 'stt-google-gemini-3.5-transcribe-speech-60s.json'],
+    ['nvidia/nemotron-3.5-transcribe', 'stt-nvidia-nemotron-3.5-transcribe-speech-60s.json'],
+  ])('takes the live %s sample through parseTranscript and into meeting lines', async (modelId, fixture) => {
+    const rootPath = await root()
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionModel: modelId, openrouterTranscriptionKind: 'stt' }), key: key(), fetch: async () => answer(await liveFixture(fixture)), lookupModel: async () => model({ id: modelId }), log: () => {} })
+    const transcriber = createHarnessTranscriber({ settings: settings(), tempDir: rootPath, signal: signal(), transcribe: request => adapter.transcribe(request) }, { prompt: () => '', language: () => 'ru', onLanguage: vi.fn() })
+    const lines = await transcriber({ track: 'them', startMs: 0, samples: new Float32Array(960_000), clearMs: 30_000 })
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.at(-1)?.endMs).toBeLessThanOrEqual(60_000)
+  })
+
+  it('rejects an STT JSON response without timestamped segments as permanent no-timestamps', async () => {
+    const rootPath = await root()
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionKind: 'stt' }), key: key(), fetch: async () => answer({ text: 'No timestamps here.' }), lookupModel: async () => model(), log: () => {} })
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })).rejects.toMatchObject({ code: 'no-timestamps', permanent: true })
+  })
+
+  it('keeps the shared parser tolerance for STT timestamp overshoot', async () => {
+    const rootPath = await root()
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    let response: unknown = { segments: [{ start: 59.5, end: 61, text: 'Within tolerance.' }] }
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionKind: 'stt' }), key: key(), fetch: async () => answer(response), lookupModel: async () => model(), log: () => {} })
+    expect(parseTranscript(await adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() }), 60).segments[0].end).toBe(60)
+    response = { segments: [{ start: 59.5, end: 62.01, text: 'Beyond tolerance.' }] }
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() }).then(raw => parseTranscript(raw, 60))).rejects.toMatchObject({ code: 'no-timestamps' })
+  })
+
+  it('rejects an STT audio upload over 25 MB before sending', async () => {
+    const rootPath = await root(), fetch = vi.fn<OpenRouterKeyFetch>()
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(25 * 1024 * 1024 + 1))
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionKind: 'stt' }), key: key(), fetch, lookupModel: async () => model(), log: () => {} })
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })).rejects.toMatchObject({ code: 'too-large', permanent: true })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('maps the provider processing deadline to a retryable timeout', async () => {
+    vi.useFakeTimers()
+    const rootPath = await root()
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    const fetch = vi.fn<OpenRouterKeyFetch>(async (_url, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true })
+    }))
+    const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionKind: 'stt' }), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {}, log: () => {} })
+    const pending = adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'timeout' })
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    await vi.runAllTimersAsync()
+    await rejected
+    expect(fetch).toHaveBeenCalledTimes(3)
+  })
+
+  it('removes empty Gemini placeholders and the evidenced faint-noise NVIDIA “The.” guess', async () => {
+    const rootPath = await root()
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 240_000 * 2))
+    const make = (fixture: string) => createOpenRouter({ settings: settings({ openrouterTranscriptionModel: 'vendor/stt', openrouterTranscriptionKind: 'stt' }), key: key(),
+      fetch: async () => answer(await liveFixture(fixture)), lookupModel: async () => model({ id: 'vendor/stt' }), log: () => {} })
+    const noise = (adapter: ReturnType<typeof make>, language = 'ru') => createHarnessTranscriber({ settings: settings(), tempDir: rootPath, signal: signal(), transcribe: request => adapter.transcribe(request) }, { prompt: () => '', language: () => language, onLanguage: vi.fn() })
+    expect(await noise(make('stt-google-gemini-3.5-transcribe-room-15s.json'))({ track: 'me', startMs: 0, samples: new Float32Array(240_000), clearMs: 100 })).toEqual([])
+    expect(await noise(make('stt-nvidia-nemotron-3.5-transcribe-room-15s.json'))({ track: 'me', startMs: 0, samples: new Float32Array(240_000), clearMs: 100 })).toEqual([])
+    expect(await noise(make('stt-nvidia-nemotron-3.5-transcribe-room-15s.json'), 'en')({ track: 'me', startMs: 0, samples: new Float32Array(240_000), clearMs: 100 })).toMatchObject([{ text: 'The.' }])
+  })
+
   it('rejects an oversized body as permanent even when reader cancellation rejects', async () => {
     const fetch = vi.fn<OpenRouterKeyFetch>(async () => new Response(new ReadableStream<Uint8Array>({
       start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)) },

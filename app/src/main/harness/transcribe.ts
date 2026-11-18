@@ -5,6 +5,7 @@ import type { Track } from '../capture'
 import { languageCode, languageName } from '../asr/appleSpeech'
 import { wavBytes, type Line, type Transcribe } from '../asr/transcribe'
 import { packedToMeeting } from '../asr/batch'
+import { isSilenceGuess } from '../asr/hallucination'
 import { assertRunning, HarnessError, inStage } from './process'
 
 const TRANSCRIPT_PROPERTIES = {
@@ -41,7 +42,7 @@ type TranscribeOptions = {
   language: () => string | undefined
   onLanguage: (track: Track, language: string, chars: number, locked: boolean) => void
 }
-export type AudioRequest = { directory: string; language?: string; instructions: string; prompt: string; maxOutputTokens?: number; signal: AbortSignal }
+export type AudioRequest = { directory: string; language?: string; clearMs?: number; instructions: string; prompt: string; maxOutputTokens?: number; signal: AbortSignal }
 
 /** Audio requests get at least this long: a packed batch can take far longer than a text answer. */
 export const MIN_AUDIO_TIMEOUT_SECONDS = 600
@@ -151,7 +152,7 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
     const response = await inStage(o.tempDir, o.signal, async directory => {
       await writeFile(join(directory, 'audio.wav'), wavBytes(chunk.samples), { mode: 0o600 })
       assertRunning(o.signal)
-      return o.transcribe({ directory, language, instructions, prompt, maxOutputTokens, signal: o.signal })
+      return o.transcribe({ directory, language, clearMs: chunk.clearMs, instructions, prompt, maxOutputTokens, signal: o.signal })
     })
     assertRunning(o.signal)
     let transcript: Transcript
@@ -161,15 +162,16 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
       console.warn(`harness transcript rejected: ${response.length} characters; ${reason}`)
       throw error
     }
+    const reported = language ?? transcript.language
+    const english = languageCode(reported) === 'en'
     const lines: Line[] = transcript.segments.map(segment => {
       const endMs = Math.round(packedToMeeting(chunk.parts, segment.end * 1000, 'end', chunk.startMs))
       // start and end map as a pair: inside one compressed pause the start snaps to the next part
       // and the end to the previous one, which would invert the line; pin it to the previous part's end
       const startMs = Math.min(Math.round(packedToMeeting(chunk.parts, segment.start * 1000, 'start', chunk.startMs)), endMs)
       return { track: chunk.track, startMs, endMs, text: segment.text }
-    })
+    }).filter(line => !(lowClear && isSilenceGuess(line.text) && !(english && line.text.trim().replace(/[.!?…]+$/u, '').toLowerCase() === 'the')))
     const text = lines.map(line => line.text).join(' ')
-    const reported = language ?? transcript.language
     if (text && reported && reported.toLowerCase() !== 'auto') {
       const code = languageCode(reported)
       callbacks.onLanguage(chunk.track, code ? languageName(code) : reported.toLowerCase(), text.length, !!language)

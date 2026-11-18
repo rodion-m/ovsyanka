@@ -235,7 +235,6 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
   const audioAll = catalog.transcription.map(option => ({
     ...option,
     hints: option.hints.includes('experimental') ? option.hints : [...option.hints, 'experimental' as const],
-    ...((option.group === 'stt' || option.kind === 'stt') ? { disabledReason: 'soon' } : {}),
   }))
   const audioOptions = sortAiOptions(audioAll, sort)
   const textOptions = sortAiOptions(catalog.text, sort)
@@ -327,7 +326,14 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
   const save = async () => {
     if (!draft || !valid || busy) return
     setBusy('save'); setNotice(undefined); setFailed(false)
-    try { accept(await window.yogurt.ai.save(draft)); setNotice('saved') }
+    try {
+      if (draft.backend === 'openrouter' && draft.openrouterTranscriptionKind === 'stt'
+        && (draft.openrouterTranscriptionKind !== preferences?.saved.openrouterTranscriptionKind || draft.openrouterTranscriptionModel !== preferences?.saved.openrouterTranscriptionModel)) {
+        const result = await window.yogurt.ai.openrouter.probe(draft, 'transcription')
+        if (!result.ok) throw new Error('The selected STT model did not return timestamped segments.')
+      }
+      accept(await window.yogurt.ai.save(draft)); setNotice('saved')
+    }
     catch { setFailed(true); setNotice('saveFailed') }
     finally { setBusy(null) }
   }

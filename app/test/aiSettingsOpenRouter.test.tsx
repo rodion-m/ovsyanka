@@ -43,6 +43,7 @@ function Stateful({ initial = aiSettings({ backend: 'openrouter' }) }: { initial
 afterEach(() => { cleanup(); setLanguage('en'); Reflect.deleteProperty(window, 'yogurt'); vi.clearAllMocks(); problemListener = undefined })
 function installApi(catalog = options) {
   api.ai.options.mockResolvedValue(catalog)
+  openrouter.probe.mockResolvedValue({ ok: true, elapsedMs: 1200, message: 'OK', costUsd: 0.0001 })
   Object.defineProperty(window, 'yogurt', { configurable: true, value: api })
 }
 
@@ -88,14 +89,14 @@ describe('OpenRouter AI settings', () => {
     expect(container.firstElementChild?.getAttribute('data-updates')).not.toContain('sk-ant-not-an-openrouter-key')
   })
 
-  it('marks STT as experimental, leaves it visible but disabled, and disables the same-model option', async () => {
+  it('marks STT as experimental, makes it selectable, and disables the same-model option', async () => {
     installApi()
     const user = userEvent.setup()
     render(createElement(Stateful, { initial: aiSettings({ backend: 'openrouter', openrouterTranscriptionModel: 'acme/whisper-1', openrouterTranscriptionKind: 'stt' }) }))
     const picker = await screen.findByTestId('ai-openrouter-transcriptionModel')
     await user.click(picker)
     const stt = screen.getByRole('option', { name: /Whisper/ })
-    expect(stt.getAttribute('aria-disabled')).toBe('true')
+    expect(stt.getAttribute('aria-disabled')).not.toBe('true')
     expect(stt.textContent).toContain('experimental')
     expect(stt.textContent).toContain('May invent text on noise without speech')
     const chatAudio = screen.getByRole('option', { name: /Gemini Flash/ })
@@ -105,6 +106,20 @@ describe('OpenRouter AI settings', () => {
     expect(screen.getByText('This model only transcribes. Choose another one for text.')).not.toBeNull()
     await user.click(screen.getByTestId('ai-openrouter-textModel'))
     expect(screen.getByRole('option', { name: /Text Model/ }).textContent).not.toContain('experimental')
+  })
+
+  it('probes a newly selected STT model before saving and refuses a no-segments result', async () => {
+    installApi()
+    openrouter.keyStatus.mockResolvedValueOnce({ state: 'ok', source: 'keychain', last4: 'aaaa' })
+    openrouter.probe.mockResolvedValueOnce({ ok: false, elapsedMs: 50, message: 'The STT model returned no timestamped segments.' })
+    const user = userEvent.setup()
+    render(createElement(AiSettings))
+    await screen.findByRole('button', { name: 'Replace' })
+    await user.click(screen.getByTestId('ai-openrouter-transcriptionModel'))
+    await user.click(screen.getByRole('option', { name: /Whisper/ }))
+    await user.click(screen.getByTestId('ai-save'))
+    await waitFor(() => expect(openrouter.probe).toHaveBeenCalledWith(expect.objectContaining({ openrouterTranscriptionKind: 'stt', openrouterTranscriptionModel: 'acme/whisper-1' }), 'transcription'))
+    expect(api.ai.save).not.toHaveBeenCalled()
   })
 
   it('turns off the derived same-model state by choosing a separate text model', async () => {

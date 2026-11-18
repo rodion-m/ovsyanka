@@ -34,7 +34,7 @@ describe('prompt echo', () => {
 
 describe('silence guesses', () => {
   it("are the stock lines whisper writes on quiet audio", () => {
-    for (const t of ['Thank you.', 'Thanks for watching!', 'you', 'Bye.', 'Thank you for watching.', 'Thank you very much.', 'Bye!']) expect(isSilenceGuess(t)).toBe(true)
+    for (const t of ['Thank you.', 'Thanks for watching!', 'you', 'Bye.', 'Thank you for watching.', 'Thank you very much.', 'Bye!', 'The.']) expect(isSilenceGuess(t)).toBe(true)
   })
   it('are not real sentences that start the same way', () => {
     for (const t of ['Thank you for the update on the budget.', 'You said Tuesday.', 'Bye for now, see you Monday.']) expect(isSilenceGuess(t)).toBe(false)
