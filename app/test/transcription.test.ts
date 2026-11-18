@@ -197,6 +197,34 @@ describe('live transcription of a meeting', () => {
     expect(store.meeting(m.id)!.language).toBe('spanish')
   })
 
+  it('in automatic mode, saves the dominant language reported by remote batches', async () => {
+    const factory = vi.fn<NonNullable<Parameters<typeof hookTranscription>[0]['transcriberFactory']>>(o => async c => {
+      o.onLanguage(c.track, 'russian', c.track === 'them' ? 120 : 20, true)
+      return says(c)
+    })
+    const r = rig('transcription-first', { quickReads: false, spoken: () => 'multi', transcriberFactory: factory })
+    const m = meeting()
+    r.begin(m)
+    r.procs[0].say('me', 500)
+    r.procs[0].say('them', 5000)
+    await r.stop(m)
+    expect(store.meeting(m.id)!.language).toBe('russian')
+  })
+
+  it('keeps explicit English even when a provider reports Russian', async () => {
+    const r = rig('transcription-first', {
+      quickReads: false, spoken: () => 'en', transcriberFactory: o => async c => {
+        o.onLanguage(c.track, 'russian', 120, true)
+        return says(c)
+      },
+    })
+    const m = meeting()
+    r.begin(m)
+    r.procs[0].say('them', 500)
+    await r.stop(m)
+    expect(store.meeting(m.id)!.language).toBe('english')
+  })
+
   for (const order of ['capture-first', 'transcription-first'] as const) {
     it(`start, audio, stop saves and sends the lines (${order})`, async () => {
       const r = rig(order)

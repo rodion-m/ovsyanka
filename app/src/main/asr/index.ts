@@ -29,6 +29,10 @@ type Session = { complete?: () => boolean; pipeline: Pipeline | null; priorLines
   recovery?: boolean
   /** the spoken language recovery transcribes with, kept in the spool's sidecars, over the live setting */
   forceSpoken?: Spoken
+  /** the setting frozen when this meeting stopped; explicit English/Russian wins over provider detection */
+  spoken?: () => Spoken
+  /** omitted in older/local callers: no explicit language, so detected batches choose the meeting language */
+  spokenExplicit?: boolean
   /** the session left the map while audio is still spooled: the note's incomplete-transcript state may have flipped */
   drained?: () => void }
 
@@ -54,6 +58,7 @@ let speechLocales: SpeechLocales = { available: false, supported: [], installed:
 let speechDeps: { ui: () => string; last: () => string | null; install: (locale: string) => Promise<boolean> } | undefined
 /** the spoken language picked (English only or Multi-language), read each time it matters */
 let spokenNow: () => Spoken = () => 'en'
+const normalizeSpoken = (value: unknown): Spoken => value === 'en' || value === 'ru' || value === 'multi' ? value : 'multi'
 const installing = new Set<string>()
 /**
  * The locale Apple's speech listens in for a new meeting, or null for whisper only. A wanted locale whose model is not on the
@@ -195,7 +200,9 @@ export function hookTranscription(p: {
   echoForTests?: EchoCheck
 }): () => void {
   idleMs = p.serverIdleMs ?? SERVER_IDLE_MS
-  spokenNow = p.spoken ?? (() => 'en')
+  // The app supplies the setting callback; an omitted or unset value is automatic detection.
+  const configuredSpoken = p.spoken
+  spokenNow = configuredSpoken ? () => normalizeSpoken(configuredSpoken()) : () => 'multi'
   if (p.speech && appleSpeechAvailable(p.speech.host)) {
     const sp = p.speech
     speechDeps = { ui: sp.ui, last: sp.last, install: sp.install ?? ((l) => installSpeechLocale(sp.binary, l)) }
@@ -257,6 +264,8 @@ export function hookTranscription(p: {
     }
     const s: Session = {
       freezeLanguage: () => { frozenSpoken ??= spokenNow() },
+      spoken: () => s.forceSpoken ?? frozenSpoken ?? spokenNow(),
+      spokenExplicit: !!configuredSpoken,
       // remote path: the transcript is complete once nothing queued is left to send; the local rule is unchanged
       complete: () => spool ? !spool.hasEntries() : !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed') && !warned.has('falling-behind'),
       store: p.store, refresh: p.refresh, speech: speechLocaleFor(id), priorLines: new Set(p.store.segments?.(id).map((s) => s.id) ?? []),
@@ -267,7 +276,7 @@ export function hookTranscription(p: {
         // a renderer that went away must not turn a committed save into a failed one (its audio would stay spooled)
         if (segs.some(s => s.hidden)) { try { p.refresh?.(id) } catch (e) { console.error('refreshing the transcript failed', e) } }
       }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce,
-        batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
+        batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => s.forceSpoken ?? frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
         // recovery drains everything at finish; the first-batch wait does not apply
         firstBatchMs: o?.recovery ? undefined : p.firstBatchMs,
         // recovered lines get no call-participant names: the call watch is gone by then, and a name guessed late is worse than Them
@@ -383,8 +392,10 @@ function finishSession(id: string, s: Session, audioDone: () => Promise<void> = 
     if (sessions.get(id) === s) {
       // the meeting's main language is kept with it, for notes written later (after a restart too);
       // a recovery session only fills it in when the meeting had none
-      const lang = bestLang(s.langs)
       const keep = s.recovery === true && s.store?.meeting?.(id)?.language != null
+      const spoken = s.forceSpoken ?? (s.spokenExplicit ? s.spoken?.() ?? 'multi' : 'multi')
+      const fixed = spoken === 'en' ? 'english' : spoken === 'ru' ? 'russian' : null
+      const lang = fixed ?? bestLang(s.langs)
       if (lang && !keep) { try { s.store?.updateMeeting(id, { language: lang }) } catch (e) { console.error('saving the language failed', e) } }
       if (heard.get(id) === s.langs) heard.delete(id)
       sessions.delete(id)

@@ -84,10 +84,23 @@ describe('transcript validation', () => {
     expect(parseTranscript('{"segments":[]}', 2)).toEqual({ segments: [] })
     expect(parseTranscript('{"segments":[{"start":0,"end":2.0005,"text":" Да. "}]}', 2).segments).toEqual([{ start: 0, end: 2, text: 'Да.' }])
   })
+  it('clamps a small timestamp overshoot and sorts segments by start', () => {
+    expect(parseTranscript(JSON.stringify({ segments: [
+      { start: 30, end: 45, text: 'later' }, { start: 5, end: 61.5, text: 'early' },
+    ] }), 60).segments).toEqual([
+      { start: 5, end: 60, text: 'early' }, { start: 30, end: 45, text: 'later' },
+    ])
+    expect(() => parseTranscript(JSON.stringify({ segments: [{ start: 0, end: 70, text: 'too far' }] }), 60)).toThrow('timestamps outside')
+  })
+  it('accepts a BOM, prose and a fenced JSON object', () => {
+    const response = '\ufeffHere is the transcript:\n```json\n{"language":"ru","segments":[{"start":0,"end":1,"text":"Привет."}]}\n```\nDone.'
+    expect(parseTranscript(response, 2)).toEqual({ language: 'ru', segments: [{ start: 0, end: 1, text: 'Привет.' }] })
+  })
   it.each([
     '{"segments":[{"start":-0.1,"end":1,"text":"secret"}]}',
     '{"segments":[{"start":1,"end":0.5,"text":"secret"}]}',
-    '{"segments":[{"start":0,"end":3,"text":"secret"}]}',
+    '{"segments":[{"start":0,"end":5,"text":"secret"}]}',
+    '{"segments":[{"start":0,"end":70,"text":"secret"}]}',
     '{"segments":[{"start":0,"end":1e999,"text":"secret"}]}',
     '{"segments":[{"start":"0","end":1,"text":"secret"}]}',
     '{"segments":[],"error":"secret"}', '{"segments":false}', 'secret',
@@ -806,7 +819,7 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     '{"segments":[],"error":"PRIVATE AUDIO ERROR"}',
     '{"segments":[{"start":-0.1,"end":1,"text":"PRIVATE AUDIO ERROR"}]}',
     '{"segments":[{"start":1,"end":0.5,"text":"PRIVATE AUDIO ERROR"}]}',
-    '{"segments":[{"start":0,"end":2.088,"text":"PRIVATE AUDIO ERROR"}]}',
+    '{"segments":[{"start":0,"end":4.088,"text":"PRIVATE AUDIO ERROR"}]}',
     '{"segments":[{"start":0,"end":1e999,"text":"PRIVATE AUDIO ERROR"}]}',
   ])('rejects raw provider errors and malformed timestamps without public Porch clamping (%#)', async response => {
     const fixture = await porchFixture({ response }), cb = callbacks()

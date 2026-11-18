@@ -55,6 +55,21 @@ describe('nameFor: who the other side was, from what the call app showed', () =>
     expect(nameFor({ startMs: 1000, endMs: 5000 }, run(0, 10_000, { ...pair, speaking: ['Alex Morgan'] }))).toBe('Dana Smith')
   })
 
+  it('uses the one other person for a line with no talker reading', () => {
+    const pair = { participants: ['Alex Morgan', 'Dana Smith'], me: 'Alex Morgan', speaking: [] }
+    expect(nameFor({ startMs: 2500, endMs: 3500 }, run(0, 10_000, pair))).toBe('Dana Smith')
+  })
+
+  it('does not guess from a three-person roster when nobody is marked', () => {
+    expect(nameFor({ startMs: 2500, endMs: 3500 }, run(0, 10_000, { ...meetingOf3, speaking: [] }))).toBeNull()
+  })
+
+  it('keeps an explicit talker over the no-mark fallback', () => {
+    const pair = { participants: ['Alex Morgan', 'Dana Smith'], me: 'Alex Morgan' }
+    const tl = [...run(0, 2000, { ...pair, speaking: [] }), ...run(2000, 4000, { ...pair, speaking: ['Dana Smith'] })]
+    expect(nameFor({ startMs: 2000, endMs: 4000 }, tl)).toBe('Dana Smith')
+  })
+
   it('a call of two where nobody is known to be the person using Yogurt names nobody', () => {
     expect(nameFor({ startMs: 1000, endMs: 5000 }, run(0, 10_000, { participants: ['Ann Lee', 'Dana Smith'] }))).toBeNull()
     // the name in Settings tells them apart

@@ -24,35 +24,58 @@ const MOST = 0.5
 
 const norm = (s: string) => s.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase()
 
+/** Call apps sometimes append an organization, account or menu suffix to the owner's display name. */
+const nameBase = (s: string) => norm(s).replace(/\s*(?:\([^)]*\)|\[[^\]]*\])\s*$/, '').replace(/(?:\.\.\.|…)\s*$/, '').trim()
+
 type Opts = { /** the person's own name in Settings, and the Mac's: never a name for the other side */ myNames?: string[] }
 
 const isMe = (name: string, s: CallSample, o: Opts) => {
   const n = norm(name)
-  return (s.me != null && norm(s.me) === n) || (o.myNames ?? []).some((m) => m && norm(m) === n)
+  const same = (a: string, b: string) => {
+    const x = norm(a), y = norm(b)
+    return !!x && x === y || !!x && !!y && nameBase(x) === nameBase(y)
+  }
+  return (s.me != null && same(s.me, n)) || (o.myNames ?? []).some((m) => m && same(m, n))
 }
+
+const uniquePeople = (s: CallSample) => [...new Map(s.participants.map((p) => [norm(p), p])).values()]
 
 /** who the other side was at one reading, or null when it can't be told */
 function whoAt(s: CallSample, o: Opts): string | null {
   if (s.ok === false) return null
-  const people = [...new Map(s.participants.map((p) => [norm(p), p])).values()]
+  // An explicit mark is stronger than the pair inference. This also keeps a stale or incomplete roster from
+  // replacing a name the call app actually gave us.
+  const others = [...new Map(s.speaking.filter((p) => !isMe(p, s, o)).map((p) => [norm(p), p])).values()]
+  if (others.length === 1) return others[0]
   // one other person in the call: the call's sound can only be them, whoever the app marks
-  if (people.length === 2) {
-    const mine = people.filter((p) => isMe(p, s, o))
-    if (mine.length === 1) return people.find((p) => !isMe(p, s, o))!
+  const people = uniquePeople(s)
+  if (people.length !== 2) return null
+  const mine = people.filter((p) => isMe(p, s, o))
+  return mine.length === 1 ? people.find((p) => !isMe(p, s, o))! : null
+}
+
+/** The unique other person seen across readable samples, or null when the meeting is ambiguous. */
+function oneOtherForMeeting(samples: CallSample[], o: Opts): string | null {
+  const others = new Map<string, string>()
+  for (const s of samples) {
+    if (s.ok === false) continue
+    const people = uniquePeople(s), mine = people.filter((p) => isMe(p, s, o))
+    if (mine.length !== 1) continue
+    for (const person of people) if (!isMe(person, s, o)) others.set(norm(person), person)
   }
-  const others = [...new Set(s.speaking.filter((p) => !isMe(p, s, o)))]
-  return others.length === 1 ? others[0] : null
+  return others.size === 1 ? others.values().next().value! : null
 }
 
 /** The name for a line of the other side spoken over [startMs, endMs], or null for Them */
 export function nameFor(span: { startMs: number; endMs: number }, samples: CallSample[], o: Opts = {}): string | null {
   if (!samples.length) return null
   const sorted = [...samples].sort((a, b) => a.ms - b.ms)
+  const meetingOther = oneOtherForMeeting(sorted, o)
   const at = (i: number) => [sorted[i].ms, Math.min(sorted[i + 1]?.ms ?? Infinity, sorted[i].ms + HOLD_MS)] as const
   // a line too short to measure: whoever it was the moment it started
   if (span.endMs <= span.startMs) {
-    for (let i = sorted.length - 1; i >= 0; i--) { const [a, b] = at(i); if (a <= span.startMs) return span.startMs < b ? whoAt(sorted[i], o) : null }
-    return null
+    for (let i = sorted.length - 1; i >= 0; i--) { const [a, b] = at(i); if (a <= span.startMs) return span.startMs < b ? (whoAt(sorted[i], o) ?? meetingOther) : meetingOther }
+    return meetingOther
   }
   const time = new Map<string, number>()
   for (let i = 0; i < sorted.length; i++) {
@@ -63,14 +86,13 @@ export function nameFor(span: { startMs: number; endMs: number }, samples: CallS
     if (who) time.set(who, (time.get(who) ?? 0) + overlap)
   }
   const [best] = [...time].sort((x, y) => y[1] - x[1])
-  return best && best[1] > MOST * (span.endMs - span.startMs) ? best[0] : null
+  return best && best[1] > MOST * (span.endMs - span.startMs) ? best[0] : meetingOther
 }
 
 /** Everyone seen in the call but the person using Yogurt, each once, in the order first seen */
 export function othersIn(samples: CallSample[], o: Opts = {}): string[] {
   const out = new Map<string, string>()
   for (const s of samples) for (const p of s.participants) if (!isMe(p, s, o) && !out.has(norm(p))) out.set(norm(p), p)
-  // someone marked "me" in a later reading is never one of the others
-  const me = new Set(samples.flatMap((s) => (s.me ? [norm(s.me)] : [])))
-  return [...out].filter(([k]) => !me.has(k)).map(([, v]) => v)
+  // someone marked "me" in a later reading is never one of the others; use the same display-name matching as nameFor.
+  return [...out].filter(([, value]) => !samples.some((s) => isMe(value, s, o))).map(([, v]) => v)
 }

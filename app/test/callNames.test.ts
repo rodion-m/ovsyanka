@@ -123,6 +123,27 @@ describe('hookCallNames', () => {
     expect(s.hook.nameFor(s.m.id, 1000, 3000)).toBe('Riley Okafor')
   })
 
+  it('names a delayed one-to-one batch from its meeting-time range, even without active-speaker marks', async () => {
+    const s = setup()
+    s.start()
+    s.audio(0, 1_000_100)
+    // The transcript line is inserted after the call readings, as a remote batch would be after several minutes.
+    for (let t = 1_000_000; t < 1_005_000; t += 500) s.emit(zoomLine(t, ['Alex Morgan', 'Dana Smith']))
+    s.store.addSegments([{ meetingId: s.m.id, track: 'them', startMs: 1000, endMs: 3000, text: 'late batch', speaker: null }])
+    s.stop(); s.transcribed(); await s.hook.finished(s.m.id)
+    expect(s.store.segments(s.m.id)[0].speaker).toBe('Dana Smith')
+    expect(s.logs.at(-1)).toContain('1 of 1 lines of the other side named')
+  })
+
+  it("doesn't treat an owner's call-app suffix as another participant", async () => {
+    const s = setup()
+    s.start()
+    s.audio(0, 1_000_100)
+    for (let t = 1_000_000; t < 1_005_000; t += 500) s.emit(zoomLine(t, ['Alex Morgan (CodeAlive)', 'Dana Smith']))
+    expect(s.hook.nameFor(s.m.id, 1000, 3000)).toBe('Dana Smith')
+    await wait()
+  })
+
   it('after the meeting every line of the other side is named again from the whole timeline; new people join the attendees', async () => {
     const s = setup({ attendees: [{ name: 'Dana Smith', email: 'dana@example.com' }] })
     s.start()

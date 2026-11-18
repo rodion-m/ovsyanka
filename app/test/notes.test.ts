@@ -129,6 +129,12 @@ describe('hookNotes', () => {
     expect(s.store.meeting(s.m.id)!.state).toBe('done')
     expect(s.sent.map((v) => v.status)).toContain('writing')
   })
+  it('uses the transcribed Russian meeting language in the notes prompt', async () => {
+    const s = setup()
+    s.store.updateMeeting(s.m.id, { language: 'russian' })
+    s.stop(); s.transcribed(); await wait(20)
+    expect(s.prompts[0]).toContain('Write in Russian')
+  })
   it('says "writing" only once the first words come; loading the model is still getting ready', async () => {
     let loaded!: () => void
     const s = setup({ load: new Promise<void>((r) => { loaded = r }) })

@@ -29,11 +29,36 @@ export type AudioRequest = { directory: string; language?: string; instructions:
 /** Audio requests get at least this long: a packed batch can take far longer than a text answer. */
 export const MIN_AUDIO_TIMEOUT_SECONDS = 600
 
-/** Parse only the structured terminal answer. Never include diagnostics or malformed provider text in an error. */
+/** Find the first complete JSON object in a provider answer, skipping prose, fences and a UTF-8 BOM. */
+function firstJsonObject(text: string): unknown | undefined {
+  const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  for (let start = 0; start < source.length; start++) {
+    if (source[start] !== '{') continue
+    let depth = 0, quoted = false, escaped = false
+    for (let at = start; at < source.length; at++) {
+      const c = source[at]
+      if (quoted) {
+        if (escaped) escaped = false
+        else if (c === '\\') escaped = true
+        else if (c === '"') quoted = false
+        continue
+      }
+      if (c === '"') { quoted = true; continue }
+      if (c === '{') depth++
+      else if (c === '}' && --depth === 0) {
+        try { return JSON.parse(source.slice(start, at + 1)) }
+        catch { break }
+      }
+    }
+  }
+  return undefined
+}
+
+/** Parse the structured answer without including diagnostics or malformed provider text in an error. */
 export function parseTranscript(text: string, duration: number): Transcript {
   if (!Number.isFinite(duration) || duration < 0) throw new HarnessError('Invalid recording duration.')
-  let value: unknown
-  try { value = JSON.parse(text) } catch { throw new HarnessError('The AI harness did not return valid transcript JSON.') }
+  const value = firstJsonObject(text)
+  if (value === undefined) throw new HarnessError('The AI harness did not return valid transcript JSON.')
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HarnessError('The AI harness returned an invalid transcript.')
   const object = value as Record<string, unknown>
   if (object.error !== undefined && typeof object.error !== 'string') throw new HarnessError('The AI harness returned an invalid transcript error field.')
@@ -41,15 +66,14 @@ export function parseTranscript(text: string, duration: number): Transcript {
   if (object.language !== undefined && (typeof object.language !== 'string' || object.language.length > 80)) throw new HarnessError('The AI harness returned an invalid transcript language.')
   if (!Array.isArray(object.segments) || object.segments.length > 10_000) throw new HarnessError('The AI harness returned an invalid transcript segment list.')
   const segments: Transcript['segments'] = []
-  let previousStart = 0
+  const tolerance = Math.max(2, duration * 0.02)
   for (const segment of object.segments) {
     if (!segment || typeof segment !== 'object' || Array.isArray(segment)) throw new HarnessError('The AI harness returned an invalid transcript segment.')
     const { start, end, text: said } = segment as Record<string, unknown>
     if (typeof start !== 'number' || typeof end !== 'number' || !Number.isFinite(start) || !Number.isFinite(end)
-      || start < 0 || end < start || start < previousStart || start > duration + 0.001 || end > duration + 0.001) {
+      || start < 0 || end < start || start > duration + tolerance || end > duration + tolerance) {
       throw new HarnessError('The AI harness returned transcript timestamps outside the recording.')
     }
-    previousStart = start
     if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The AI harness returned invalid transcript text.')
     // models sometimes wrap quoted names in backslashes (\Имя\, \\Имя\\) or leave a lone \ between spaces;
     // they never belong in speech. Windows paths (C:\dir\file) keep theirs: only runs at word edges or between spaces go
@@ -61,6 +85,7 @@ export function parseTranscript(text: string, duration: number): Transcript {
       .trim()
     if (clean) segments.push({ start: Math.min(start, duration), end: Math.min(end, duration), text: clean })
   }
+  segments.sort((a, b) => a.start - b.start)
   return { ...(typeof object.language === 'string' ? { language: object.language.trim() } : {}), segments }
 }
 
@@ -108,7 +133,13 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
       return o.transcribe({ directory, language, instructions, prompt, signal: o.signal })
     })
     assertRunning(o.signal)
-    const transcript = parseTranscript(response, duration)
+    let transcript: Transcript
+    try { transcript = parseTranscript(response, duration) }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'invalid transcript'
+      console.warn(`harness transcript rejected: ${response.length} characters; ${reason}`)
+      throw error
+    }
     const lines: Line[] = transcript.segments.map(segment => {
       const endMs = Math.round(packedToMeeting(chunk.parts, segment.end * 1000, 'end', chunk.startMs))
       // start and end map as a pair: inside one compressed pause the start snaps to the next part
