@@ -56,8 +56,8 @@ function speechOff(s: Session, why: string) {
 /** what the Mac's speech can do, read once at start-up (nothing where it is not available) */
 let speechLocales: SpeechLocales = { available: false, supported: [], installed: [] }
 let speechDeps: { ui: () => string; last: () => string | null; install: (locale: string) => Promise<boolean> } | undefined
-/** the spoken language picked (English only or Multi-language), read each time it matters */
-let spokenNow: () => Spoken = () => 'en'
+/** the spoken language picked (Multi-language by default), read each time it matters */
+let spokenNow: () => Spoken = () => 'multi'
 const normalizeSpoken = (value: unknown): Spoken => value === 'en' || value === 'ru' || value === 'multi' ? value : 'multi'
 const installing = new Set<string>()
 /**
@@ -192,7 +192,7 @@ export function hookTranscription(p: {
   nameOf?: (meetingId: string, startMs: number, endMs: number) => string | null
   /** Apple's on-device speech for the live words (macOS 26, Apple Silicon): where to ask what it can do, and the locale choices */
   speech?: { host: SpeechHost; binary: string; ui: () => string; last: () => string | null; locales?: () => Promise<SpeechLocales>; install?: (locale: string) => Promise<boolean> }
-  /** the spoken language picked in Settings or the note (English only when left out) */
+  /** the spoken language picked in Settings or the note (Multi-language when left out) */
   spoken?: () => Spoken
   /** the meeting's own folder (its audio spool lives inside it); used on the remote path only */
   meetingDir?: (id: string) => string

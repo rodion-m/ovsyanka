@@ -708,5 +708,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Виберіть англійську або російську чи дозвольте Yogurt визначити мову.",
   "Yogurt detects the spoken language automatically.": "Yogurt автоматично визначає мову розмови.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Транскрипція неповна: частину запису ще не розшифровано.",
-  "Retry": "Повторити"
+  "Retry": "Повторити",
+  "Can't hear the other side": "Не чутно співрозмовника",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Звук комп’ютера не записується вже хвилину. Якщо це вебінар або ви виступаєте самі, усе гаразд.",
+  "Restart sound capture": "Перезапустити захоплення звуку",
+  "Don't warn for this meeting": "Не попереджати на цій зустрічі",
+  "Restarting sound capture…": "Перезапускаю захоплення звуку…",
+  "The other side's sound is being recorded again": "Звук співрозмовника знову записується",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Не допомогло. Перевірте пристрій виведення звуку в налаштуваннях системи або в застосунку для дзвінків.",
+  "Warnings are off for this meeting": "Попередження вимкнено для цієї зустрічі",
+  "Warn when the other side can't be heard": "Попереджати, якщо не чутно співрозмовника",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Показує банер і сповіщення, коли звук комп’ютера не записується під час дзвінка.",
+  "from {start} to {end}": "з {start} до {end}",
+  "and {n} more": "і ще {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Звук співрозмовника не записувався {ranges} — його реплік у транскрипті за цей час немає."
 }

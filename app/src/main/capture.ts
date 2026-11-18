@@ -162,6 +162,8 @@ export class Capture extends EventEmitter {
   resume() { return !this.stopping && this.send('resume') }
   /** records from this mic from now on (null: Auto), without stopping */
   setMic(uid: string | null) { return !this.stopping && this.send(uid ? `mic ${uid}` : 'mic auto') }
+  /** asks the helper to rebuild the system-sound tap now (the same debounce as a device change) */
+  rebuildSystem() { return !this.stopping && this.send('rebuild-system') }
 
   /** Finishes both files; a helper that hangs is killed after 10 s (the files stay playable up to the last 5 s flush) */
   async stop(): Promise<void> {
@@ -238,10 +240,14 @@ export async function prepareAppend(meetingDir: string): Promise<{ part: number;
 let active: Capture | null = null
 /** The capture of the meeting being recorded, for transcription to listen to */
 export const activeCapture = (): Capture | null => active
+/** rebuild-system to the capture recording this meeting; false when none runs */
+export function rebuildSystemCapture(id: string): boolean {
+  return session?.id === id && !!active && active.rebuildSystem()
+}
 
 /** What the recording widget hears about: levels, warnings, and the helper's restarts */
 export type RecordingEvent =
-  | { t: 'level'; me: number; them: number }
+  | { t: 'level'; me: number; them: number; meetingId: string }
   | { t: 'warn'; code: WarnCode | TranscribeWarn }
   | { t: 'hiccup' }
   | { t: 'gave-up' }
@@ -270,7 +276,7 @@ export function setRecordingPaused(id: string, paused: boolean): boolean {
     try { restart(); delete session.restart } catch { session.paused = true; return false }
   } else if (!(paused ? active.pause() : active.resume())) return false
   session.paused = paused
-  if (paused) tell({ t: 'level', me: 0, them: 0 })
+  if (paused) tell({ t: 'level', me: 0, them: 0, meetingId: id })
   tell({ t: 'paused', meetingId: id, paused, at: Date.now() })
   return true
 }
@@ -378,7 +384,7 @@ export function hookCapture(p: {
     const attach = (c: Capture) => {
       active = c
       c.on('warn', (code) => { console.warn('capture warning', code); tell({ t: 'warn', code }) })
-      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them }))
+      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them, meetingId: s.id }))
       c.on('ended', (e) => {
         // a capture that was stopped on purpose or replaced is not ours to judge
         if (active !== c) return

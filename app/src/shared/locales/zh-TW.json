@@ -633,5 +633,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "選擇英語或俄語，也可以讓 Yogurt 自動辨識語言。",
   "Yogurt detects the spoken language automatically.": "Yogurt 會自動辨識所說的語言。",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "轉寫不完整：錄音的一部分尚未轉寫。",
-  "Retry": "重試"
+  "Retry": "重試",
+  "Can't hear the other side": "聽不到對方",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "電腦聲音已連續一分鐘沒有錄到。如果這是網路研討會或您正在獨自簡報，一切正常。",
+  "Restart sound capture": "重新啟動聲音擷取",
+  "Don't warn for this meeting": "本次會議不再提醒",
+  "Restarting sound capture…": "正在重新啟動聲音擷取…",
+  "The other side's sound is being recorded again": "對方聲音已恢復錄製",
+  "That didn't help. Check the sound output in your system settings or the call app.": "沒有奏效。請在系統設定或通話應用程式中檢查聲音輸出。",
+  "Warnings are off for this meeting": "本次會議的提醒已關閉",
+  "Warn when the other side can't be heard": "聽不到對方時提醒",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "通話期間電腦聲音未被錄製時顯示橫幅和通知。",
+  "from {start} to {end}": "{start} 至 {end}",
+  "and {n} more": "以及另外 {n} 段",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "對方聲音在 {ranges} 未被錄製——該時段的發言在逐字稿中缺失。"
 }

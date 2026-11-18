@@ -712,5 +712,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Vyberte angličtinu nebo ruštinu, nebo nechte Yogurt rozpoznat jazyk.",
   "Yogurt detects the spoken language automatically.": "Yogurt automaticky rozpozná mluvený jazyk.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Přepis je neúplný: část nahrávky ještě není přepsána.",
-  "Retry": "Zkusit znovu"
+  "Retry": "Zkusit znovu",
+  "Can't hear the other side": "Druhý účastník není slyšet",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Zvuk počítače se už minutu nenahrává. Pokud jde o webinář nebo prezentujete sami, je to v pořádku.",
+  "Restart sound capture": "Restartovat zachycení zvuku",
+  "Don't warn for this meeting": "Na tomto setkání neupozorňovat",
+  "Restarting sound capture…": "Restartuji zachycení zvuku…",
+  "The other side's sound is being recorded again": "Zvuk druhého účastníka se znovu nahrává",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Nepomohlo to. Zkontrolujte výstup zvuku v nastavení systému nebo v aplikaci pro hovory.",
+  "Warnings are off for this meeting": "Upozornění jsou pro toto setkání vypnuta",
+  "Warn when the other side can't be heard": "Upozorňovat, když druhý účastník není slyšet",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Zobrazuje banner a oznámení, když se zvuk počítače během hovoru nenahrává.",
+  "from {start} to {end}": "od {start} do {end}",
+  "and {n} more": "a dalších {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Zvuk druhého účastníka se nenahrával {ranges} — jeho repliky za tuto dobu v přepisu chybí."
 }

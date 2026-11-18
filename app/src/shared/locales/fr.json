@@ -693,5 +693,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Choisissez l’anglais ou le russe, ou laissez Yogurt détecter la langue.",
   "Yogurt detects the spoken language automatically.": "Yogurt détecte automatiquement la langue parlée.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "La transcription est incomplète : une partie de l'enregistrement n'est pas encore transcrite.",
-  "Retry": "Réessayer"
+  "Retry": "Réessayer",
+  "Can't hear the other side": "Impossible d'entendre l'autre participant",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Le son de l'ordinateur n'est pas enregistré depuis une minute. S'il s'agit d'un webinaire ou si vous présentez seul, tout est normal.",
+  "Restart sound capture": "Redémarrer la capture du son",
+  "Don't warn for this meeting": "Ne pas avertir pour cette réunion",
+  "Restarting sound capture…": "Redémarrage de la capture du son…",
+  "The other side's sound is being recorded again": "Le son de l'autre participant est de nouveau enregistré",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Cela n'a pas suffi. Vérifiez la sortie audio dans les réglages système ou dans l'application d'appel.",
+  "Warnings are off for this meeting": "Les avertissements sont désactivés pour cette réunion",
+  "Warn when the other side can't be heard": "Avertir quand l'autre participant n'est pas audible",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Affiche une bannière et une notification quand le son de l'ordinateur n'est pas enregistré pendant un appel.",
+  "from {start} to {end}": "de {start} à {end}",
+  "and {n} more": "et {n} autres",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Le son de l'autre participant n'a pas été enregistré {ranges} — ses répliques manquent dans la transcription pendant cette période."
 }

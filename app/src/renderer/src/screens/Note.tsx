@@ -32,6 +32,8 @@ import { SummaryActions } from '../components/ViewPill'
 import { MicMenu } from '../components/MicMenu'
 import { SpokenMenu } from '../components/SpokenMenu'
 import { RecordingHint } from '../components/RecordingHint'
+import { ThemSilence } from '../components/ThemSilence'
+import { themSilentText } from '../../../shared/themSilent'
 import { FolderChip, FolderPicker, type FolderSuggestion } from '../components/FolderPicker'
 import { FolderName } from '../components/FolderDialogs'
 import { InlineError } from '../components/InlineError'
@@ -121,6 +123,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   /** what the recorder has to say right now (a hint, a hiccup), shown under the note too */
   const [recorder, setRecorder] = useState<WidgetView | null>(null)
   const hint = recorder?.note
+  /** stretches where the other side's track was silent during a call, over two minutes in all */
+  const themSilentNote = themSilentText(m?.themSilent)
   const sourceDone = useRef<number | undefined>(undefined)
   useEffect(() => {
     if (!at || !notes || !m || sourceDone.current === at.seq) return
@@ -377,6 +381,12 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                 <button data-testid="note-transcript-retry" disabled={retryingTranscript} onClick={retryTranscript} className="workspace-button"><RotateCcw size={13} aria-hidden="true" />{t('Retry')}</button>
               </div>
             )}
+            {themSilentNote && (
+              <div data-testid="note-them-silent" role="status" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed">
+                <TriangleAlert size={16} aria-hidden="true" className="shrink-0 text-muted" />
+                <p className="min-w-48 flex-1">{themSilentNote}</p>
+              </div>
+            )}
 
           <div ref={primaryTabs} className="note-primary-tabs" data-summary-arriving={finishRequested && hasEnhanced && !reducedMotion}>
             <div role="tablist" aria-label={t('Meeting view')} className="contents">
@@ -451,7 +461,8 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
           {startFailed && <p role="alert" className="pointer-events-auto mx-auto mt-3 w-fit text-[13px] text-danger">{t("Yogurt couldn't start the notes. Try again in a moment.")}</p>}
           {resumeFailed && <p data-testid="note-resume-failed" role="alert" className="pointer-events-auto mx-auto mt-3 w-fit max-w-[calc(100%-32px)] text-[13px] text-danger">{t("Couldn't resume recording. Your existing note and audio are kept. Try again.")}</p>}
           {pauseFailed && recording && <p role="alert" className="pointer-events-auto mx-auto mt-3 w-fit text-[13px] text-danger">{pauseFailed === 'pause' ? t("Couldn't pause the recording. Try again.") : t("Couldn't resume the recording. Try again.")}</p>}
-          {recording && hint && <RecordingHint hint={hint} />}
+          {recording && recorder && <ThemSilence view={recorder} />}
+          {recording && hint && hint.code !== 'them-silent' && <RecordingHint hint={hint} />}
           <div className="note-footer-bar">
           <div className="note-status pointer-events-auto flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
             {(recording || m.state === 'prepared') && <><MicMenu recording={recording} paused={recording && m.paused} /><SpokenMenu /><span aria-hidden="true">·</span></>}

@@ -11,7 +11,7 @@ const KIND: Record<'no-mic' | 'no-system-audio', PermissionKind> = { 'no-mic': '
  * on (the Mac's prompt or System Settings). The recording already going keeps what it has; the next one gets it all.
  */
 export function RecordingHint({ hint }: { hint: NonNullable<WidgetView['note']> }) {
-  const kinds = hint.missingAudio ?? (hint.code ? [KIND[hint.code]] : [])
+  const kinds = hint.missingAudio ?? (hint.code === 'no-mic' || hint.code === 'no-system-audio' ? [KIND[hint.code]] : [])
   const [permissions, setPermissions] = useState<PermissionStatus>()
   const [fixed, setFixed] = useState(false)
   const reload = () => { void window.yogurt.permissions.status().then(setPermissions, () => {}) }

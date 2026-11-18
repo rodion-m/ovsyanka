@@ -29,6 +29,8 @@ export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what t
   stopWhenCallEnds?: boolean
   /** a quiet reminder to ask everyone before recording; on unless turned off */
   recordingReminder?: boolean
+  /** banner and notification when a call is on but the computer's sound isn't recorded; on unless turned off */
+  themSilenceWarn?: boolean
   /** keep audio after its transcript and summary are saved; on unless turned off */
   keepRecordings?: boolean
   /** Only meetings ending after this opt-out may lose their audio automatically. */
@@ -39,14 +41,14 @@ export type Settings = { theme?: 'light' | 'dark'; language?: string; /** what t
   hiddenCalendarIds?: string[]
   /** names, products and acronyms to spell right in transcripts and notes (shared/jargon.ts) */
   jargon?: string[]
-  /** The spoken language: English by default, explicit Russian, or automatic detection (shared/spoken.ts). */
+  /** The spoken language: Multi-language by default, explicit English or Russian (shared/spoken.ts). */
   spoken?: Spoken
   /** The selected subscription harness or the original local models. Applied at the next launch. */
   ai?: AiSettings
   /** new versions download by themselves; on unless turned off */
   autoUpdate?: boolean }
 
-/** English unless Russian or Multi-language was picked. */
+/** Multi-language unless English or Russian was picked. */
 export const spokenSetting = (s: Settings): Spoken => spokenOf(s.spoken)
 
 /** "Finish recording when the call ends": on by default */

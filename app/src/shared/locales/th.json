@@ -633,5 +633,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "เลือกภาษาอังกฤษหรือรัสเซีย หรือให้ Yogurt ตรวจจับภาษา",
   "Yogurt detects the spoken language automatically.": "Yogurt ตรวจจับภาษาที่พูดโดยอัตโนมัติ",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "การถอดความยังไม่สมบูรณ์: ยังไม่ได้ถอดเสียงบางส่วนของการบันทึก",
-  "Retry": "ลองอีกครั้ง"
+  "Retry": "ลองอีกครั้ง",
+  "Can't hear the other side": "ไม่ได้ยินอีกฝ่าย",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "เสียงคอมพิวเตอร์ไม่ได้ถูกบันทึกมานาทีหนึ่งแล้ว ถ้าเป็นเว็บินาร์หรือคุณนำเสนอคนเดียวก็ไม่มีปัญหา",
+  "Restart sound capture": "เริ่มการจับเสียงใหม่",
+  "Don't warn for this meeting": "ไม่ต้องเตือนในการประชุมนี้",
+  "Restarting sound capture…": "กำลังเริ่มการจับเสียงใหม่…",
+  "The other side's sound is being recorded again": "เสียงของอีกฝ่ายกำลังถูกบันทึกอีกครั้ง",
+  "That didn't help. Check the sound output in your system settings or the call app.": "ไม่ได้ผล โปรดตรวจสอบเอาต์พุตเสียงในการตั้งค่าระบบหรือในแอปโทร",
+  "Warnings are off for this meeting": "การเตือนปิดอยู่สำหรับการประชุมนี้",
+  "Warn when the other side can't be heard": "เตือนเมื่อไม่ได้ยินอีกฝ่าย",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "แสดงแบนเนอร์และการแจ้งเตือนเมื่อเสียงคอมพิวเตอร์ไม่ได้ถูกบันทึกระหว่างการโทร",
+  "from {start} to {end}": "ตั้งแต่ {start} ถึง {end}",
+  "and {n} more": "และอีก {n} ช่วง",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "เสียงของอีกฝ่ายไม่ได้ถูกบันทึก {ranges} — คำพูดของเขาไม่มีในบทถอดความช่วงเวลานั้น"
 }

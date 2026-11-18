@@ -669,5 +669,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "अंग्रेज़ी या रूसी चुनें, या Yogurt को भाषा पहचानने दें।",
   "Yogurt detects the spoken language automatically.": "Yogurt बोली जाने वाली भाषा अपने आप पहचानता है।",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "ट्रांसक्रिप्ट अधूरा है: रिकॉर्डिंग का एक हिस्सा अभी तक ट्रांसक्राइब नहीं हुआ है।",
-  "Retry": "पुनः प्रयास करें"
+  "Retry": "पुनः प्रयास करें",
+  "Can't hear the other side": "दूसरी तरफ़ की आवाज़ नहीं सुनाई दे रही",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "कंप्यूटर की आवाज़ एक मिनट से रिकॉर्ड नहीं हो रही। अगर यह वेबिनार है या आप अकेले प्रस्तुति दे रहे हैं, तो कोई बात नहीं।",
+  "Restart sound capture": "ध्वनि कैप्चर फिर से शुरू करें",
+  "Don't warn for this meeting": "इस मीटिंग में चेतावनी न दें",
+  "Restarting sound capture…": "ध्वनि कैप्चर फिर से शुरू हो रहा है…",
+  "The other side's sound is being recorded again": "दूसरी तरफ़ की आवाज़ फिर से रिकॉर्ड हो रही है",
+  "That didn't help. Check the sound output in your system settings or the call app.": "इससे फ़ायदा नहीं हुआ। सिस्टम सेटिंग्स या कॉल ऐप में साउंड आउटपुट जाँचें।",
+  "Warnings are off for this meeting": "इस मीटिंग के लिए चेतावनियाँ बंद हैं",
+  "Warn when the other side can't be heard": "चेतावनी दें जब दूसरी तरफ़ की आवाज़ न सुनाई दे",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "कॉल के दौरान कंप्यूटर की आवाज़ रिकॉर्ड न होने पर बैनर और सूचना दिखाता है।",
+  "from {start} to {end}": "{start} से {end} तक",
+  "and {n} more": "और {n} और",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "दूसरी तरफ़ की आवाज़ {ranges} रिकॉर्ड नहीं हुई — उन समयों में उनके वाक्य ट्रांसक्रिप्ट में नहीं हैं।"
 }

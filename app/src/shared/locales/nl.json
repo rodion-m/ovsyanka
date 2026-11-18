@@ -678,5 +678,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Kies Engels of Russisch, of laat Yogurt de taal herkennen.",
   "Yogurt detects the spoken language automatically.": "Yogurt herkent automatisch de gesproken taal.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Het transcript is onvolledig: een deel van de opname is nog niet getranscribeerd.",
-  "Retry": "Opnieuw"
+  "Retry": "Opnieuw",
+  "Can't hear the other side": "De ander is niet te horen",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Het geluid van de computer wordt al een minuut niet opgenomen. Als dit een webinar is of je presenteert alleen, is dat prima.",
+  "Restart sound capture": "Geluidsopname opnieuw starten",
+  "Don't warn for this meeting": "Niet waarschuwen voor deze vergadering",
+  "Restarting sound capture…": "Geluidsopname wordt opnieuw gestart…",
+  "The other side's sound is being recorded again": "Het geluid van de ander wordt weer opgenomen",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Dat hielp niet. Controleer de geluidsuitvoer in de systeeminstellingen of in de bell-app.",
+  "Warnings are off for this meeting": "Waarschuwingen staan uit voor deze vergadering",
+  "Warn when the other side can't be heard": "Waarschuwen als de ander niet te horen is",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Toont een banner en een melding als het computergeluid tijdens een gesprek niet wordt opgenomen.",
+  "from {start} to {end}": "van {start} tot {end}",
+  "and {n} more": "en nog {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Het geluid van de ander is {ranges} niet opgenomen — zijn of haar uitspraken ontbreken dan in de transcriptie."
 }

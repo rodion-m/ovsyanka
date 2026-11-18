@@ -16,7 +16,7 @@
 //   {"t":"mic","uid":string|null,"name":string|null}   the mic recording now, after each start: uid null is Auto (the Mac's default input)
 //   {"t":"speech","track":"me"|"them","final":bool,"startMs","endMs","text","words":[{"text","startMs","endMs"}]}  Apple's on-device speech (record --speech LOCALE, macOS 26)
 // yogurt-audio speech-locales → {"available","supported":[bcp47],"installed":[bcp47]}; speech-install LOCALE → {"installed":bool}
-// stdin: pause, resume, stop (end of input also stops), mic UID or mic auto (switch without stopping). Problems go to stderr.
+// stdin: pause, resume, stop (end of input also stops), rebuild-system (rebuild the tap now), mic UID or mic auto (switch without stopping). Problems go to stderr.
 import AVFoundation
 import Speech
 import CoreAudio
@@ -293,9 +293,13 @@ func yogurtProcesses() -> [AudioObjectID] {
   return Array(out)
 }
 
-func defaultOutputUID() -> String? {
+func defaultOutputDevice() -> AudioObjectID? {
   var a = address(kAudioHardwarePropertyDefaultOutputDevice), dev = AudioObjectID(0), size = UInt32(MemoryLayout<AudioObjectID>.size)
   guard AudioObjectGetPropertyData(system, &a, 0, nil, &size, &dev) == noErr, dev != kAudioObjectUnknown else { return nil }
+  return dev
+}
+func defaultOutputUID() -> String? {
+  guard let dev = defaultOutputDevice() else { return nil }
   var ua = address(kAudioDevicePropertyDeviceUID), uid: Unmanaged<CFString>?, us = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
   guard AudioObjectGetPropertyData(dev, &ua, 0, nil, &us, &uid) == noErr, let uid else { return nil }
   return uid.takeRetainedValue() as String
@@ -306,6 +310,38 @@ func stringProp(_ obj: AudioObjectID, _ sel: AudioObjectPropertySelector) -> Str
   var s: Unmanaged<CFString>?
   guard AudioObjectGetPropertyData(obj, &a, 0, nil, &size, &s) == noErr, let v = s else { return nil }
   return v.takeRetainedValue() as String
+}
+/// output-scope stream ids on a device, for the change logs (-1 when unreadable)
+func streamIds(_ obj: AudioObjectID) -> Int {
+  var a = address(kAudioDevicePropertyStreams, kAudioObjectPropertyScopeOutput), size: UInt32 = 0
+  guard AudioObjectGetPropertyDataSize(obj, &a, 0, nil, &size) == noErr else { return -1 }
+  return Int(size) / MemoryLayout<AudioStreamID>.size
+}
+/// output-scope stream buffers on a device, for the change logs (-1 when unreadable)
+func streamBuffers(_ obj: AudioObjectID) -> Int {
+  var a = address(kAudioDevicePropertyStreamConfiguration, kAudioObjectPropertyScopeOutput), size: UInt32 = 0
+  guard AudioObjectGetPropertyDataSize(obj, &a, 0, nil, &size) == noErr, size > 0 else { return -1 }
+  let raw = UnsafeMutableRawPointer.allocate(byteCount: Int(size), alignment: MemoryLayout<AudioBufferList>.alignment)
+  defer { raw.deallocate() }
+  guard AudioObjectGetPropertyData(obj, &a, 0, nil, &size, raw) == noErr else { return -1 }
+  return Int(raw.assumingMemoryBound(to: AudioBufferList.self).pointee.mNumberBuffers)
+}
+/// whether a device is still alive, for the change logs
+func deviceAlive(_ obj: AudioObjectID) -> Bool {
+  var a = address(kAudioDevicePropertyDeviceIsAlive), v: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+  return AudioObjectGetPropertyData(obj, &a, 0, nil, &size, &v) == noErr && v != 0
+}
+/// audio processes outside Yogurt's own (the same pids yogurtProcesses() leaves out) playing output right now
+func playingOutputProcesses() -> Int {
+  let me = getpid(), app = getppid()
+  var n = 0
+  for obj in audioProcesses() {
+    let pid = pidOf(obj)
+    if pid == me || pid == app || parentPid(pid) == app { continue }
+    var a = address(kAudioProcessPropertyIsRunningOutput), v: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+    if AudioObjectGetPropertyData(obj, &a, 0, nil, &size, &v) == noErr, v != 0 { n += 1 }
+  }
+  return n
 }
 func defaultInput() -> AudioObjectID? {
   var a = address(kAudioHardwarePropertyDefaultInputDevice), dev = AudioObjectID(0), size = UInt32(MemoryLayout<AudioObjectID>.size)
@@ -364,7 +400,8 @@ final class SystemAudio {
   }
 
   func start() -> Bool {
-    let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: yogurtProcesses())
+    let excluded = yogurtProcesses()
+    let desc = CATapDescription(stereoGlobalTapButExcludeProcesses: excluded)
     desc.uuid = UUID()
     desc.name = "Yogurt"
     desc.isPrivate = true
@@ -402,6 +439,22 @@ final class SystemAudio {
       guard let self, let r = SystemAudio.tapRate(self.tap), r != tapRate0 else { return }
       log("the tap's rate changed to \(Int(r)) Hz"); self.onRateChange?()
     }
+    // diagnostics only: what moves around the tap, logged on the work queue and removed in stop()
+    watch(system, kAudioHardwarePropertyProcessObjectList) {
+      var playing = 0
+      for obj in audioProcesses() {
+        var a = address(kAudioProcessPropertyIsRunningOutput), v: UInt32 = 0, size = UInt32(MemoryLayout<UInt32>.size)
+        if AudioObjectGetPropertyData(obj, &a, 0, nil, &size, &v) == noErr, v != 0 { playing += 1 }
+      }
+      log("audio processes changed: \(audioProcesses().count) processes, \(playing) playing output")
+    }
+    if let out = defaultOutputDevice() {
+      watch(out, kAudioDevicePropertyStreamConfiguration) { log("output device stream configuration changed: \(streamBuffers(out)) buffers") }
+      watch(out, kAudioDevicePropertyStreams) { log("output device streams changed: \(streamIds(out))") }
+      watch(out, kAudioDevicePropertyDeviceIsAlive) { log("output device alive: \(deviceAlive(out))") }
+    }
+    watch(agg, kAudioDevicePropertyStreamConfiguration) { log("aggregate stream configuration changed: \(streamBuffers(self.agg)) buffers") }
+    watch(agg, kAudioDevicePropertyStreams) { log("aggregate streams changed: \(streamIds(self.agg))") }
 
     let onBuffer = self.onBuffer
     err = AudioDeviceCreateIOProcIDWithBlock(&proc, agg, nil) { _, inData, inTime, _, _ in
@@ -417,6 +470,13 @@ final class SystemAudio {
     guard err == noErr else { log("io proc failed: \(err)"); stop(); return false }
     err = AudioDeviceStart(agg, proc)
     guard err == noErr else { log("start failed: \(err)"); stop(); return false }
+    // every (re)start says what the tap hears from: a silent "them" track is diagnosed from these lines
+    if let out = defaultOutputDevice() {
+      let name = stringProp(out, kAudioObjectPropertyName) ?? "?"
+      let uid = stringProp(out, kAudioDevicePropertyDeviceUID) ?? "?"
+      let rate = SystemAudio.nominalRate(out).map { "\(Int($0))" } ?? "?"
+      log("system tap: output \"\(name)\" (\(uid)) at \(rate) Hz, tap \(Int(asbd.mSampleRate)) Hz, \(excluded.count) processes excluded")
+    }
     return true
   }
 
@@ -679,13 +739,22 @@ final class Recorder {
   var micTries = 0
   /// the microphone the person chose (its UID); nil is Auto, the Mac's default input, followed as it changes
   var micUID: String? = argValue("--mic")
+  /// the "them" tap's health, all on the work queue: the exact-zero stretch, the self-heal's backoff, per-minute stats
+  var zeroSince: Double?, zeroLogged = false
+  var autoRebuilds = 0, nextAutoRebuildAt = 0.0
+  var themCallbacks = 0, themPeakDb = -Double.infinity
+  var minuteTimer: DispatchSourceTimer?
   /// Apple's live speech per track (macOS 26, when asked for with --speech), as Any so older Macs never see the type
   var speech: [String: Any] = [:]
 
   init(dir: URL) {
     me = Track("me", dir: dir); them = Track("them", dir: dir)
     mic = Mic { [unowned self] b in if !self.paused && !self.finishing { self.me.append(b) } }
-    sys = SystemAudio { [unowned self] b, heard in if !self.paused && !self.finishing { self.them.append(b, heardMs: heard) } }
+    sys = SystemAudio { [unowned self] b, heard in
+      guard !self.paused && !self.finishing else { return }
+      self.noteThemBuffer(b)
+      self.them.append(b, heardMs: heard)
+    }
     sys.onRateChange = { [unowned self] in self.rebuildSystem() }
   }
 
@@ -736,6 +805,17 @@ final class Recorder {
     }
     t.resume(); timer = t
 
+    // once a minute: did the "them" IO keep delivering, and how loud did it get
+    let mt = DispatchSource.makeTimerSource(queue: work)
+    mt.schedule(deadline: .now() + 60, repeating: 60)
+    mt.setEventHandler { [unowned self] in
+      guard !self.finishing else { return }
+      let peak = self.themPeakDb.isFinite ? String(format: "%.1f", self.themPeakDb) : "-inf"
+      log("them: \(self.themCallbacks) IO callbacks in the last minute, peak \(peak) dBFS")
+      self.themCallbacks = 0; self.themPeakDb = -.infinity
+    }
+    mt.resume(); minuteTimer = mt
+
     listen(kAudioHardwarePropertyDefaultOutputDevice) { [unowned self] in self.rebuildSystem() }
     // Auto follows the Mac's input; a chosen mic stays put
     listen(kAudioHardwarePropertyDefaultInputDevice) { [unowned self] in if self.micUID == nil { self.rebuildMic() } }
@@ -765,6 +845,43 @@ final class Recorder {
   func listen(_ sel: AudioObjectPropertySelector, _ fn: @escaping () -> Void) {
     var a = address(sel)
     AudioObjectAddPropertyListenerBlock(system, &a, work) { _, _ in fn() }
+  }
+
+  /// Every "them" buffer, on the work queue (never the IO thread): the per-minute stats, the exact-zero stretch
+  /// logs, and the tap's own self-heal — a full rebuild after 20 s of zeros while other audio plays, backing off
+  /// 40 s, 80 s, ... up to 5 minutes, reset by the first non-zero buffer.
+  func noteThemBuffer(_ b: AVAudioPCMBuffer) {
+    themCallbacks += 1
+    var peak: Float = 0, silent = true
+    if let data = b.floatChannelData {
+      for c in 0..<Int(b.format.channelCount) {
+        let p = data[c]
+        for i in 0..<Int(b.frameLength) {
+          let v = p[i]
+          if v != 0 { silent = false }
+          let a = abs(v); if a > peak { peak = a }
+        }
+      }
+    } else { silent = false }
+    if peak > 0 { let db = 20 * log10(Double(peak)); if db > themPeakDb { themPeakDb = db } }
+    let t = nowMs()
+    if silent {
+      if zeroSince == nil { zeroSince = t }
+      let stretch = t - zeroSince!
+      if stretch >= 10_000 && !zeroLogged { zeroLogged = true; log("them: exact zeros for 10 s") }
+      if stretch >= 20_000 && t >= nextAutoRebuildAt {
+        let playing = playingOutputProcesses()
+        if playing > 0 {
+          autoRebuilds += 1
+          nextAutoRebuildAt = t + min(300_000, 40_000 * pow(2, Double(autoRebuilds - 1)))
+          log("rebuilding the system tap: 20 s of exact zeros while \(playing) processes play")
+          rebuildSystem()
+        }
+      }
+    } else {
+      if let z = zeroSince, t - z >= 10_000 { log("them: sound is back after \(Int((t - z) / 1000)) s of exact zeros") }
+      zeroSince = nil; zeroLogged = false; autoRebuilds = 0; nextAutoRebuildAt = 0
+    }
   }
 
   // device changes come in bursts; rebuild once they settle, without stopping the recording
@@ -849,6 +966,7 @@ final class Recorder {
     case "pause": paused = true; me.flushPending(); them.flushPending()
     case "resume": paused = false; me.resync(); them.resync()
     case "stop": finish()
+    case "rebuild-system": log("rebuilding the system tap: requested by the app"); rebuildSystem()
     case _ where c.hasPrefix("mic "): chooseMic(String(c.dropFirst(4)).trimmingCharacters(in: .whitespaces))
     // local measurements only (YOGURT_AUDIO_TEST=1): the engine stopped as a configuration change stops it, then
     // brought back the way an output switch now does (restart) or used to (rebuild)
@@ -861,7 +979,7 @@ final class Recorder {
   func finish() {
     if finishing { return }
     finishing = true
-    timer?.cancel()
+    timer?.cancel(); minuteTimer?.cancel()
     mic.stop(); sys.stop()
     me.flushPending(); them.flushPending()
     // both files end together, so they stay the same length

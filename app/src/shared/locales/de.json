@@ -678,5 +678,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Wähle Englisch oder Russisch oder lass Yogurt die Sprache erkennen.",
   "Yogurt detects the spoken language automatically.": "Yogurt erkennt die gesprochene Sprache automatisch.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Das Transkript ist unvollständig: Ein Teil der Aufnahme wurde noch nicht transkribiert.",
-  "Retry": "Erneut versuchen"
+  "Retry": "Erneut versuchen",
+  "Can't hear the other side": "Der andere Teilnehmer ist nicht zu hören",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Der Ton des Computers wird seit einer Minute nicht aufgezeichnet. Wenn dies ein Webinar ist oder Sie allein präsentieren, ist das in Ordnung.",
+  "Restart sound capture": "Tonaufnahme neu starten",
+  "Don't warn for this meeting": "Für dieses Meeting nicht warnen",
+  "Restarting sound capture…": "Tonaufnahme wird neu gestartet…",
+  "The other side's sound is being recorded again": "Der Ton des anderen Teilnehmers wird wieder aufgezeichnet",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Das hat nicht geholfen. Überprüfen Sie die Audioausgabe in den Systemeinstellungen oder in der Anruf-App.",
+  "Warnings are off for this meeting": "Warnungen sind für dieses Meeting deaktiviert",
+  "Warn when the other side can't be heard": "Warnen, wenn der andere Teilnehmer nicht zu hören ist",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Zeigt ein Banner und eine Mitteilung an, wenn der Ton des Computers während eines Anrufs nicht aufgezeichnet wird.",
+  "from {start} to {end}": "von {start} bis {end}",
+  "and {n} more": "und {n} weitere",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Der Ton des anderen Teilnehmers wurde {ranges} nicht aufgezeichnet — seine Beiträge fehlen in diesem Zeitraum im Transkript."
 }

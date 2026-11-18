@@ -693,5 +693,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Escolha inglês ou russo, ou deixe o Yogurt detectar o idioma.",
   "Yogurt detects the spoken language automatically.": "O Yogurt detecta automaticamente o idioma falado.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "A transcrição está incompleta: parte da gravação ainda não foi transcrita.",
-  "Retry": "Tentar novamente"
+  "Retry": "Tentar novamente",
+  "Can't hear the other side": "Não dá para ouvir a outra pessoa",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "O som do computador não está sendo gravado há um minuto. Se for um webinar ou você estiver apresentando sozinho, está tudo bem.",
+  "Restart sound capture": "Reiniciar captura de som",
+  "Don't warn for this meeting": "Não avisar nesta reunião",
+  "Restarting sound capture…": "Reiniciando a captura de som…",
+  "The other side's sound is being recorded again": "O som da outra pessoa está sendo gravado novamente",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Não resolveu. Verifique a saída de som nas configurações do sistema ou no app de chamadas.",
+  "Warnings are off for this meeting": "Os avisos estão desativados para esta reunião",
+  "Warn when the other side can't be heard": "Avisar quando a outra pessoa não puder ser ouvida",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Mostra um banner e uma notificação quando o som do computador não é gravado durante uma chamada.",
+  "from {start} to {end}": "de {start} a {end}",
+  "and {n} more": "e mais {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "O som da outra pessoa não foi gravado {ranges} — as falas dela não aparecem na transcrição nesse período."
 }

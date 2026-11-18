@@ -47,11 +47,12 @@ import { deleteMeeting } from './deleteMeeting'
 import { emptyTrash, moveToTrash, purgeTrash } from './trash'
 import { isId, text } from './ipcArgs'
 import { hookMics } from './mics'
-import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
+import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rebuildSystemCapture, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
 import { hookTranscription, onWhisperGpuOff, meetingLanguage, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcriptPartials, transcribing } from './asr'
 import { meetingsWithSpool } from './asr/spool'
-import { hookCallNames, type Watch } from './callNames'
+import { hookCallNames, type CallNames, type Watch } from './callNames'
+import { createThemSilence, type ThemSilence } from './themSilence'
 import { helperWatch, killAllWatches } from './callNames/watch'
 import { macFullName } from './user'
 import { setJargon, setOwnerName } from './vocab'
@@ -284,6 +285,11 @@ const macName = () => (isFake() ? process.env.YOGURT_FAKE_FULL_NAME ?? 'Sam Rive
 /** fake mode's hooks reach the store and the notes through these */
 let storeRef: Store | undefined
 let indexerRef: { schedule(): Promise<unknown> } | undefined
+/** the call reader's view for the silent-"them" watchdog, and the watchdog itself (made with the widget) */
+let callNamesRef: CallNames | undefined
+let themSilence: ThemSilence | undefined
+/** Settings → "Warn when the other side can't be heard"; the recorder's own healing ignores it */
+let themWarnOn = true
 
 /** Notice calls, offer to take notes, stop when the call ends (or ask, with that setting off). Starts nothing without a click. */
 function startDetection() {
@@ -317,6 +323,31 @@ function startDetection() {
     stop: (id) => { stopMeeting(id) },
     foreground: () => !!win && !win.isDestroyed() && win.isVisible() && !win.isMinimized() && win.isFocused(),
   })
+  // the silent-"them" watchdog: levels in, rebuild requests and at most one notification out; the
+  // recorder keeps healing itself even when this is muted or off in Settings
+  const them = createThemSilence({
+    warnEnabled: () => themWarnOn,
+    callOn: () => watcher.onCall(),
+    watch: (id) => callNamesRef?.themWatch(id) ?? null,
+    rebuild: (id) => rebuildSystemCapture(id),
+    notify: (id) => {
+      if (!themWarnOn || isFake() || !Notification.isSupported()) return
+      const n = new Notification({ title: t("Can't hear the other side"), body: t("The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine."), silent: true })
+      n.on('click', () => goTo(`/note/${id}`))
+      n.show()
+    },
+    publish: (id) => { const v = them.view(id); widget.themSilent(id, v.phase, v.muted) },
+    loadRanges: (id) => storeRef?.meeting(id)?.themSilent?.ranges ?? [],
+    saveRanges: (id, ranges) => { if (storeRef?.meeting(id)) storeRef.updateMeeting(id, { themSilent: { ranges } }) },
+    log: (msg) => console.warn('them-silence:', msg),
+  })
+  themSilence = them
+  onRecordingEvent((e) => {
+    if (e.t === 'level') them.level(e.meetingId, e.me, e.them)
+    else if (e.t === 'paused') them.paused(e.meetingId, e.paused, e.at)
+  })
+  onMeetingStart((m) => them.started(m))
+  onMeetingStop((m) => them.stopped(m.id))
   onMeetingStart(() => { prompts.hide(); watcher.cleared(); updateOfferChanged() })
   // Recording needs the mic and the call audio: one never asked is asked now (the Mac's own prompt, as any app does
   // when it first records); one still off says so under the note, where its button turns it on.
@@ -493,6 +524,7 @@ app.whenReady().then(() => {
     },
     slowStartMs: isFake() ? Number(process.env.YOGURT_FAKE_BOOT_MS ?? 0) : 0,
     onSpoken: () => spokenChanged(),
+    onThemSilenceWarn: (on) => { themWarnOn = on },
   })
   // Music and Spotify pause while a meeting records, and play again after
   const media = createMedia({ helper: runHelper })
@@ -513,6 +545,7 @@ app.whenReady().then(() => {
   initMeetings(store)
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
+  themWarnOn = loadSettings(settingsFile).themSilenceWarn !== false
   hookAiPreferences({ file: settingsFile, active: ai, restart: () => {
     if (activeMeeting() || transcribing() || finishing || queue.busy()) return false
     if (isFake()) { relaunched++; return true }
@@ -533,6 +566,7 @@ app.whenReady().then(() => {
     changed: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id); win?.webContents.send('meetings:changed'); notes.applyPeople(id) },
     onStart: onMeetingStart, onStop: onMeetingStop, onCapture: onCaptureStart,
   })
+  callNamesRef = callNames
   // Windows and Linux: whisper left the graphics card in a meeting, so the speed check (timed with it) runs again next start
   onWhisperGpuOff(() => speedStore(speedFile()).forget())
   hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
@@ -685,6 +719,23 @@ app.whenReady().then(() => {
     if (!isId(id) || !store.meeting(id)) return
     await recoverMeetingTranscript(id, { retry: true }, transcriptFollowUp)
     win?.webContents.send('meetings:changed')
+  })
+  // the silent-"them" banner's buttons: one rebuild now, and quiet for this meeting only
+  ipcMain.handle('meetings:restart-sound', () => {
+    const id = activeMeeting()?.id
+    return !!id && !!themSilence?.restart(id)
+  })
+  ipcMain.handle('meetings:mute-them-silence', () => {
+    const id = activeMeeting()?.id
+    if (!id) return false
+    themSilence?.mute(id)
+    return true
+  })
+  ipcMain.handle('meetings:unmute-them-silence', () => {
+    const id = activeMeeting()?.id
+    if (!id) return false
+    themSilence?.unmute(id)
+    return true
   })
   // Both Ask surfaces share saved conversations and the same recording-first model queue.
   const conversations = hookConversations({

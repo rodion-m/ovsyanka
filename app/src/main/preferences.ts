@@ -21,6 +21,8 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
   slowStartMs?: number
   /** the spoken language changed: the meeting being recorded follows it where it can */
   onSpoken?: (v: Spoken) => void
+  /** "warn when the other side can't be heard" changed */
+  onThemSilenceWarn?: (on: boolean) => void
   /** the permissions this computer has (supportedKinds in platform.ts); a Mac has them all */
   kinds?: readonly PermissionKind[] }) {
   const kinds = d.kinds ?? PERMISSION_KINDS
@@ -49,7 +51,7 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     // what the Mac says, so a change in System Settings shows here
     // locale: every window (main, card, widget) shows the interface language
     // language: the one picked ('' is the Mac's); locale: the one in use; systemLocale: the Mac's, for the picker
-    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: s.showInMenuBar !== false, language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), keepRecordings: s.keepRecordings !== false, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s) }
+    return { theme: s.theme ?? 'system', openAtLogin: d.loginOn(s.openAtLogin), showInMenuBar: s.showInMenuBar !== false, language: isLocale(s.language) ? s.language : '', locale: localeOf(s, systemLocale()), systemLocale: systemLocale(), myName: s.myName?.trim() || d.macName(), macName: d.macName(), stopWhenCallEnds: stopsWhenCallEnds(s), recordingReminder: recordingReminderOn(s), keepRecordings: s.keepRecordings !== false, jargon: cleanJargon(s.jargon), spoken: spokenSetting(s), themSilenceWarn: s.themSilenceWarn !== false }
   })
   // what the person is called in meetings (who "You" is when naming voices); blank: the Mac's full name again
   ipcMain.handle('settings:name', (_e, v: unknown) => {
@@ -91,11 +93,17 @@ export function hookPreferences(d: { file: string; permissions: Permissions; ask
     updateSettings(d.file, { jargon: jargon.length ? jargon : undefined })
     return jargon
   })
-  // English is the default; preserve either explicit Russian or automatic language detection.
+  // Multi-language is the default; explicit English or Russian is written down.
   ipcMain.handle('settings:spoken', (_e, v: unknown) => {
     if (!SPOKEN.includes(v as Spoken)) return
-    updateSettings(d.file, { spoken: v === 'en' ? undefined : v as Spoken })
+    updateSettings(d.file, { spoken: v === 'multi' ? undefined : v as Spoken })
     d.onSpoken?.(v as Spoken)
+  })
+  // on is the default, so only off is written down; the recorder's own healing stays on either way
+  ipcMain.handle('settings:them-silence-warn', (_e, on: unknown) => {
+    if (typeof on !== 'boolean') return
+    updateSettings(d.file, { themSilenceWarn: on ? undefined : false })
+    d.onThemSilenceWarn?.(on)
   })
   ipcMain.handle('settings:menu-bar', (_e, on: unknown) => {
     if (typeof on !== 'boolean') return

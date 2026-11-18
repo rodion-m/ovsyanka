@@ -269,6 +269,16 @@ describe('choosing the mic while recording', () => {
     await tick()
     expect(f.commands).toEqual(['mic usb:yeti', 'mic auto'])
   })
+  it('rebuildSystem sends the rebuild-system line, and refuses once stopping', async () => {
+    const f = fakeProc(); const c = new Capture(f.proc)
+    expect(c.rebuildSystem()).toBe(true)
+    await tick()
+    expect(f.commands).toEqual(['rebuild-system'])
+    const stopped = c.stop()
+    f.exit(0)
+    await stopped
+    expect(c.rebuildSystem()).toBe(false)
+  })
 })
 
 describe('Capture end time', () => {

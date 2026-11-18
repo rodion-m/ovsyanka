@@ -708,5 +708,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Выберите английский или русский либо доверьте определение языка Yogurt.",
   "Yogurt detects the spoken language automatically.": "Yogurt автоматически определяет язык речи.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Расшифровка неполная: часть записи ещё не расшифрована.",
-  "Retry": "Повторить"
+  "Retry": "Повторить",
+  "Can't hear the other side": "Не слышно собеседника",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Звук компьютера не записывается уже минуту. Если это вебинар или вы выступаете один, всё в порядке.",
+  "Restart sound capture": "Перезапустить захват звука",
+  "Don't warn for this meeting": "Не предупреждать на этой встрече",
+  "Restarting sound capture…": "Перезапускаю захват звука…",
+  "The other side's sound is being recorded again": "Звук собеседника снова записывается",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Не помогло. Проверьте устройство вывода звука в настройках системы или в приложении для звонков.",
+  "Warnings are off for this meeting": "Предупреждения выключены для этой встречи",
+  "Warn when the other side can't be heard": "Предупреждать, если не слышно собеседника",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Показывает баннер и уведомление, когда звук компьютера не записывается во время звонка.",
+  "from {start} to {end}": "с {start} до {end}",
+  "and {n} more": "и ещё {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Звук собеседника не записывался {ranges} — его реплик в расшифровке за это время нет."
 }

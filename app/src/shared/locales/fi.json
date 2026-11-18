@@ -681,5 +681,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Valitse englanti tai venäjä tai anna Yogurtin tunnistaa kieli.",
   "Yogurt detects the spoken language automatically.": "Yogurt tunnistaa puhutun kielen automaattisesti.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Litterointi on epätäydellinen: osa tallenteesta on vielä transkriboimatta.",
-  "Retry": "Yritä uudelleen"
+  "Retry": "Yritä uudelleen",
+  "Can't hear the other side": "Toista osapuolta ei kuulosta",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Tietokoneen ääntä ei ole tallennettu minuuttiin. Jos kyseessä on webinaari tai esittelet yksin, kaikki on kunnossa.",
+  "Restart sound capture": "Käynnistä äänen kaappaus uudelleen",
+  "Don't warn for this meeting": "Älä varoita tässä kokouksessa",
+  "Restarting sound capture…": "Käynnistän äänen kaappausta uudelleen…",
+  "The other side's sound is being recorded again": "Toisen osapuolen ääntä tallennetaan taas",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Eipä auttanut. Tarkista äänen ulostulo järjestelmäasetuksista tai puhelusovelluksesta.",
+  "Warnings are off for this meeting": "Varoitukset on pois päältä tässä kokouksessa",
+  "Warn when the other side can't be heard": "Varoita, kun toista osapuolta ei kuulu",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Näyttää bannerin ja ilmoituksen, kun tietokoneen ääntä ei tallenneta puhelun aikana.",
+  "from {start} to {end}": "{start}–{end}",
+  "and {n} more": "ja vielä {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Toisen osapuolen ääntä ei tallennettu {ranges} — sen repliikit puuttuvat litteroinnista sinä aikana."
 }

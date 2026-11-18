@@ -18,18 +18,18 @@ const settingsFile = () => {
 afterEach(() => { dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })); handlers.clear() })
 
 describe('the spoken language setting', () => {
-  it('defaults to English while recognizing explicit Russian and Multi-language', () => {
+  it('defaults to Multi-language while keeping explicit English and Russian', () => {
     expect(SPOKEN).toEqual(['en', 'ru', 'multi'])
-    expect(spokenOf(undefined)).toBe('en')
+    expect(spokenOf(undefined)).toBe('multi')
     expect(spokenOf('en')).toBe('en')
     expect(spokenOf('ru')).toBe('ru')
     expect(spokenOf('multi')).toBe('multi')
-    expect(spokenOf('klingon')).toBe('en')
-    expect(spokenSetting({})).toBe('en')
+    expect(spokenOf('klingon')).toBe('multi')
+    expect(spokenSetting({})).toBe('multi')
     expect(spokenSetting({ spoken: 'ru' })).toBe('ru')
     expect(spokenSetting({ spoken: 'multi' })).toBe('multi')
   })
-  it('persists Russian and Multi-language while allowing English to use the default', () => {
+  it('persists explicit choices; Multi-language is the unwritten default', () => {
     const file = settingsFile()
     updateSettings(file, { spoken: 'ru' })
     expect(spokenSetting(loadSettings(file))).toBe('ru')
@@ -51,7 +51,7 @@ describe('the spoken language setting', () => {
     hookPreferences(deps)
     const get = () => handlers.get('settings:get')!()
     const set = (value: unknown) => handlers.get('settings:spoken')!(null, value)
-    expect(get().spoken).toBe('en')
+    expect(get().spoken).toBe('multi')
     set('ru')
     expect(loadSettings(file)).toMatchObject({ spoken: 'ru', language: 'en', myName: 'Родион' })
     expect(onSpoken).toHaveBeenLastCalledWith('ru')
@@ -63,10 +63,11 @@ describe('the spoken language setting', () => {
     expect(get().spoken).toBe('ru')
     set('multi')
     expect(get().spoken).toBe('multi')
-    expect(loadSettings(file).spoken).toBe('multi')
+    expect(loadSettings(file).spoken).toBeUndefined()
     set('en')
     expect(get().spoken).toBe('en')
-    expect(JSON.parse(readFileSync(file, 'utf8'))).not.toHaveProperty('spoken')
+    // English is no longer the default: the explicit choice is written down
+    expect(loadSettings(file).spoken).toBe('en')
     expect(onSpoken.mock.calls.map(([value]) => value)).toEqual(['ru', 'multi', 'en'])
   })
 })

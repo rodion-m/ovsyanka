@@ -28,7 +28,7 @@ const trayLabel = () => osWords({ mac: t('Show Yogurt in the menu bar'), windows
 /** focus: the setting a toast's Settings button opens, recordings or notes-model */
 export function Settings({ revision = 0, focus }: { revision?: number; focus?: string }) {
   const [perms, setPerms] = useState<PermissionStatus>()
-  const [prefs, setPrefs] = useState<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; myName: string; macName: string; stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean }>()
+  const [prefs, setPrefs] = useState<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; myName: string; macName: string; stopWhenCallEnds: boolean; recordingReminder: boolean; themSilenceWarn: boolean; keepRecordings: boolean }>()
   const [name, setName] = useState('')
   const [generalReady, setGeneralReady] = useState(false)
   const [ai, setAi] = useState<AiPreferences>()
@@ -124,6 +124,15 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
               </div>
               <button data-testid="recording-reminder-toggle" role="switch" aria-checked={!!prefs?.recordingReminder} aria-label={t('Recording reminder')}
                 onClick={() => { if (!prefs) return; const on = !prefs.recordingReminder; setPrefs({ ...prefs, recordingReminder: on }); void window.yogurt.settings.setRecordingReminder(on) }}
+                className="settings-toggle"><span className="settings-toggle-knob" /></button>
+            </div>
+            <div className="settings-row">
+              <div className="settings-row-copy">
+                <p className="settings-label">{t("Warn when the other side can't be heard")}</p>
+                <p className="settings-description">{t("Shows a banner and a notification when the computer's sound isn't recorded during a call.")}</p>
+              </div>
+              <button data-testid="them-silence-warn-toggle" role="switch" aria-checked={!!prefs?.themSilenceWarn} aria-label={t("Warn when the other side can't be heard")}
+                onClick={() => { if (!prefs) return; const on = !prefs.themSilenceWarn; setPrefs({ ...prefs, themSilenceWarn: on }); void window.yogurt.settings.setThemSilenceWarn(on) }}
                 className="settings-toggle"><span className="settings-toggle-knob" /></button>
             </div>
             <RecordingSetting reveal={focus === 'recordings' && generalReady && !!perms} on={prefs?.keepRecordings ?? true} disabled={!prefs} onChange={async on => {

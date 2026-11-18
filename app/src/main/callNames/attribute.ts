@@ -29,7 +29,7 @@ const nameBase = (s: string) => norm(s).replace(/\s*(?:\([^)]*\)|\[[^\]]*\])\s*$
 
 type Opts = { /** the person's own name in Settings, and the Mac's: never a name for the other side */ myNames?: string[] }
 
-const isMe = (name: string, s: CallSample, o: Opts) => {
+export const isMe = (name: string, s: CallSample, o: Opts) => {
   const n = norm(name)
   const same = (a: string, b: string) => {
     const x = norm(a), y = norm(b)

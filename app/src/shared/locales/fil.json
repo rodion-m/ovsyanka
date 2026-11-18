@@ -678,5 +678,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Pumili ng Ingles o Ruso, o hayaang tukuyin ng Yogurt ang wika.",
   "Yogurt detects the spoken language automatically.": "Awtomatikong tinutukoy ng Yogurt ang wikang sinasalita.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Hindi kumpleto ang transcript: may bahagi pa ng recording na hindi pa nai-transcribe.",
-  "Retry": "Subukan ulit"
+  "Retry": "Subukan ulit",
+  "Can't hear the other side": "Hindi marinig ang kabilang panig",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Hindi naire-record ang tunog ng computer sa loob ng isang minuto. Kung webinar ito o nagpe-present ka nang mag-isa, ayos lang.",
+  "Restart sound capture": "I-restart ang sound capture",
+  "Don't warn for this meeting": "Huwag magbabala sa meeting na ito",
+  "Restarting sound capture…": "Nire-restart ang sound capture…",
+  "The other side's sound is being recorded again": "Nire-record na muli ang tunog ng kabilang panig",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Hindi ito nakatulong. Suriin ang sound output sa system settings o sa calling app.",
+  "Warnings are off for this meeting": "Naka-off ang mga babala para sa meeting na ito",
+  "Warn when the other side can't be heard": "Magbala kapag hindi marinig ang kabilang panig",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Nagpapakita ng banner at notification kapag hindi nare-record ang tunog ng computer sa gitduring ng tawag.",
+  "from {start} to {end}": "mula {start} hanggang {end}",
+  "and {n} more": "at {n} pa",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Hindi naire-record ang tunog ng kabilang panig {ranges} — wala ang kanilang mga linya sa transcript sa panahong iyon."
 }

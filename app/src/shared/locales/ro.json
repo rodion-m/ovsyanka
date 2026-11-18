@@ -696,5 +696,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Alegeți engleza sau rusa sau lăsați Yogurt să detecteze limba.",
   "Yogurt detects the spoken language automatically.": "Yogurt detectează automat limba vorbită.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transcrierea este incompletă: o parte din înregistrare nu a fost încă transcrisă.",
-  "Retry": "Reîncearcă"
+  "Retry": "Reîncearcă",
+  "Can't hear the other side": "Nu se aude cealaltă parte",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Sunetul computerului nu este înregistrat de un minut. Dacă este un webinar sau prezentați singur, totul este în regulă.",
+  "Restart sound capture": "Repornește captarea sunetului",
+  "Don't warn for this meeting": "Nu avertiza la această întâlnire",
+  "Restarting sound capture…": "Se repornește captarea sunetului…",
+  "The other side's sound is being recorded again": "Sunetul celeilalte părți este din nou înregistrat",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Nu a ajutat. Verificați ieșirea audio în setările sistemului sau în aplicația de apeluri.",
+  "Warnings are off for this meeting": "Avertismentele sunt dezactivate pentru această întâlnire",
+  "Warn when the other side can't be heard": "Avertizează când cealaltă parte nu se aude",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Afișează un banner și o notificare când sunetul computerului nu este înregistrat în timpul unui apel.",
+  "from {start} to {end}": "de la {start} la {end}",
+  "and {n} more": "și încă {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Sunetul celeilalte părți nu a fost înregistrat {ranges} — replicile ei lipsesc din transcriere în acea perioadă."
 }

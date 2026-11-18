@@ -690,5 +690,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "בחרו אנגלית או רוסית, או תנו ל־Yogurt לזהות את השפה.",
   "Yogurt detects the spoken language automatically.": "Yogurt מזהה אוטומטית את שפת הדיבור.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "התמליל אינו שלם: חלק מההקלטה עדיין לא תומלל.",
-  "Retry": "נסה שוב"
+  "Retry": "נסה שוב",
+  "Can't hear the other side": "לא שומעים את הצד השני",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "הצליל של המחשב לא מוקלט כבר דקה. אם זה וובינר או שאתה מציג לבד, הכל בסדר.",
+  "Restart sound capture": "הפעל מחדש לכידת שמע",
+  "Don't warn for this meeting": "אל תתריע בפגישה הזו",
+  "Restarting sound capture…": "מפעיל מחדש לכידת שמע…",
+  "The other side's sound is being recorded again": "הצליל של הצד השני מוקלט שוב",
+  "That didn't help. Check the sound output in your system settings or the call app.": "זה לא עזר. בדוק את פלט השמע בהגדרות המערכת או באפליקציית השיחות.",
+  "Warnings are off for this meeting": "האזהרות כבויות לפגישה הזו",
+  "Warn when the other side can't be heard": "להתריע כשלא שומעים את הצד השני",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "מציג באנר והתראה כשצליל המחשב לא מוקלט במהלך שיחה.",
+  "from {start} to {end}": "מ-{start} עד {end}",
+  "and {n} more": "ועוד {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "צליל הצד השני לא הוקלט {ranges} — הדיווחים שלו חסרים בתמלול בתקופה הזו."
 }

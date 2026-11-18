@@ -4,7 +4,7 @@ import type { Meeting } from './store'
 import { WidgetModel } from './widgetModel'
 import { onRecordingEvent, recordingFinished } from './capture'
 import { onMeetingChange, onMeetingStart, onMeetingStop, stopSavePending } from './meeting'
-import type { WidgetView } from '../shared/types'
+import type { ThemSilentPhase, WidgetView } from '../shared/types'
 import { floatingType, floatOverFullScreen } from './float'
 import { isFake } from './paths'
 import { t, onLanguage } from '../shared/i18n'
@@ -262,6 +262,8 @@ export function createWidget(d: { open(meetingId: string): void; stop(meetingId:
     elapsed: () => model.view(Date.now())?.elapsedMs ?? 0,
     /** the recording is about to stop because its call ended: the finished card says so */
     callEnded: (meetingId: string) => { if (model.meetingId === meetingId) model.callEnded() },
+    /** the silent-"them" watchdog's state for the meeting being recorded */
+    themSilent: (meetingId: string, phase: ThemSilentPhase | null, muted: boolean) => { if (model.meetingId === meetingId) { model.themSilent(phase, muted); push() } },
     /** The same actual transcript events used by the main note, delivered to the recorder. */
     transcript: (channel: string, value: unknown) => { if (win && !win.isDestroyed()) win.webContents.send(channel, value) },
     /** for tests: what the widget would show, and where it sits */

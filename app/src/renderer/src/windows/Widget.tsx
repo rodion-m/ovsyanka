@@ -115,6 +115,27 @@ function Recording({ view }: { view: WidgetView }) {
   </div>
 }
 
+/** The compact silent-"them" warning: icon + short text, both actions a real button away. */
+function ThemSilentNote({ note }: { note: NonNullable<WidgetView['note']> }) {
+  const phase = note.them ?? 'warn'
+  const [busy, setBusy] = useState(false)
+  const restart = () => { setBusy(true); void window.yogurt.meetings.restartSoundCapture().finally(() => setBusy(false)) }
+  const warn = phase === 'warn' || phase === 'failed'
+  return <>
+    <p data-testid="widget-note" data-tone={note.tone} data-them={phase}>{warn ? t("Can't hear the other side") : note.text}</p>
+    {phase === 'warn' && <p className="widget-them-body">{t("The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.")}</p>}
+    {phase === 'failed' && <p className="widget-them-body">{t("That didn't help. Check the sound output in your system settings or the call app.")}</p>}
+    {(warn || phase === 'restarting') && <div className="widget-them-actions">
+      <button data-testid="widget-them-restart" className="widget-settings" disabled={phase === 'restarting' || busy} onClick={restart}>
+        {phase === 'restarting' || busy ? t('Restarting sound capture…') : t('Restart sound capture')}
+      </button>
+      <button data-testid="widget-them-mute" className="widget-settings" disabled={phase === 'restarting'} onClick={() => void window.yogurt.meetings.muteThemSilence()}>
+        {t("Don't warn for this meeting")}
+      </button>
+    </div>}
+  </>
+}
+
 const RECENT_LINES = 80
 
 function Preview({ view, open }: { view: WidgetView; open: boolean }) {
@@ -197,9 +218,11 @@ function Preview({ view, open }: { view: WidgetView; open: boolean }) {
   const note = view.note
   const permission = widgetSettings(note)
   return <div data-testid="widget-preview" className="widget-preview" role="region" aria-label={t('Live transcript')} inert={!open} aria-hidden={!open}>
-    {note && <div className="widget-preview-warning" role="status">
-      <p data-testid="widget-note" data-tone={note.tone}>{note.text}</p>
-      {permission && <button className="widget-settings" onClick={() => { void window.yogurt.permissions.open(permission) }}>{t('Open Settings')}</button>}
+    {note && <div className="widget-preview-warning" role="status" aria-live="polite">
+      {note.code === 'them-silent' ? <ThemSilentNote note={note} /> : <>
+        <p data-testid="widget-note" data-tone={note.tone}>{note.text}</p>
+        {permission && <button className="widget-settings" onClick={() => { void window.yogurt.permissions.open(permission) }}>{t('Open Settings')}</button>}
+      </>}
     </div>}
     <ScrollFade>
     <div ref={scroll} data-testid="widget-preview-text" className="widget-preview-conversation" role="log" aria-live="off" aria-label={t('Transcript')}

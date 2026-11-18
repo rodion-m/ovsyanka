@@ -96,6 +96,12 @@ export type YogurtApi = {
     retryStopSave(id: string): Promise<boolean>
     /** sends the meeting's kept remote audio through transcription again, including chunks that failed enough times to be skipped */
     retryTranscription(id: string): Promise<void>
+    /** the banner's primary button: rebuild the system-sound tap now */
+    restartSoundCapture(): Promise<boolean>
+    /** "don't warn for this meeting": quiet for this meeting only */
+    muteThemSilence(): Promise<boolean>
+    /** undo "don't warn for this meeting" */
+    unmuteThemSilence(): Promise<boolean>
     /** the person's own title (tidied; blank keeps the old one) */
     rename(id: string, title: string): Promise<void>
     /** gone for good, audio too; refused while it records */
@@ -259,7 +265,7 @@ export type YogurtApi = {
   }
   settings: {
     /** myName: what the person is called in meetings (their Mac's full name, macName, when they never changed it) */
-    get(): Promise<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; /** the language picked; '' follows the Mac */ language: string; /** the language in use */ locale: string; /** the Mac's language, among Yogurt's */ systemLocale: string; myName: string; macName: string; /** a recording stops by itself when its call ends (off: ask first) */ stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean; /** personal jargon, spelled as typed */ jargon: string[]; /** the language people speak in meetings */ spoken: import('./spoken').Spoken }>
+    get(): Promise<{ theme: Theme; openAtLogin: boolean; showInMenuBar: boolean; /** the language picked; '' follows the Mac */ language: string; /** the language in use */ locale: string; /** the Mac's language, among Yogurt's */ systemLocale: string; myName: string; macName: string; /** a recording stops by itself when its call ends (off: ask first) */ stopWhenCallEnds: boolean; recordingReminder: boolean; keepRecordings: boolean; /** personal jargon, spelled as typed */ jargon: string[]; /** the language people speak in meetings */ spoken: import('./spoken').Spoken; /** warn when a call is on but the computer's sound isn't recorded */ themSilenceWarn: boolean }>
     /** blank goes back to the Mac's full name */
     setName(name: string): Promise<void>
     setTheme(v: Theme): Promise<void>
@@ -276,6 +282,8 @@ export type YogurtApi = {
     onLanguage(cb: (locale: string) => void): () => void
     /** English only or Multi-language: the meeting being recorded and the next ones */
     setSpoken(v: import('./spoken').Spoken): Promise<void>
+    /** warn when a call is on but the computer's sound isn't recorded (on by default) */
+    setThemSilenceWarn(on: boolean): Promise<void>
   }
   /** finds meetings by date, title, attendees, folders, transcript and notes; nothing typed: the latest. folder: only the meetings in it */
   search: { query(q: string, folder?: string, people?: Person[]): Promise<SearchResult[]>; people(): Promise<Person[]> }
@@ -395,6 +403,8 @@ export type MicDevice = { id: string; name: string; isDefault: boolean }
 /** The mic picker: the mics, the chosen one (null: Auto), the name in use, and the default's name for Auto */
 export type MicsView = { devices: MicDevice[]; choice: string | null; using: string | null; defaultName: string | null }
 
+/** The silent-"them" warning's place: shown, a rebuild running, sound back, or the last try failed */
+export type ThemSilentPhase = 'warn' | 'restarting' | 'ok' | 'failed'
 /** What the recording widget shows: recording (time, hints) or the card after stopping */
 export type WidgetView = {
   kind: 'recording' | 'captured'
@@ -404,7 +414,9 @@ export type WidgetView = {
   /** time recorded as of `at` (main's clock); the page counts on from there while recording */
   elapsedMs: number
   at: number
-  note: { tone: 'hint' | 'hiccup'; text: string; /** which warning a hint is for */ code?: 'no-mic' | 'no-system-audio'; missingAudio?: ('mic' | 'systemAudio')[] } | null
+  note: { tone: 'hint' | 'hiccup'; text: string; /** which warning a hint is for */ code?: 'no-mic' | 'no-system-audio' | 'them-silent'; missingAudio?: ('mic' | 'systemAudio')[]; /** the silent-"them" warning's state */ them?: ThemSilentPhase } | null
+  /** "don't warn for this meeting" was picked: the note shows a quiet line instead of the banner */
+  themMuted?: true
   /** the recording stopped because the audio helper kept failing */
   crashed: boolean
   /** the recording stopped by itself because the call ended */

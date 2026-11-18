@@ -149,3 +149,38 @@ describe('stopped because the call ended', () => {
     expect(w.view(6000)?.callEnded).toBeUndefined()
   })
 })
+
+describe('the silent-"them" warning on the widget', () => {
+  const note = (phase: 'warn' | 'restarting' | 'ok' | 'failed' | null, muted = false) => {
+    const w = new WidgetModel()
+    w.start(m)
+    w.themSilent(phase, muted)
+    return w.view(2000)
+  }
+  it('shows the compact state for each phase', () => {
+    expect(note('warn')?.note).toMatchObject({ code: 'them-silent', them: 'warn', text: "Can't hear the other side" })
+    expect(note('restarting')?.note).toMatchObject({ code: 'them-silent', them: 'restarting', text: 'Restarting sound capture…' })
+    expect(note('ok')?.note).toMatchObject({ code: 'them-silent', them: 'ok', text: "The other side's sound is being recorded again" })
+    expect(note('failed')?.note).toMatchObject({ code: 'them-silent', them: 'failed' })
+    expect(note(null)?.note).toBeNull()
+  })
+  it('"don\'t warn for this meeting" hides the note but keeps the quiet flag', () => {
+    const v = note('warn', true)
+    expect(v?.note).toBeNull()
+    expect(v?.themMuted).toBe(true)
+  })
+  it('a missing-mic warning still wins over the silent-"them" one', () => {
+    const w = new WidgetModel()
+    w.start(m)
+    w.warn('no-mic')
+    w.themSilent('warn', false)
+    expect(w.view(2000)?.note?.code).toBe('no-mic')
+  })
+  it('the next meeting starts without it', () => {
+    const w = new WidgetModel()
+    w.start(m); w.themSilent('warn', true); w.stop(3000)
+    w.start(m)
+    expect(w.view(4000)?.note).toBeNull()
+    expect(w.view(4000)?.themMuted).toBeUndefined()
+  })
+})

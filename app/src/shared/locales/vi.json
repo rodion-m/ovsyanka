@@ -633,5 +633,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Chọn tiếng Anh hoặc tiếng Nga, hoặc để Yogurt nhận diện ngôn ngữ.",
   "Yogurt detects the spoken language automatically.": "Yogurt tự động nhận diện ngôn ngữ đang được nói.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Bản ghi chưa đầy đủ: một phần bản ghi âm chưa được phiên âm.",
-  "Retry": "Thử lại"
+  "Retry": "Thử lại",
+  "Can't hear the other side": "Không nghe thấy người đối diện",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Âm thanh máy tính đã một phút chưa được ghi. Nếu đây là webinar hoặc bạn đang thuyết trình một mình thì không sao.",
+  "Restart sound capture": "Khởi động lại thu âm",
+  "Don't warn for this meeting": "Không cảnh báo trong cuộc họp này",
+  "Restarting sound capture…": "Đang khởi động lại thu âm…",
+  "The other side's sound is being recorded again": "Âm thanh của người đối diện đang được ghi lại",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Không hiệu quả. Hãy kiểm tra đầu ra âm thanh trong cài đặt hệ thống hoặc ứng dụng gọi.",
+  "Warnings are off for this meeting": "Cảnh báo đã tắt cho cuộc họp này",
+  "Warn when the other side can't be heard": "Cảnh báo khi không nghe thấy người đối diện",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Hiển thị biểu ngữ và thông báo khi âm thanh máy tính không được ghi trong cuộc gọi.",
+  "from {start} to {end}": "từ {start} đến {end}",
+  "and {n} more": "và {n} khoảng nữa",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Âm thanh của người đối diện không được ghi {ranges} — lời của họ không có trong bản ghi trong khoảng thời gian đó."
 }

@@ -681,5 +681,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Välj engelska eller ryska, eller låt Yogurt känna igen språket.",
   "Yogurt detects the spoken language automatically.": "Yogurt känner automatiskt igen språket som talas.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkriberingen är ofullständig: en del av inspelningen har inte transkriberats ännu.",
-  "Retry": "Försök igen"
+  "Retry": "Försök igen",
+  "Can't hear the other side": "Den andra personen hörs inte",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Datorns ljud har inte spelats in på en minut. Om det här är ett webbseminarium eller du presenterar ensam är allt som det ska.",
+  "Restart sound capture": "Starta om ljudinspelningen",
+  "Don't warn for this meeting": "Varna inte på det här mötet",
+  "Restarting sound capture…": "Startar om ljudinspelningen…",
+  "The other side's sound is being recorded again": "Den andra personens ljud spelas in igen",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Det hjälpte inte. Kontrollera ljudutgången i systeminställningarna eller i samtalsappen.",
+  "Warnings are off for this meeting": "Varningar är avstängda för det här mötet",
+  "Warn when the other side can't be heard": "Varna när den andra personen inte hörs",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Visar en banderoll och ett meddelande när datorns ljud inte spelas in under ett samtal.",
+  "from {start} to {end}": "från {start} till {end}",
+  "and {n} more": "och {n} till",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Den andra personens ljud spelades inte in {ranges} — hens repliker saknas i transkriptionen under den tiden."
 }

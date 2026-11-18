@@ -78,6 +78,9 @@ const api: YogurtApi = {
     setPaused: (id, paused) => ipcRenderer.invoke('meetings:set-paused', id, paused),
     retryStopSave: (id) => ipcRenderer.invoke('meetings:retry-stop-save', id),
     retryTranscription: (id) => ipcRenderer.invoke('meetings:retry-transcription', id),
+    restartSoundCapture: () => ipcRenderer.invoke('meetings:restart-sound'),
+    muteThemSilence: () => ipcRenderer.invoke('meetings:mute-them-silence'),
+    unmuteThemSilence: () => ipcRenderer.invoke('meetings:unmute-them-silence'),
     rename: (id, title) => ipcRenderer.invoke('meetings:rename', id, title),
     delete: (id) => ipcRenderer.invoke('meetings:delete', id),
     trash: (id) => ipcRenderer.invoke('meetings:trash', id),
@@ -242,6 +245,7 @@ const api: YogurtApi = {
     setLanguage: (id) => ipcRenderer.invoke('settings:language', id),
     onLanguage: (cb) => { const f = (_e: unknown, locale: string) => cb(locale); ipcRenderer.on('settings:language', f); return () => { ipcRenderer.off('settings:language', f) } },
     setSpoken: (v) => ipcRenderer.invoke('settings:spoken', v),
+    setThemSilenceWarn: (on) => ipcRenderer.invoke('settings:them-silence-warn', on),
   },
   search: { query: (q, folder, people) => ipcRenderer.invoke('search:query', q, folder, people), people: () => ipcRenderer.invoke('search:people') },
   folders: {

@@ -16,7 +16,7 @@ export function SpokenSetting() {
     const step = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 }[e.key]
     if (!step) return
     e.preventDefault()
-    const next = SPOKEN[(SPOKEN.indexOf(spoken ?? 'en') + step + SPOKEN.length) % SPOKEN.length]
+    const next = SPOKEN[(SPOKEN.indexOf(spoken ?? 'multi') + step + SPOKEN.length) % SPOKEN.length]
     choose(next)
     e.currentTarget.querySelector<HTMLButtonElement>(`[data-spoken-choice="${next}"]`)?.focus()
   }
@@ -29,7 +29,7 @@ export function SpokenSetting() {
       </div>
       <div role="radiogroup" aria-label={t('Spoken language')} onKeyDown={arrows} className="settings-spoken" style={{ gridTemplateColumns: `repeat(${SPOKEN.length}, minmax(0, 1fr))` }}>
         {SPOKEN.map((v) => (
-          <button key={v} data-testid={`settings-spoken-${v}`} data-spoken-choice={v} role="radio" aria-checked={spoken === v} tabIndex={(spoken ?? 'en') === v ? 0 : -1} onClick={() => choose(v)}
+          <button key={v} data-testid={`settings-spoken-${v}`} data-spoken-choice={v} role="radio" aria-checked={spoken === v} tabIndex={(spoken ?? 'multi') === v ? 0 : -1} onClick={() => choose(v)}
             className="settings-spoken-choice">{label(v)}</button>
         ))}
       </div>

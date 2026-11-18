@@ -1,6 +1,6 @@
 import type { RecordingStart } from '../meeting'
 import type { Meeting, Store } from '../store'
-import { nameFor, othersIn, type CallSample } from './attribute'
+import { isMe, nameFor, othersIn, type CallSample } from './attribute'
 import { readCall, summarize, type AxWindow, type CallKind } from './parse'
 
 /**
@@ -40,7 +40,9 @@ const APP_LAG_MS = 750
 const LOGGED_CHANGES = 30
 
 type Sample = Omit<CallSample, 'ms'> & { t: number }
-type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number }
+type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number
+  /** for the silent-"them" watchdog: the last headcount, whether it ever read speakers, when someone else last talked */
+  lastParticipants: number | null; sawSpeakers: boolean; otherTalkedAt: number | null }
 
 export function hookCallNames(p: {
   store: Pick<Store, 'meeting' | 'segments' | 'setSegmentSpeakers' | 'updateMeeting'>
@@ -81,6 +83,12 @@ export function hookCallNames(p: {
     if (!s.pictured) { s.pictured = true; log(`call names: reading ${l.app} (${kind}), its window in short:\n${summarize(l.windows)}`) }
     const r = readCall(kind, l.windows)
     s.samples.push({ t: l.t, ...r })
+    s.lastParticipants = r.participants.length || null
+    if (r.speaking.length) {
+      s.sawSpeakers = true
+      const sample: CallSample = { ms: 0, ...r }
+      if (r.speaking.some((n) => !isMe(n, sample, { myNames: p.myNames() }))) s.otherTalkedAt = l.t
+    }
     const said = `${r.speaking.join(', ') || '-'} of ${r.participants.length}${r.me ? ', me known' : ''}`
     if (said !== s.last && s.logged < LOGGED_CHANGES) { s.logged++; log(`call names: ${kind} talking ${said}`) }
     s.last = said
@@ -88,7 +96,10 @@ export function hookCallNames(p: {
 
   p.onStart((m) => {
     const ids = watchIds(m.app)
-    const s: Session = { samples: [], priorLines: new Set(p.store.segments(m.id, { hidden: true }).map((line) => line.id)), startedAt: m.resume ? m.resume.startedAt - m.resume.startMs : m.startedAt, pictured: false, errors: new Set(), last: '', logged: 0 }
+    // a resumed meeting keeps what the reader already knew about this call
+    const prev = sessions.get(m.id)
+    const s: Session = { samples: [], priorLines: new Set(p.store.segments(m.id, { hidden: true }).map((line) => line.id)), startedAt: m.resume ? m.resume.startedAt - m.resume.startMs : m.startedAt, pictured: false, errors: new Set(), last: '', logged: 0,
+      lastParticipants: prev?.lastParticipants ?? null, sawSpeakers: prev?.sawSpeakers ?? false, otherTalkedAt: prev?.otherTalkedAt ?? null }
     sessions.set(m.id, s)
     if (!ids.length) { log(`call names: ${m.app} can't be read, the other side is Them`); return }
     try { s.watch = p.watch(ids, (l) => onLine(m.id, s, l)) } catch (e) { console.error('call names: the watch did not start', e) }
@@ -136,6 +147,11 @@ export function hookCallNames(p: {
     },
     /** resolves when the names after the meeting are in */
     finished: (id: string): Promise<void> => finals.get(id) ?? Promise.resolve(),
+    /** the call reader's view for the silent-"them" watchdog; null when it reads nothing for this meeting */
+    themWatch(meetingId: string): { participants: number | null; sawSpeakers: boolean; otherTalkedAt: number | null } | null {
+      const s = sessions.get(meetingId)
+      return s ? { participants: s.lastParticipants, sawSpeakers: s.sawSpeakers, otherTalkedAt: s.otherTalkedAt } : null
+    },
   }
 }
 export type CallNames = ReturnType<typeof hookCallNames>

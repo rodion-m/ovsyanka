@@ -681,5 +681,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Επιλέξτε αγγλικά ή ρωσικά ή αφήστε το Yogurt να αναγνωρίσει τη γλώσσα.",
   "Yogurt detects the spoken language automatically.": "Το Yogurt αναγνωρίζει αυτόματα την ομιλούμενη γλώσσα.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Η απομαγνητοφώνηση είναι ελλιπής: μέρος της ηχογράφησης δεν έχει απομαγνητοφωνηθεί ακόμη.",
-  "Retry": "Επανάληψη"
+  "Retry": "Επανάληψη",
+  "Can't hear the other side": "Δεν ακούγεται ο συνομιλητής",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Ο ήχος του υπολογιστή δεν ηχογραφείται εδώ και ένα λεπτό. Αν πρόκειται για διαδικτυακό σεμινάριο ή παρουσιάζετε μόνοι σας, όλα είναι εντάξει.",
+  "Restart sound capture": "Επανεκκίνηση λήψης ήχου",
+  "Don't warn for this meeting": "Να μην ειδοποιούμαι σε αυτή τη συνάντηση",
+  "Restarting sound capture…": "Επανεκκίνηση λήψης ήχου…",
+  "The other side's sound is being recorded again": "Ο ήχος του συνομιλητή ηχογραφείται ξανά",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Δεν βοήθησε. Ελέγξτε την έξοδο ήχου στις ρυθμίσεις συστήματος ή στην εφαρμογή κλήσεων.",
+  "Warnings are off for this meeting": "Οι ειδοποιήσεις είναι απενεργοποιημένες για αυτή τη συνάντηση",
+  "Warn when the other side can't be heard": "Ειδοποίηση όταν δεν ακούγεται ο συνομιλητής",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Εμφανίζει banner και ειδοποίηση όταν ο ήχος του υπολογιστή δεν ηχογραφείται κατά τη διάρκεια κλήσης.",
+  "from {start} to {end}": "από {start} έως {end}",
+  "and {n} more": "και άλλα {n}",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges} — οι απαντήσεις του λείπουν από τη μεταγραφή εκείνη την περίοδο."
 }

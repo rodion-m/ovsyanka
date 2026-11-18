@@ -633,5 +633,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Pilih bahasa Inggris atau Rusia, atau biarkan Yogurt mendeteksi bahasanya.",
   "Yogurt detects the spoken language automatically.": "Yogurt mendeteksi bahasa yang diucapkan secara otomatis.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkrip belum lengkap: sebagian rekaman belum ditranskripsikan.",
-  "Retry": "Coba lagi"
+  "Retry": "Coba lagi",
+  "Can't hear the other side": "Pihak lain tidak terdengar",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Suara komputer tidak terekam selama satu menit. Jika ini webinar atau Anda presentasi sendiri, tidak apa-apa.",
+  "Restart sound capture": "Mulai ulang perekaman suara",
+  "Don't warn for this meeting": "Jangan peringatkan di rapat ini",
+  "Restarting sound capture…": "Memulai ulang perekaman suara…",
+  "The other side's sound is being recorded again": "Suara pihak lain terekam lagi",
+  "That didn't help. Check the sound output in your system settings or the call app.": "Tidak berhasil. Periksa output suara di pengaturan sistem atau di aplikasi panggilan.",
+  "Warnings are off for this meeting": "Peringatan nonaktif untuk rapat ini",
+  "Warn when the other side can't be heard": "Peringatkan saat pihak lain tidak terdengar",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Menampilkan spanduk dan notifikasi saat suara komputer tidak terekam selama panggilan.",
+  "from {start} to {end}": "dari {start} hingga {end}",
+  "and {n} more": "dan {n} lagi",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "Suara pihak lain tidak terekam {ranges} — ucapannya tidak ada dalam transkrip selama waktu itu."
 }

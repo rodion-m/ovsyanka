@@ -36,6 +36,8 @@ export type Meeting = {
   durationMs?: number
   /** Some recorded audio still needs a saved transcript, including earlier sessions. */
   transcriptionPending?: boolean
+  /** stretches where the other side's track was silent during a call (recording ms), for the after-meeting note */
+  themSilent?: { ranges: Array<[number, number]> }
   /** when it was moved to the Trash; there it is out of every list, search and chat until restored */
   trashedAt?: number
 }
@@ -64,6 +66,7 @@ const toMeeting = (r: Row): Meeting => ({
   ...(r.event_calendar_source == null ? {} : { eventCalendarSource: String(r.event_calendar_source) }),
   ...(r.duration_ms == null ? {} : { durationMs: Number(r.duration_ms) }),
   ...(r.trashed_at == null ? {} : { trashedAt: Number(r.trashed_at) }),
+  ...(r.them_silent == null ? {} : { themSilent: JSON.parse(String(r.them_silent)) as Meeting['themSilent'] }),
 })
 const toSegment = (r: Row): Segment => ({
   id: Number(r.id), meetingId: String(r.meeting_id), track: r.track as Segment['track'], startMs: Number(r.start_ms), endMs: Number(r.end_ms),
@@ -214,6 +217,7 @@ export class Store {
     if (!meetingCols.includes('duration_ms')) this.db.exec('ALTER TABLE meetings ADD COLUMN duration_ms INTEGER')
     if (!meetingCols.includes('language')) this.db.exec('ALTER TABLE meetings ADD COLUMN language TEXT')
     if (!meetingCols.includes('trashed_at')) this.db.exec('ALTER TABLE meetings ADD COLUMN trashed_at INTEGER')
+    if (!meetingCols.includes('them_silent')) this.db.exec('ALTER TABLE meetings ADD COLUMN them_silent TEXT')
     if (!meetingCols.includes('title_source')) {
       // meetings from before: worked out from the title and the event, as a new one would be
       this.db.exec("ALTER TABLE meetings ADD COLUMN title_source TEXT NOT NULL DEFAULT 'user'")
@@ -292,10 +296,10 @@ export class Store {
   }
   updateMeeting(id: string, patch: Partial<Omit<Meeting, 'id'>>) {
     if (patch.attendees) rememberPeople(this.db, patch.attendees)
-    const col: Record<string, string> = { title: 'title', startedAt: 'started_at', endedAt: 'ended_at', eventId: 'event_id', eventStartedAt: 'event_started_at', eventEndedAt: 'event_ended_at', eventTitle: 'event_title', eventCalendarName: 'event_calendar_name', eventCalendarSource: 'event_calendar_source', app: 'app', attendees: 'attendees', state: 'state', language: 'language', titleSource: 'title_source', durationMs: 'duration_ms', transcriptionPending: 'transcription_pending' }
+    const col: Record<string, string> = { title: 'title', startedAt: 'started_at', endedAt: 'ended_at', eventId: 'event_id', eventStartedAt: 'event_started_at', eventEndedAt: 'event_ended_at', eventTitle: 'event_title', eventCalendarName: 'event_calendar_name', eventCalendarSource: 'event_calendar_source', app: 'app', attendees: 'attendees', state: 'state', language: 'language', titleSource: 'title_source', durationMs: 'duration_ms', transcriptionPending: 'transcription_pending', themSilent: 'them_silent' }
     const keys = Object.keys(patch).filter((k) => k in col && (patch as Row)[k] !== undefined)
     if (!keys.length) return
-    const vals = keys.map((k) => (k === 'attendees' ? JSON.stringify(patch.attendees) : k === 'transcriptionPending' ? Number(patch.transcriptionPending) : (patch as Row)[k]) as string | number | null)
+    const vals = keys.map((k) => (k === 'attendees' ? JSON.stringify(patch.attendees) : k === 'themSilent' ? JSON.stringify(patch.themSilent) : k === 'transcriptionPending' ? Number(patch.transcriptionPending) : (patch as Row)[k]) as string | number | null)
     this.db.prepare(`UPDATE meetings SET ${keys.map((k) => `${col[k]} = ?`).join(', ')} WHERE id = ?`).run(...vals, id)
   }
   /** Refresh every note still linked to this occurrence, including alternate calendar IDs. */

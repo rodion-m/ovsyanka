@@ -739,5 +739,18 @@
   "Choose English or Russian, or let Yogurt detect the language.": "اختر الإنجليزية أو الروسية، أو دع Yogurt يتعرّف على اللغة.",
   "Yogurt detects the spoken language automatically.": "يتعرّف Yogurt على اللغة المنطوقة تلقائيًا.",
   "The transcript is incomplete: part of the recording is not transcribed yet.": "النسخة غير مكتملة: لم يتم تفريغ جزء من التسجيل بعد.",
-  "Retry": "إعادة المحاولة"
+  "Retry": "إعادة المحاولة",
+  "Can't hear the other side": "لا يمكن سماع الطرف الآخر",
+  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "لم يتم تسجيل صوت الكمبيوتر منذ دقيقة. إذا كان هذا webinar أو كنت تقدم بمفردك، فلا بأس.",
+  "Restart sound capture": "إعادة تشغيل التقاط الصوت",
+  "Don't warn for this meeting": "لا تحذير في هذا الاجتماع",
+  "Restarting sound capture…": "جارٍ إعادة تشغيل التقاط الصوت…",
+  "The other side's sound is being recorded again": "يتم تسجيل صوت الطرف الآخر مرة أخرى",
+  "That didn't help. Check the sound output in your system settings or the call app.": "لم ينفع ذلك. تحقق من مخرج الصوت في إعدادات النظام أو في تطبيق المكالمات.",
+  "Warnings are off for this meeting": "التحذيرات متوقفة لهذا الاجتماع",
+  "Warn when the other side can't be heard": "التحذير عندما لا يمكن سماع الطرف الآخر",
+  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "يعرض لافتة وإشعارًا عندما لا يتم تسجيل صوت الكمبيوتر أثناء مكالمة.",
+  "from {start} to {end}": "من {start} إلى {end}",
+  "and {n} more": "و{n} أخرى",
+  "The other side's sound wasn't recorded {ranges} — their lines are missing from the transcript for that time.": "لم يتم تسجيل صوت الطرف الآخر {ranges} — ردوده غير موجودة في النص خلال ذلك الوقت."
 }
