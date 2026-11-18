@@ -14,7 +14,9 @@ export function createHarnessModel(o: { settings: AiSettings; tempDir: string; s
     async llm(signal): Promise<Llm> {
       const stop = signal ? AbortSignal.any([o.signal, signal]) : o.signal
       assertRunning(stop)
-      loaded = o.settings.backend === 'porch' ? `porch:${o.settings.textProfile}` : `agy:${o.settings.textModel}`
+      loaded = o.settings.backend === 'porch' ? `porch:${o.settings.textProfile}`
+        : o.settings.backend === 'openrouter' ? `openrouter:${o.settings.openrouterTextModel}`
+          : `agy:${o.settings.textModel}`
       const llm: Llm & { estimate: (text: string) => number } = {
         // The application budgets/splits its own prompts against this smaller window before chat adds policy and framing.
         contextSize: Math.max(1024, o.settings.contextTokens - 2048),

@@ -133,6 +133,8 @@ export function mergeBackup(into: DatabaseSync, from: DatabaseSync): { added: st
 
 /** the live copy older versions kept for telling voices apart: scratch, not a recording */
 const scratch = (name: string) => name.endsWith('.f32')
+/** Secret stores are never part of a backup, even if a future meeting-side artifact is nested under one. */
+export const backupExcluded = (path: string): boolean => path.split(sep).includes('secrets')
 // Cleanup cannot undo a committed export/import or replace the original failure.
 const cleanup = (dir: string) => rm(dir, { recursive: true, force: true }).catch((e) => console.warn('backup cleanup failed', dir, e))
 
@@ -157,7 +159,7 @@ export async function exportBackup(o: { db: DatabaseSync; meetingsDir: string; o
       // the remote path's on-disk spool never crosses a backup: a restore must not find sidecars without their audio
       const spoolDir = join(src, SPOOL_DIR)
       try {
-        await cp(src, join(work, 'meetings', id), { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (s) => !scratch(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
+        await cp(src, join(work, 'meetings', id), { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (s) => !scratch(s) && !backupExcluded(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
       } catch (e) {
         // Recordings can be deleted during export; the saved text still makes a complete backup.
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
@@ -211,7 +213,7 @@ export async function importBackup(o: { db: DatabaseSync; meetingsDir: string; z
       await mkdir(o.meetingsDir, { recursive: true })
       copied.push(dest)
       const spoolDir = join(src, SPOOL_DIR)
-      await cp(src, dest, { recursive: true, filter: async (s) => await plainOnly(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
+      await cp(src, dest, { recursive: true, filter: async (s) => await plainOnly(s) && !backupExcluded(s) && s !== spoolDir && !s.startsWith(spoolDir + sep) })
     }
     const r = mergeBackup(o.db, from)
     return { ok: true, added: r.added.length, skipped: r.skipped }

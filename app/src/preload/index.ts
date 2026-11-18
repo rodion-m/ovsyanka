@@ -14,6 +14,12 @@ const api: YogurtApi = {
     check: (settings) => ipcRenderer.invoke('ai:check', settings),
     options: (request) => ipcRenderer.invoke('ai:options', request),
     restart: () => ipcRenderer.invoke('ai:restart'),
+    openrouter: {
+      keyStatus: () => ipcRenderer.invoke('ai.openrouter.keyStatus'),
+      setKey: (key) => ipcRenderer.invoke('ai.openrouter.setKey', key),
+      clearKey: () => ipcRenderer.invoke('ai.openrouter.clearKey'),
+      usage: () => ipcRenderer.invoke('ai.openrouter.usage'),
+    },
   },
   setup: {
     state: () => ipcRenderer.invoke('setup:state'),

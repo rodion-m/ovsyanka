@@ -1,17 +1,10 @@
-import type { AiEffort } from './ai'
+import type { AiEffort, AiProblemCode, OpenRouterAudioKind } from './ai'
+export type { AiProblemCode, OpenRouterAudioKind } from './ai'
 
 // ---- OpenRouter catalog types and pure functions ----
 
 /** Labels used by the model picker. Keep the OpenRouter vocabulary separate from agy entries. */
 export type AiHint = 'audio' | 'verified' | 'fast' | 'cheap' | 'free' | 'tokens' | 'expiring' | 'unavailable'
-
-export type OpenRouterAudioKind = 'chat' | 'stt'
-
-/** Problem codes shared by the model list and the later OpenRouter request adapter. */
-export type AiProblemCode =
-  | 'auth' | 'credits' | 'budget' | 'rate-limit' | 'model-gone' | 'no-provider'
-  | 'unavailable' | 'timeout' | 'network' | 'too-large' | 'moderation' | 'truncated'
-  | 'no-timestamps' | 'bad-response' | 'no-key' | 'keychain'
 
 export type AiOption = {
   id: string
@@ -76,7 +69,8 @@ export const OPENROUTER_RECOMMENDED_MODEL_IDS = ['google/gemini-3.8-flash'] as c
 export const OPENROUTER_CHAT_ENDPOINT = '/api/v1/chat/completions'
 export const OPENROUTER_STT_ENDPOINT = '/api/v1/audio/transcriptions'
 export const OPENROUTER_TEXT_CONTEXT_MINIMUM = 32_000
-export const OPENROUTER_AUDIO_TOKENS_PER_SECOND = 32
+/** Stage 0 measured Gemini 3.8 Flash chat-audio input at 25 tokens per second. */
+export const OPENROUTER_AUDIO_TOKENS_PER_SECOND = 25
 export const OPENROUTER_AUDIO_OUTPUT_TOKENS_PER_MINUTE = 500
 export const OPENROUTER_HOURLY_PRICE_MIN_USD = 0.005
 export const OPENROUTER_HOURLY_PRICE_MAX_USD = 3

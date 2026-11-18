@@ -4,10 +4,11 @@ import { access, chmod, mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promi
 import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join, resolve } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
+import type { AiProblemCode } from '../../shared/ai'
 
 /** Errors deliberately omit provider diagnostics: they can contain meeting text or credentials. */
 export class HarnessError extends Error {
-  constructor(message: string) { super(message); this.name = 'HarnessError' }
+  constructor(message: string, readonly code?: AiProblemCode) { super(message); this.name = 'HarnessError' }
 }
 
 export function aborted(): Error {

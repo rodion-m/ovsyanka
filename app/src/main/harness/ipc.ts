@@ -1,11 +1,13 @@
 import { ipcMain } from 'electron'
-import { aiSettings, validAiSettings, type AiCheck, type AiPreferences, type AiSettings } from '../../shared/ai'
-import { configuredAi, loadSettings, updateSettings } from '../settings'
+import { aiSettings, validAiSettings, type AiCheck, type AiKeyStatus, type AiPreferences, type AiSettings, type AiUsage } from '../../shared/ai'
+import { configuredAi, keyLast4, loadSettings, updateSettings } from '../settings'
 import { checkHarness } from './index'
 import { getAiOptions } from './aiOptions'
+import type { OpenRouterKeyStore } from './openrouterKey'
+import type { OpenRouterUsage } from './openrouterUsage'
 
 /** Environment variables that fix a settings field for the whole launch. */
-const envLocks = { YOGURT_AI_BACKEND: 'backend', YOGURT_AGY_PATH: 'agyPath', YOGURT_PORCH_PATH: 'porchPath' } as const
+const envLocks = { YOGURT_AI_BACKEND: 'backend', YOGURT_AGY_PATH: 'agyPath', YOGURT_PORCH_PATH: 'porchPath', YOGURT_OPENROUTER_API_KEY: 'openrouterKey' } as const
 
 /** A launch keeps one provider configuration. Saving changes only the next launch. */
 export function hookAiPreferences(o: {
@@ -15,13 +17,17 @@ export function hookAiPreferences(o: {
   /** Checks executable availability/version only; never starts a model request. */
   check?: (settings: AiSettings) => Promise<AiCheck>
   env?: NodeJS.ProcessEnv
+  openrouterKey?: string
+  openrouter?: Pick<OpenRouterKeyStore, 'status' | 'set' | 'clear'>
+  usage?: Pick<OpenRouterUsage, 'summary'>
 }) {
   const active = aiSettings(o.active)
   const env = { ...(o.env ?? process.env) }
   const locked: NonNullable<AiPreferences['locked']> = {}
   for (const variable of Object.keys(envLocks) as (keyof typeof envLocks)[]) {
     const field = envLocks[variable]
-    if (env[variable]) locked[field] = { variable, value: String(active[field]) }
+    const value = field === 'openrouterKey' ? (o.openrouterKey ?? env[variable]) : env[variable]
+    if (value) locked[field] = { variable, value: field === 'openrouterKey' ? keyLast4(String(value)) : String(active[field]) }
   }
   const savedSettings = () => aiSettings(loadSettings(o.file).ai ?? active)
   const preferences = (): AiPreferences => {
@@ -65,4 +71,8 @@ export function hookAiPreferences(o: {
       agyPath: value.agyPath as string | undefined, porchPath: value.porchPath as string | undefined })
   })
   ipcMain.handle('ai:restart', () => o.restart())
+  ipcMain.handle('ai.openrouter.keyStatus', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.status() : { state: 'none' })
+  ipcMain.handle('ai.openrouter.setKey', async (_e, value: unknown): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.set(typeof value === 'string' ? value : '') : { state: 'unavailable' })
+  ipcMain.handle('ai.openrouter.clearKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.clear() : { state: 'none' })
+  ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {} })
 }

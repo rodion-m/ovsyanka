@@ -7,16 +7,28 @@ import { wavBytes, type Line, type Transcribe } from '../asr/transcribe'
 import { packedToMeeting } from '../asr/batch'
 import { assertRunning, HarnessError, inStage } from './process'
 
-export const TRANSCRIPT_SCHEMA: Record<string, unknown> = {
-  type: 'object',
-  properties: {
-    language: { type: 'string' }, error: { type: 'string' },
-    segments: { type: 'array', items: { type: 'object', properties: {
-      start: { type: 'number' }, end: { type: 'number' }, speaker: { type: 'string' }, text: { type: 'string' },
-    }, required: ['start', 'end', 'text'] } },
-  },
-  required: ['segments'],
+const TRANSCRIPT_PROPERTIES = {
+  language: { type: 'string' }, error: { type: 'string' },
+  segments: { type: 'array', items: { type: 'object', properties: {
+    start: { type: 'number' }, end: { type: 'number' }, speaker: { type: 'string' }, text: { type: 'string' },
+  }, required: ['start', 'end', 'text'], additionalProperties: false } },
 }
+
+/** The native CLI historically requires only its authoritative segments field. */
+export const TRANSCRIPT_SCHEMA: Record<string, unknown> = {
+  type: 'object', additionalProperties: false, properties: TRANSCRIPT_PROPERTIES, required: ['segments'],
+}
+
+/** OpenRouter strict structured outputs require every declared top-level property. */
+export const STRICT_TRANSCRIPT_SCHEMA: Record<string, unknown> = {
+  type: 'object', additionalProperties: false, properties: TRANSCRIPT_PROPERTIES, required: ['language', 'error', 'segments'],
+}
+
+/** Rules shared by the OpenRouter audio request and the CLI prompt. File/tool instructions stay CLI-only. */
+export const TRANSCRIPTION_RULES = [
+  'Each segment is a natural phrase or sentence, with start and end in seconds from the beginning of this file and verbatim text. Omit speaker labels.',
+  'If you cannot hear the audio, return an empty segments array and a nonempty error. Return an empty array without error only for silence or no speech. Never guess.',
+].join('\n')
 
 type Transcript = { language?: string; segments: Array<{ start: number; end: number; text: string }> }
 type TranscribeOptions = {
@@ -122,8 +134,7 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
       'Transcribe the audio file ./audio.wav.',
       'Listen using your native file-reading tool (view_file / read_file). That tool supplies the actual audio to the model. Do not read waveform bytes as text, run commands, or infer speech from metadata.',
       'Work alone without subagents, web browsing, or other tools. Return only JSON matching the provided schema.',
-      'Each segment is a natural phrase or sentence, with start and end in seconds from the beginning of this file and verbatim text. Omit speaker labels.',
-      'If you cannot hear the audio, return an empty segments array and a nonempty error. Return an empty array without error only for silence or no speech. Never guess.',
+      TRANSCRIPTION_RULES,
       ...(language ? [`Expected spoken language: ${language}.`] : []), instructions,
     ].join('\n')
     if (lowClear) console.log(`transcriber sending ${chunk.track} chunk at ${chunk.startMs} ms: ${duration.toFixed(1)} s of audio with ${chunk.clearMs} ms of clear speech, without the vocabulary line`)

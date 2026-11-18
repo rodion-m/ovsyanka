@@ -72,6 +72,7 @@ export function createAgy(settings: AiSettings, processes: HarnessProcesses, opt
     delete env.GEMINI_API_KEY
     delete env.GOOGLE_API_KEY
     delete env.AGY_ADC_AUTH
+    delete env.YOGURT_OPENROUTER_API_KEY
     prependPath(env, [dirname(binary)])
     assertRunning(request.signal)
     // agy keeps a private copy of every conversation, audio included. Its id arrives in the

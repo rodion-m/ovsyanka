@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { aiSettings, type AiPreferences, type AiSettings } from '../src/shared/ai'
-import { configuredAi, loadSettings, updateSettings } from '../src/main/settings'
+import { configuredAi, consumeOpenRouterKey, loadSettings, updateSettings } from '../src/main/settings'
 import { hookAiPreferences } from '../src/main/harness/ipc'
 import { checkHarness } from '../src/main/harness/index'
 
@@ -25,6 +25,32 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('AI preferences IPC', () => {
+  it('accepts OpenRouter settings and validates model IDs without reading a generic API-key variable', () => {
+    const env = { YOGURT_AI_BACKEND: 'openrouter', YOGURT_OPENROUTER_API_KEY: 'launch-only', OPENROUTER_API_KEY: 'must-not-be-read' }
+    expect(consumeOpenRouterKey(env)).toBe('launch-only')
+    expect(env.YOGURT_OPENROUTER_API_KEY).toBeUndefined()
+    expect(env.OPENROUTER_API_KEY).toBe('must-not-be-read')
+    expect(configuredAi({}, env).backend).toBe('openrouter')
+    const value = aiSettings({ backend: 'openrouter', openrouterTextModel: 'vendor/model:reasoning' })
+    expect(value.openrouterTextModel).toBe('vendor/model:reasoning')
+    expect(aiSettings({ backend: 'openrouter', openrouterTextModel: 'bad model' }).openrouterTextModel).toBe('google/gemini-3.8-flash')
+  })
+
+  it('redacts the launch key in preferences and keeps every OpenRouter IPC response metadata-only', async () => {
+    const fakeKey = `sk-or-v1-${'abcdef0123456789'.repeat(4)}`
+    const openrouter = {
+      status: vi.fn(async () => ({ state: 'unchecked' as const, source: 'env' as const, last4: fakeKey.slice(-4) })),
+      set: vi.fn(async () => ({ state: 'rejected' as const, source: 'keychain' as const, last4: fakeKey.slice(-4), problem: 'auth' as const })),
+      clear: vi.fn(async () => ({ state: 'none' as const })),
+    }
+    const usage = { summary: vi.fn(async () => ({ todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {} })) }
+    hookAiPreferences({ file, active: aiSettings({ backend: 'openrouter' }), restart, check, env: {}, openrouterKey: fakeKey, openrouter, usage })
+    expect(call<AiPreferences>('ai:get').locked).toEqual({ openrouterKey: { variable: 'YOGURT_OPENROUTER_API_KEY', value: fakeKey.slice(-4) } })
+    for (const response of [await call('ai.openrouter.keyStatus'), await call('ai.openrouter.setKey', fakeKey), await call('ai.openrouter.clearKey'), await call('ai.openrouter.usage')]) {
+      expect(JSON.stringify(response)).not.toContain(fakeKey)
+    }
+  })
+
   it('uses the active launch default for an unsaved profile without writing or checking anything', () => {
     expect(call('ai:get')).toEqual({ saved: active, active, restartRequired: false })
     expect(existsSync(file)).toBe(false)

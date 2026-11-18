@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { openStore, type Store } from '../src/main/store'
-import { BACKUP_FORMAT, carriedTables, checkManifest, exportBackup, importBackup, meetingTables, mergeBackup } from '../src/main/backup'
+import { BACKUP_FORMAT, backupExcluded, carriedTables, checkManifest, exportBackup, importBackup, meetingTables, mergeBackup } from '../src/main/backup'
 import { Library } from '../src/main/library/store'
 import { pack, packPortable, unpack, unpackPortable } from '../src/main/zip'
 import { SPOOL_DIR } from '../src/main/asr/spool'
@@ -170,6 +170,12 @@ describe('backup merge', () => {
 })
 
 describe('backup manifest', () => {
+  it('excludes secret stores from every backup path', () => {
+    expect(backupExcluded('/tmp/userData/secrets/openrouter.bin')).toBe(true)
+    expect(backupExcluded('/tmp/userData/meetings/m1/secrets/key')).toBe(true)
+    expect(backupExcluded('/tmp/userData/meetings/m1/audio.wav')).toBe(false)
+  })
+
   it('takes this format and older, refuses a newer one, and anything else is not a backup', () => {
     expect(checkManifest({ format: BACKUP_FORMAT, app: '0.1.0', createdAt: 1, meetings: 2 })).toBe('ok')
     expect(checkManifest({ format: BACKUP_FORMAT + 1, app: '9.0.0', createdAt: 1, meetings: 2 })).toBe('newer')

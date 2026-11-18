@@ -11,14 +11,14 @@ import { isAppRoute } from '../shared/routes'
 import { resumesNote } from '../shared/agendaNote'
 import { relaunchOptions, stripAppImageEnv } from './relaunch'
 import { capabilities, micListHelper, platformOf, supportedKinds } from '../shared/platform'
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, Notification, protocol, safeStorage, shell } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isFake, userDataDir } from './paths'
 import { logToFile } from './log'
-import { configuredAi, loadSettings, localeOf, keepsRecording, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings } from './settings'
+import { configuredAi, consumeOpenRouterKey, loadSettings, localeOf, keepsRecording, recordingReminderOn, spokenSetting, stopsWhenCallEnds, updateSettings } from './settings'
 import { CALL_GONE_MS, useCallApps } from './detect'
 import { systemLocale } from './locale'
 import { language as uiLanguage, onLanguage, setLanguage, t } from '../shared/i18n'
@@ -70,6 +70,8 @@ import { Library } from './library/store'
 import { createEmbedder, keywordOnlyEmbedder } from './library/embedder'
 import { createSubscriptionHarness } from './harness'
 import { hookAiPreferences } from './harness/ipc'
+import { createOpenRouterKeyStore } from './harness/openrouterKey'
+import { createOpenRouterUsage } from './harness/openrouterUsage'
 import { createIndexer } from './library/indexer'
 import { hookConversations } from './library/conversations'
 import { hookShare } from './share'
@@ -96,6 +98,9 @@ logToFile(join(userDataDir(), 'logs', 'main.log'))
 // logged, never a dialog: one bad message or a failed promise must not stop a recording
 process.on('unhandledRejection', (err) => console.error('unhandled rejection', err))
 process.on('uncaughtException', (err) => console.error('uncaught exception', err))
+
+// Consume the developer-only key before any relaunch or child process can inherit it.
+const launchOpenRouterKey = consumeOpenRouterKey()
 
 // Linux on Wayland: once more through XWayland, so the widget and the card can float (display.ts)
 const x11 = x11Relaunch(process.platform, process.argv, process.env, process.execPath)
@@ -500,8 +505,12 @@ app.whenReady().then(() => {
   if (!app.isPackaged && process.platform === 'darwin') app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   const settings = loadSettings(join(userDataDir(), 'settings.json'))
   const ai = configuredAi(settings, process.env, isFake())
+  const openrouterKey = createOpenRouterKeyStore({ userData: userDataDir(), safeStorage, envKey: launchOpenRouterKey,
+    fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch })
+  const openrouterUsage = createOpenRouterUsage({ userData: userDataDir() })
   const subscription = ai.backend !== 'local'
-  const harness = subscription ? createSubscriptionHarness({ settings: ai, tempDir: join(userDataDir(), 'harness-tmp') }) : undefined
+  const harness = subscription ? createSubscriptionHarness({ settings: ai, tempDir: join(userDataDir(), 'harness-tmp'),
+    openrouter: { key: openrouterKey, fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch, userData: userDataDir(), usage: openrouterUsage } }) : undefined
   // the theme picked in Settings; the system's when none
   nativeTheme.themeSource = settings.theme ?? 'system'
   setLanguage(localeOf(settings, systemLocale()))
@@ -553,7 +562,7 @@ app.whenReady().then(() => {
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
   themWarnOn = loadSettings(settingsFile).themSilenceWarn !== false
-  hookAiPreferences({ file: settingsFile, active: ai, restart: () => {
+  hookAiPreferences({ file: settingsFile, active: ai, openrouterKey: launchOpenRouterKey, openrouter: openrouterKey, usage: openrouterUsage, restart: () => {
     if (activeMeeting() || transcribing() || finishing || queue.busy()) return false
     if (isFake()) { relaunched++; return true }
     stripAppImageEnv()

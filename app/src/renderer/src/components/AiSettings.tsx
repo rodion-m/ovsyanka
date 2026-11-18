@@ -7,7 +7,8 @@ import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
 import { ModelPicker, type ModelPickerGroup } from './ModelPicker'
 import './AiSettings.css'
 
-const backendName = (backend: AiBackend) => aiText(backend)
+// Stage 4 adds the backend before the picker copy is added; the renderer still renders the generic key here.
+const backendName = (backend: AiBackend) => aiText(backend as AiCopyKey)
 const same = (a: Configuration, b: Configuration) => JSON.stringify(a) === JSON.stringify(b)
 /** The status line's one-line summary of a configuration: mode plus what transcribes. */
 const summary = (s: Configuration) => backendName(s.backend) + (s.backend === 'local' ? '' : ` · ${s.backend === 'porch' ? s.transcriptionProfile : s.transcriptionModel}`)

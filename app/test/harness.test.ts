@@ -43,7 +43,7 @@ process.stdin.on('end', () => {
   const audioPath = path.join(process.cwd(), 'audio.wav');
   const call = {args, cwd:process.cwd(), input:JSON.parse(input), audio:fs.existsSync(audioPath) ? Array.from(fs.readFileSync(audioPath).subarray(0,44)) : null,
     schema:schemaIndex < 0 ? null : JSON.parse(fs.readFileSync(args[schemaIndex+1], 'utf8')),
-    env: {GEMINI_API_KEY: 'GEMINI_API_KEY' in process.env, GOOGLE_API_KEY: 'GOOGLE_API_KEY' in process.env, AGY_ADC_AUTH: 'AGY_ADC_AUTH' in process.env}};
+    env: {GEMINI_API_KEY: 'GEMINI_API_KEY' in process.env, GOOGLE_API_KEY: 'GOOGLE_API_KEY' in process.env, AGY_ADC_AUTH: 'AGY_ADC_AUTH' in process.env, YOGURT_OPENROUTER_API_KEY: 'YOGURT_OPENROUTER_API_KEY' in process.env}};
   fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(call) + '\\n');
   const answers = ${JSON.stringify(response)};
   const messages = typeof answers === 'string' ? [] : JSON.parse(call.input.message.content.split('\\n\\n').find(part => part.startsWith('{"messages":'))).messages;
@@ -65,6 +65,14 @@ const chunk = () => ({ track: 'them' as const, startMs: 12_000, samples: new Flo
 const isWindows = process.platform === 'win32'
 
 describe('agy final-answer contract', () => {
+  it('scrubs the launch OpenRouter key from an agy child environment', async () => {
+    vi.stubEnv('YOGURT_OPENROUTER_API_KEY', `sk-or-v1-${'abcdef0123456789'.repeat(4)}`)
+    const fixture = await agyFixture('answer')
+    const llm = await fixture.harness.model.llm()
+    await llm.chat('ping', () => {})
+    expect((await fixture.calls()).at(-1)?.env.YOGURT_OPENROUTER_API_KEY).toBe(false)
+  })
+
   it('takes exactly the authoritative response, never deltas, thoughts, tools, or diagnostics', () => {
     expect(agyAnswer(JSON.stringify({ event: 'step_update', step_update: { text_delta: 'wrong', thinking_delta: 'secret' } }) + '\n' + successful('Верный ответ'))).toBe('Верный ответ')
   })
@@ -204,7 +212,7 @@ describe.skipIf(isWindows)('native agy adapter with a fake executable', () => {
     expect(call.args).not.toContain('--dangerously-skip-permissions')
     expect(JSON.parse(arg('--settings'))).toMatchObject({ agentMode: '', toolPermission: 'request-review', modelProvider: '', useG1Credits: false,
       permissions: { deny: ['command(*)', 'write_file(*)', 'mcp(*)', 'read_url(*)', 'execute_url(*)'] } })
-    expect(call.env).toEqual({ GEMINI_API_KEY: false, GOOGLE_API_KEY: false, AGY_ADC_AUTH: false })
+    expect(call.env).toEqual({ GEMINI_API_KEY: false, GOOGLE_API_KEY: false, AGY_ADC_AUTH: false, YOGURT_OPENROUTER_API_KEY: false })
     const audio = Buffer.from(call.audio)
     expect(audio.toString('ascii', 0, 4)).toBe('RIFF'); expect(audio.readUInt32LE(24)).toBe(16_000); expect(audio.readUInt32LE(40)).toBe(64_000)
     expect(call.schema.required).toEqual(['segments'])

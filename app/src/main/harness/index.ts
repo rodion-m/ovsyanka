@@ -5,8 +5,9 @@ import { createHarnessModel } from './model'
 import { createPorch, exactProfile, porchInstallation, PORCH_CONTRACT } from './porch'
 import { executablePath, HarnessError, HarnessProcesses } from './process'
 import { createHarnessTranscriber, TRANSCRIPT_SCHEMA } from './transcribe'
+import { createOpenRouter, type OpenRouterDependencies } from './openrouter'
 
-export function createSubscriptionHarness({ settings, tempDir, storeRoot = agyStoreRoot() }: { settings: AiSettings; tempDir: string; storeRoot?: string }) {
+export function createSubscriptionHarness({ settings, tempDir, storeRoot = agyStoreRoot(), openrouter }: { settings: AiSettings; tempDir: string; storeRoot?: string; openrouter?: Omit<OpenRouterDependencies, 'settings'> }) {
   if (settings.backend === 'local') throw new HarnessError('Local models use Yogurt\'s existing local engine.')
   const selected = { ...settings }
   if (selected.backend === 'porch') { exactProfile(selected.textProfile); exactProfile(selected.transcriptionProfile) }
@@ -17,14 +18,23 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
     .catch(error => console.warn('Yogurt could not replay pending agy conversation cleanup.', error))
   const agy = createAgy(selected, processes, { storeRoot, journalPath })
   const porch = createPorch(selected, processes)
+  const router = selected.backend === 'openrouter' ? createOpenRouter({
+    settings: selected,
+    ...(openrouter ?? {
+      key: { read: async () => { throw new HarnessError('Add an OpenRouter API key in Settings before transcribing.', 'no-key') } },
+      fetch: async () => { throw new HarnessError('OpenRouter is not configured.', 'network') },
+    }),
+  }) : undefined
   const common = { settings: selected, tempDir, signal: processes.signal }
   return {
     model: createHarnessModel({ ...common, complete: selected.backend === 'porch' ? porch.text
-      : (prompt, directory, signal) => agy({ prompt, directory, signal }) }),
+      : selected.backend === 'openrouter' ? (prompt, _directory, signal) => router!.text(prompt, signal!)
+        : (prompt, directory, signal) => agy({ prompt, directory, signal }) }),
     transcriber(callbacks: Parameters<typeof createHarnessTranscriber>[1]) {
       return createHarnessTranscriber({ ...common, transcribe: request => selected.backend === 'porch'
         ? porch.transcribe(request.prompt, request.directory, request.signal)
-        : agy({ prompt: request.prompt, directory: request.directory, signal: request.signal, audio: true, schema: TRANSCRIPT_SCHEMA }) }, callbacks)
+        : selected.backend === 'openrouter' ? router!.transcribe(request)
+          : agy({ prompt: request.prompt, directory: request.directory, signal: request.signal, audio: true, schema: TRANSCRIPT_SCHEMA }) }, callbacks)
     },
     stop: () => processes.stop(),
   }
@@ -33,6 +43,7 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
 /** Installation-only check. No login, model listing, inference, or audio leaves the computer. */
 export async function checkHarness(settings: AiSettings): Promise<AiCheck> {
   if (settings.backend === 'local') return { ok: true, message: 'Local models use Yogurt\'s existing setup.' }
+  if (settings.backend === 'openrouter') return { ok: true, message: 'OpenRouter adapter is available. Authentication and model access have not been tested.' }
   const processes = new HarnessProcesses()
   const version = async (path: string, label: string, args: string[]) => {
     const executable = await executablePath(path, label)

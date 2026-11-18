@@ -61,11 +61,20 @@ export const keepsRecording = (s: Settings, endedAt: number | null): boolean =>
 
 export const autoUpdateOn = (s: Settings): boolean => s.autoUpdate !== false
 
+/** Read the developer-only OpenRouter key once before Electron starts any child process. */
+export function consumeOpenRouterKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const value = env.YOGURT_OPENROUTER_API_KEY
+  delete env.YOGURT_OPENROUTER_API_KEY
+  return typeof value === 'string' && value.length ? value : undefined
+}
+
+export const keyLast4 = (value: string): string => value.slice(-4)
+
 /** The fork starts with subscription AI. Test fixtures retain their original local setup unless explicitly configured. */
 export function configuredAi(s: Settings, env: NodeJS.ProcessEnv = process.env, fake = false): AiSettings {
   const saved = aiSettings(s.ai)
   const backend = env.YOGURT_AI_BACKEND
-  if (backend && !['agy', 'porch', 'local'].includes(backend)) throw new Error('YOGURT_AI_BACKEND must be agy, porch, or local')
+  if (backend && !['agy', 'porch', 'openrouter', 'local'].includes(backend)) throw new Error('YOGURT_AI_BACKEND must be agy, porch, openrouter, or local')
   return aiSettings({
     ...saved,
     ...(fake && !s.ai ? { backend: 'local' } : {}),
