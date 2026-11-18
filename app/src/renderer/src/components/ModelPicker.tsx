@@ -5,7 +5,7 @@ import { language } from '../../../shared/i18n'
 import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
 import './ModelPicker.css'
 
-export type ModelPickerGroup = { id: AiOption['group']; label: string }
+export type ModelPickerGroup = { id: AiOption['group']; label: string; vendor?: string }
 
 /** What the list can show beyond plain rows; `cache`/`empty`/`error` come with the network-backed catalogs. */
 export type ModelPickerState =
@@ -13,7 +13,7 @@ export type ModelPickerState =
   | { status: 'loading' }
   | { status: 'cache'; fetchedAt?: number; onRetry?(): void }
   | { status: 'empty'; onRetry?(): void }
-  | { status: 'error'; message: string; onRetry?(): void }
+  | { status: 'error'; message: string; onRetry?(): void; keepOptions?: boolean }
 
 export type ModelPickerProps = {
   id: string
@@ -30,7 +30,7 @@ export type ModelPickerProps = {
   locked?: boolean
   /** Extra line under the closed field (e.g. why the shown list fell back to built-in). */
   hint?: string
-  /** Reserved slot above the list (sort switch, refresh button) for the OpenRouter stage. */
+  /** Optional controls above the list, such as a refresh button. */
   toolbar?: ReactNode
   describedBy?: string
 }
@@ -75,7 +75,7 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
   const root = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
 
-  const listed = status === 'ready' || status === 'cache'
+  const listed = status === 'ready' || status === 'cache' || (status === 'error' && !!state && 'keepOptions' in state && state.keepOptions === true)
   const filtered = useMemo(() => listed ? searchAiOptions(options, query) : [], [listed, options, query])
   const indexOf = useMemo(() => new Map(options.map((option, index) => [option, index])), [options])
   const domIdOf = (option: AiOption) => `${id}-option-${indexOf.get(option) ?? 0}`
@@ -178,9 +178,10 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
       {toolbar}
       <div role="listbox" id={`${id}-list`} className="model-picker-list" aria-label={label}>
         {(groups ?? []).map(group => {
-          const inside = filtered.filter(option => option.group === group.id)
-          return inside.length > 0 && <div key={group.id} role="group" aria-labelledby={`${id}-group-${group.id}`}>
-            <div id={`${id}-group-${group.id}`} className="model-picker-group">{group.label}</div>
+          const inside = filtered.filter(option => option.group === group.id && (!group.vendor || option.vendor === group.vendor))
+          const groupDomId = `${id}-group-${group.id}${group.vendor ? `-${group.vendor}` : ''}`
+          return inside.length > 0 && <div key={`${group.id}:${group.vendor ?? ''}`} role="group" aria-labelledby={groupDomId}>
+            <div id={groupDomId} className="model-picker-group">{group.label}</div>
             {inside.map(option => <OptionRow key={option.id} id={domIdOf(option)} option={option} current={value}
               highlighted={activeDomId === domIdOf(option)} select={() => commit(rows.find(row => row.option === option)!)} />)}
           </div>
@@ -213,6 +214,6 @@ function OptionRow({ id, option, current, highlighted, select }: { id: string; o
     <span className="model-picker-check" aria-hidden="true">{option.id === current && <Check size={13} />}</span>
     <span className="model-picker-name">{option.label}</span>
     <span className="model-picker-hints">{option.hints.filter(h => h !== 'unavailable').map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>
-    <span className="model-picker-sub">{option.disabledReason ?? facts(option)}</span>
+    <span className="model-picker-sub">{option.disabledReason === 'backend-unavailable' ? aiText('profileUnavailable') : option.disabledReason ?? facts(option)}</span>
   </div>
 }

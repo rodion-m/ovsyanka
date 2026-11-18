@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { aiSettings, validAiSettings, type AiCheck, type AiPreferences, type AiSettings } from '../../shared/ai'
 import { configuredAi, loadSettings, updateSettings } from '../settings'
 import { checkHarness } from './index'
+import { getAiOptions } from './aiOptions'
 
 /** Environment variables that fix a settings field for the whole launch. */
 const envLocks = { YOGURT_AI_BACKEND: 'backend', YOGURT_AGY_PATH: 'agyPath', YOGURT_PORCH_PATH: 'porchPath' } as const
@@ -51,6 +52,17 @@ export function hookAiPreferences(o: {
     const settings = checked(value)
     try { return await (o.check ?? checkHarness)(settings) }
     catch (error) { return { ok: false, message: error instanceof Error ? error.message : 'Could not check the AI executable' } }
+  })
+  ipcMain.handle('ai:options', async (_e, request: unknown) => {
+    if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid AI options request')
+    const value = request as Record<string, unknown>
+    if (value.backend !== 'agy' && value.backend !== 'porch') throw new Error('Unsupported AI options backend')
+    if (value.refresh !== undefined && typeof value.refresh !== 'boolean') throw new Error('Invalid AI options refresh flag')
+    for (const field of ['agyPath', 'porchPath'] as const) {
+      if (value[field] !== undefined && (typeof value[field] !== 'string' || value[field].length > 4096)) throw new Error('Invalid AI executable path')
+    }
+    return getAiOptions({ backend: value.backend, refresh: value.refresh as boolean | undefined,
+      agyPath: value.agyPath as string | undefined, porchPath: value.porchPath as string | undefined })
   })
   ipcMain.handle('ai:restart', () => o.restart())
 }

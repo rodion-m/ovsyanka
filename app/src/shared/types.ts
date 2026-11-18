@@ -35,6 +35,7 @@ export type YogurtApi = {
     save(settings: import('./ai').AiSettings): Promise<import('./ai').AiPreferences>
     /** Availability/version only: no model call or account verification. */
     check(settings: import('./ai').AiSettings): Promise<import('./ai').AiCheck>
+    options(request: { backend: 'agy' | 'porch'; refresh?: boolean; agyPath?: string; porchPath?: string }): Promise<import('./aiCatalog').AiOptions>
     /** False while recording, transcription or other work prevents a safe restart. */
     restart(): Promise<boolean>
   }

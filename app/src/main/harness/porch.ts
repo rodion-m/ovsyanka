@@ -39,7 +39,7 @@ export async function porchInstallation(path: string): Promise<{ porch: string; 
 const PORCH_PROVIDER_CREDENTIALS = [
   'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'AGY_ADC_AUTH',
   'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'XAI_API_KEY',
-  'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY', 'MOONSHOT_API_KEY', 'GOOGLE_APPLICATION_CREDENTIALS',
+  'OPENROUTER_API_KEY', 'YOGURT_OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY', 'MOONSHOT_API_KEY', 'GOOGLE_APPLICATION_CREDENTIALS',
 ]
 // An inherited binary, model or effort override would silently repoint a profile at another CLI or settings.
 const PORCH_INHERITED_OVERRIDES = [
@@ -48,12 +48,38 @@ const PORCH_INHERITED_OVERRIDES = [
   'CODEX_EFFORT', 'CLAUDE_EFFORT', 'OPENCODE_EFFORT', 'GROK_EFFORT', 'AGY_EFFORT',
 ]
 
-function environment(directory: string): NodeJS.ProcessEnv {
+export function porchEnvironment(directory: string): NodeJS.ProcessEnv {
   const env = { ...process.env }
   for (const key of ['PORCH_DUMP_ARGV', 'PORCH_DEBUG_EVENTS', 'PORCH_DEBUG_EVENTS_PATH', 'PORCH_ARTIFACT_KEY', 'PORCH_RAW_PROMPT', 'PORCH_SKIP_OUTPUT_TEMPLATE', 'PORCH_OUTPUT_SCHEMA', 'PORCH_MEDIA_IMAGES', ...PORCH_PROVIDER_CREDENTIALS, ...PORCH_INHERITED_OVERRIDES]) delete env[key]
   return { ...env, TMPDIR: directory, TMP: directory, TEMP: directory,
     PORCH_PROGRESS: 'none', PORCH_PROGRESS_STYLE: 'none', PORCH_SAVE_OUTPUTS: '0',
     PORCH_RUN_DIR: join(directory, 'run'), PORCH_OUTPUT_DIR: join(directory, 'outputs'), PORCH_SINGLE_AGENT: '1' }
+}
+
+export async function porchChildPathDirs(agyPath: string): Promise<string[]> {
+  const dirs = [dirname(await executablePath('bash', 'Bash'))]
+  for (const lookup of [() => executablePath(agyPath, 'Antigravity CLI (agy)'), () => executablePath('python3', 'Python 3')]) {
+    try { dirs.push(dirname(await lookup())) }
+    catch (error) { if (!(error instanceof HarnessError)) throw error }
+  }
+  return [...new Set(dirs)]
+}
+
+/** Shared read-only capabilities query for Settings and transcription validation. */
+export async function readPorchCapabilities(o: {
+  porch: string; bash: string; directory: string; processes: HarnessProcesses; pathDirs: string[]; signal?: AbortSignal
+}): Promise<string[]> {
+  const result = await o.processes.run({ label: 'Porch audio capabilities', executable: o.bash,
+    args: [o.porch, 'media', 'capabilities', '--json'], cwd: o.directory,
+    env: prependPath(porchEnvironment(o.directory), o.pathDirs), signal: o.signal,
+    timeoutMs: 5000, stdoutLimit: 128 * 1024 })
+  let capabilities: unknown
+  try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.') }
+  if (!capabilities || typeof capabilities !== 'object' || !('transcribe' in capabilities)
+    || !Array.isArray(capabilities.transcribe) || !capabilities.transcribe.every(value => typeof value === 'string')) {
+    throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.')
+  }
+  return capabilities.transcribe
 }
 
 /**
@@ -64,40 +90,15 @@ function environment(directory: string): NodeJS.ProcessEnv {
 export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
   let resolved: ReturnType<typeof porchInstallation> | undefined
   const installation = () => (resolved ??= porchInstallation(settings.porchPath).catch(error => { resolved = undefined; throw error }))
-  let audioProfile: Promise<void> | undefined
-  const requireAudioProfile = (directory: string, signal?: AbortSignal) => (audioProfile ??= (async () => {
+  const requireAudioProfile = async (directory: string, signal?: AbortSignal) => {
     const profile = exactProfile(settings.transcriptionProfile)
     const { porch, bash } = await installation()
-    // Public, read-only JSON configuration query: no provider or model is started. At the pinned
-    // contract only antigravity-cli declares transcribe; names alone never establish native audio support.
-    const result = await processes.run({ label: 'Porch audio capabilities', executable: bash,
-      args: [porch, 'media', 'capabilities', '--json'], cwd: directory, env: prependPath(environment(directory), await childPathDirs()),
-      signal, timeoutMs: 5000, stdoutLimit: 128 * 1024 })
-    let capabilities: unknown
-    try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.') }
-    if (!capabilities || typeof capabilities !== 'object' || !('transcribe' in capabilities)
-      || !Array.isArray(capabilities.transcribe) || !capabilities.transcribe.every(value => typeof value === 'string')) {
-      throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.')
-    }
-    if (!capabilities.transcribe.includes(profile)) {
+    const transcribe = await readPorchCapabilities({ porch, bash, directory, processes,
+      pathDirs: await porchChildPathDirs(settings.agyPath), signal })
+    if (!transcribe.includes(profile)) {
       throw new HarnessError('The selected Porch transcription profile does not support native audio. Choose one exact antigravity-cli profile listed by porch media capabilities --json.')
     }
-  })().catch(error => { audioProfile = undefined; throw error }))
-  let pathDirs: Promise<string[]> | undefined
-  // A Finder launch has a minimal PATH; the child gets the directories the checks resolved, so
-  // bash, agy and python3 run even when the GUI environment cannot find them by name.
-  const childPathDirs = () => (pathDirs ??= (async () => {
-    const { bash } = await installation()
-    const dirs = [dirname(bash)]
-    for (const lookup of [
-      () => executablePath(settings.agyPath, 'Antigravity CLI (agy)'),
-      () => executablePath('python3', 'Python 3'),
-    ]) {
-      try { dirs.push(dirname(await lookup())) }
-      catch (error) { if (!(error instanceof HarnessError)) throw error }
-    }
-    return [...new Set(dirs)]
-  })().catch(error => { pathDirs = undefined; throw error }))
+  }
   return {
     async text(prompt: string, directory: string, signal?: AbortSignal): Promise<string> {
       const profile = exactProfile(settings.textProfile)
@@ -114,7 +115,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
       // No model override: the selected profile chooses the text harness, model and effort.
       const result = await processes.run({ label: 'Porch', executable: bash,
         args: [runner, '--mode', 'media', '--agent-id', profile, '--raw', '--prompt-file', file],
-        cwd: directory, env: prependPath({ ...environment(directory), ...(agy ? { PORCH_BIN_AGY: agy } : {}) }, await childPathDirs()), signal, timeoutMs: settings.timeoutSeconds * 1000,
+        cwd: directory, env: prependPath({ ...porchEnvironment(directory), ...(agy ? { PORCH_BIN_AGY: agy } : {}) }, await porchChildPathDirs(settings.agyPath)), signal, timeoutMs: settings.timeoutSeconds * 1000,
         stdoutLimit: 2 * 1024 * 1024 })
         .catch(error => {
           if (agy === undefined && error instanceof HarnessError) {
@@ -138,8 +139,8 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
       // clamps provider timestamps, which would hide invalid results from Yogurt's strict parser.
       const result = await processes.run({ label: 'Porch transcription', executable: bash,
         args: [runner, '--mode', 'media', '--agent-id', profile, '--raw', '--prompt-file', file], cwd: directory,
-        env: prependPath({ ...environment(directory), PORCH_BIN_AGY: agy, AGY_MODEL: settings.transcriptionModel,
-          AGY_EFFORT: clampTranscriptionEffort(settings.transcriptionEffort), PORCH_OUTPUT_SCHEMA: schema }, await childPathDirs()),
+        env: prependPath({ ...porchEnvironment(directory), PORCH_BIN_AGY: agy, AGY_MODEL: settings.transcriptionModel,
+          AGY_EFFORT: clampTranscriptionEffort(settings.transcriptionEffort), PORCH_OUTPUT_SCHEMA: schema }, await porchChildPathDirs(settings.agyPath)),
         signal, timeoutMs: Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) * 1000, stdoutLimit: 2 * 1024 * 1024 })
       if (!result.stdout.trim()) throw new HarnessError('Porch transcription returned an empty response.')
       return result.stdout

@@ -12,6 +12,7 @@ const api: YogurtApi = {
     get: () => ipcRenderer.invoke('ai:get'),
     save: (settings) => ipcRenderer.invoke('ai:save', settings),
     check: (settings) => ipcRenderer.invoke('ai:check', settings),
+    options: (request) => ipcRenderer.invoke('ai:options', request),
     restart: () => ipcRenderer.invoke('ai:restart'),
   },
   setup: {

@@ -167,6 +167,16 @@ describe('ModelPicker', () => {
     await user.keyboard('any-1')
     expect(screen.getByRole('option', { name: /Use custom ID: "any-1"/ })).not.toBeNull()
   })
+
+  it('keeps built-in options visible beside a live-list error when requested', async () => {
+    const user = userEvent.setup()
+    render(createElement(ModelPicker, { id: 'ai-fallback', value: 'gemini-3.8-flash', options: agyTextOptions(), groups,
+      allowCustom: true, validateCustom: validCustomId, onChange() {},
+      state: { status: 'error', message: 'Could not get the list from agy. The built-in list is shown.', keepOptions: true } }))
+    await user.click(screen.getByRole('combobox'))
+    expect(screen.getByText('Could not get the list from agy. The built-in list is shown.')).not.toBeNull()
+    expect(screen.getByRole('option', { name: /Claude Opus 5.5/ })).not.toBeNull()
+  })
 })
 
 describe('agy model pickers in AI settings', () => {

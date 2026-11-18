@@ -1,0 +1,74 @@
+<porch-plan>
+  <agent id="codex" label="Codex GPT-6.2 Sol" backend="codex-cli" model="gpt-6.2-sol" role="analyst" enabled="true" backend-available="true"/>
+  <agent id="codex-gpt-5.6" label="Codex GPT-5.6 (Sol alias)" backend="codex-cli" model="gpt-5.6" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-5.6-terra" label="Codex GPT-5.6 Terra" backend="codex-cli" model="gpt-5.6-terra" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6.1-terra" label="Codex GPT-6.1 Terra" backend="codex-cli" model="gpt-6.1-terra" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-5.6-luna" label="Codex GPT-5.6 Luna" backend="codex-cli" model="gpt-5.6-luna" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="gemini-cli" label="Gemini" backend="gemini-cli" model="gemini-3.1-pro-preview" role="lateral" enabled="false" backend-available="false"/>
+  <agent id="opencode" label="OpenCode GLM-5.2" backend="opencode" model="opencode-go/glm-5.2" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="grok" label="Grok 4.7 (native)" backend="grok-build" model="grok-4.7" role="analyst" enabled="true" backend-available="true"/>
+  <agent id="grok-fast" label="Grok 4.7 Fast (native)" backend="grok-build" model="grok-4.7-build-fast" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="grok-4.5" label="Grok 4.5 (native)" backend="grok-build" model="grok-4.5" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="devin" label="Devin SWE-2 Flash" backend="devin-cli" model="swe-2-flash-high" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="devin-swe-2" label="Devin SWE-2" backend="devin-cli" model="swe-2-high" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="devin-gemini-4-argon" label="Devin Gemini 4 Argon High (only when Devin is named)" backend="devin-cli" model="gemini-4-argon-high" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="devin-gemini-4-hydrogen" label="Devin Gemini 4 Hydrogen High (only when Devin is named)" backend="devin-cli" model="gemini-4-hydrogen-high" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="devin-gemini-4-carbon" label="Devin Gemini 4 Carbon High (only when Devin is named)" backend="devin-cli" model="gemini-4-carbon-high" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-argon" label="Antigravity Gemini 4 Argon High" backend="antigravity-cli" model="gemini-4-argon" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-carbon" label="Antigravity Gemini 4 Carbon High (limited access)" backend="antigravity-cli" model="gemini-4-carbon" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-carbon-medium" label="Antigravity Gemini 4 Carbon Medium (limited access)" backend="antigravity-cli" model="gemini-4-carbon" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-carbon-low" label="Antigravity Gemini 4 Carbon Low (limited access)" backend="antigravity-cli" model="gemini-4-carbon" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-hydrogen" label="Antigravity Gemini 4 Hydrogen High" backend="antigravity-cli" model="gemini-4-hydrogen" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-hydrogen-xhigh" label="Antigravity Gemini 4 Hydrogen XHigh" backend="antigravity-cli" model="gemini-4-hydrogen" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-hydrogen-medium" label="Antigravity Gemini 4 Hydrogen Medium" backend="antigravity-cli" model="gemini-4-hydrogen" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-4-hydrogen-low" label="Antigravity Gemini 4 Hydrogen Low" backend="antigravity-cli" model="gemini-4-hydrogen" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="agy-gemini-3.8-flash" label="Antigravity Gemini 3.8 Flash High" backend="antigravity-cli" model="gemini-3.8-flash" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-xai-grok45" label="xAI Grok 4.5 (OpenCode fallback)" backend="opencode" model="xai/grok-4.5" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-kimi-k3" label="OpenCode Zen Kimi K3 (fallback)" backend="opencode" model="opencode/kimi-k3" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-kimi-k3" label="OC-Go Kimi K3" backend="opencode" model="opencode-go/kimi-k3" role="analyst" enabled="true" backend-available="true"/>
+  <agent id="opencode-go-gemini-4-argon-contributor" label="OC-Go Gemini 4 Argon Contributor" backend="opencode" model="opencode-go/gemini-4-argon-contributor" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-muse-spark-1.3-contributor" label="OC-Go Muse Spark 1.3 Contributor" backend="opencode" model="opencode-go/muse-spark-1.3-contributor" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-deepseek-v4.1-flash" label="OC-Go DeepSeek V4.1 Flash" backend="opencode" model="opencode-go/deepseek-v4.1-flash" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-beam-free" label="OC-Go Beam Free" backend="opencode" model="opencode-go/beam-free" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-claude-haiku-5-5" label="OC-Go Claude Haiku 5.5" backend="opencode" model="opencode-go/claude-haiku-5-5" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-deepseek-v4-pro" label="OC-Go DeepSeek V4 Pro" backend="opencode" model="opencode-go/deepseek-v4-pro" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-gemini-4-argon" label="OC-Go Gemini 4 Argon" backend="opencode" model="opencode-go/gemini-4-argon" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-glm-5.2" label="OC-Go GLM-5.2" backend="opencode" model="opencode-go/glm-5.2" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-glm-5.3" label="OC-Go GLM-5.3" backend="opencode" model="opencode-go/glm-5.3" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-glm-5.3-flash" label="OC-Go GLM-5.3-Flash" backend="opencode" model="opencode-go/glm-5.3-flash" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-gpt-5.6-luna" label="OC-Go GPT-5.6 Luna" backend="opencode" model="opencode-go/gpt-5.6-luna" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-gpt-6-luna" label="OC-Go GPT-6 Luna" backend="opencode" model="opencode-go/gpt-6-luna" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-grok-4.7" label="OC-Go Grok 4.7" backend="opencode" model="opencode-go/grok-4.7" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-hy3" label="OC-Go Hy3" backend="opencode" model="opencode-go/hy3" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-hy4-preview" label="OC-Go Hy4 preview" backend="opencode" model="opencode-go/hy4-preview" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-iceman-contributor-free" label="OC-Go Iceman Contributor Free" backend="opencode" model="opencode-go/iceman-contributor-free" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-kimi-k2.7-code" label="OC-Go Kimi K2.7 Code" backend="opencode" model="opencode-go/kimi-k2.7-code" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-kimi-k3.1-pro" label="OC-Go Kimi K3.1 Pro" backend="opencode" model="opencode-go/kimi-k3.1-pro" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-longcat-2.0" label="OC-Go LongCat-2.0" backend="opencode" model="opencode-go/longcat-2.0" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-mimo-v2.6-flash" label="OC-Go MiMo-V2.6-Flash" backend="opencode" model="opencode-go/mimo-v2.6-flash" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-mimo-v2.6-pro" label="OC-Go MiMo-V2.6-Pro" backend="opencode" model="opencode-go/mimo-v2.6-pro" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-minimax-m3" label="OC-Go MiniMax-M3" backend="opencode" model="opencode-go/minimax-m3" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-minimax-m3.1-flash" label="OC-Go MiniMax M3.1 Flash" backend="opencode" model="opencode-go/minimax-m3.1-flash" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-muse-spark-1.2-contributor" label="OC-Go Muse Spark 1.2 Contributor" backend="opencode" model="opencode-go/muse-spark-1.2-contributor" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-qwen3.7-plus" label="OC-Go Qwen3.7 Plus" backend="opencode" model="opencode-go/qwen3.7-plus" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-qwen3.8-flash" label="OC-Go Qwen3.8 Flash" backend="opencode" model="opencode-go/qwen3.8-flash" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-qwen3.8-max" label="OC-Go Qwen3.8 Max" backend="opencode" model="opencode-go/qwen3.8-max" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-step-5-preview" label="OC-Go Step 5 Preview" backend="opencode" model="opencode-go/step-5-preview" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-synthetic-kimi-k3" label="Synthetic Kimi K3 (fallback)" backend="opencode" model="synthetic/hf:moonshotai/Kimi-K3" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="claude-code" label="Claude Opus" backend="claude-code" model="opus" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="claude-opus" label="Claude Opus" backend="claude-code" model="opus" role="analyst" enabled="true" backend-available="true"/>
+  <agent id="claude-fable" label="Claude Fable" backend="claude-code" model="fable" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="claude-sonnet" label="Claude Sonnet" backend="claude-code" model="sonnet" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="claude-haiku" label="Claude Haiku" backend="claude-code" model="haiku" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-minimax" label="OC-Go MiniMax M3" backend="opencode" model="opencode-go/minimax-m3" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-kimi" label="OC-Go Kimi K2.7 Code" backend="opencode" model="opencode-go/kimi-k2.7-code" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-glm" label="OC-Go GLM-5.1" backend="opencode" model="opencode-go/glm-5.1" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-qwen37-max" label="OC-Go Qwen3.7 Max" backend="opencode" model="opencode-go/qwen3.7-max" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="opencode-go-qwen37-plus" label="OC-Go Qwen3.7 Plus" backend="opencode" model="opencode-go/qwen3.7-plus" role="lateral" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6.1-sol" label="Codex GPT-6.1 Sol" backend="codex-cli" model="gpt-6.1-sol" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6-sol" label="Codex GPT-6 Sol" backend="codex-cli" model="gpt-6-sol" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6-luna" label="Codex GPT-6 Luna" backend="codex-cli" model="gpt-6-luna" role="analyst" enabled="true" backend-available="true"/>
+  <agent id="codex-gpt-6-astra" label="Codex GPT-6 Astra" backend="codex-cli" model="gpt-6-astra" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6.2-sol" label="Codex GPT-6.2 Sol" backend="codex-cli" model="gpt-6.2-sol" role="analyst" enabled="false" backend-available="true"/>
+  <agent id="codex-gpt-6.2-astra" label="Codex GPT-6.2 Astra" backend="codex-cli" model="gpt-6.2-astra" role="analyst" enabled="false" backend-available="true"/>
+</porch-plan>

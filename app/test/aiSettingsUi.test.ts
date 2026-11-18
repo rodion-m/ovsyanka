@@ -52,7 +52,11 @@ describe('AI settings fields', () => {
     expect(html).not.toContain('id="ai-textModel"')
     expect(html).not.toContain('id="ai-textEffort"')
     expect(html).toContain('id="ai-porchPath"')
-    expect(html).toContain('one exact Porch profile ID backed by agy')
+    expect(html).toContain('Choose one exact Porch profile backed by agy.')
+    expect(html).toContain('The selected profile sets the model and thinking level for text.')
+    expect(html).toContain('Transcription model override')
+    const advanced = html.slice(html.indexOf('<details'))
+    expect(advanced).toContain('id="ai-transcriptionModel"')
   })
 
   it('does not expose irrelevant executable controls for local models', () => {
