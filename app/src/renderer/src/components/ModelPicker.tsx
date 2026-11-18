@@ -24,6 +24,7 @@ export type ModelPickerProps = {
   groups?: readonly ModelPickerGroup[]
   onChange(id: string): void
   allowCustom?: boolean
+  showErrorWhenClosed?: boolean
   validateCustom?(id: string): boolean
   state?: ModelPickerState
   /** Set by a launch variable: the control shows the effective value but cannot be opened. */
@@ -66,7 +67,7 @@ function facts(option: AiOption): string {
 
 type Row = { key: string; domId: string; option?: AiOption; custom?: string }
 
-export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, validateCustom, state, locked, hint, toolbar, describedBy }: ModelPickerProps) {
+export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, showErrorWhenClosed, validateCustom, state, locked, hint, toolbar, describedBy }: ModelPickerProps) {
   const status = state?.status ?? 'ready'
   const selected = options.find(option => option.id === value)
   const [open, setOpen] = useState(false)
@@ -168,6 +169,7 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
     </span>
     {!open && <p className="model-picker-sub" data-testid={`${id}-sub`}>{sub}</p>}
     {!open && hint && <p className="model-picker-sub">{hint}</p>}
+    {!open && showErrorWhenClosed && status === 'error' && state && 'message' in state && notice(state.message, 'onRetry' in state ? state.onRetry : undefined)}
     {open && <div className="model-picker-pop">
       {status === 'loading' && <>
         {notice(aiText('listLoading'))}

@@ -132,7 +132,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
             toolbar={<button type="button" className="model-picker-retry" aria-label={aiText('refreshList')} title={aiText('refreshList')} disabled={catalogBusy} onMouseDown={e => e.preventDefault()} onClick={() => void refreshCatalog()}><RefreshCw size={14} aria-hidden="true" /></button>} />
         </Row>
         <Row id="ai-textProfile" label={aiText('textProfile')} help={aiText('textProfileHelp')}>
-          <ModelPicker id="ai-textProfile" value={shown.textProfile} options={catalog.text} groups={porchTextGroups(catalog.text)} allowCustom
+          <ModelPicker id="ai-textProfile" value={shown.textProfile} options={catalog.text} groups={porchTextGroups(catalog.text)} allowCustom showErrorWhenClosed
             validateCustom={id => /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(id)} onChange={id => change({ textProfile: id })}
             state={catalogBusy ? { status: 'loading' } : catalog.problem ? { status: 'error', message: aiText('porchListFailed'), onRetry: () => void refreshCatalog() } : { status: 'ready' }}
             toolbar={<button type="button" className="model-picker-retry" aria-label={aiText('refreshList')} title={aiText('refreshList')} disabled={catalogBusy} onMouseDown={e => e.preventDefault()} onClick={() => void refreshCatalog()}><RefreshCw size={14} aria-hidden="true" /></button>} />
