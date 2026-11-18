@@ -68,7 +68,7 @@ export function consumeOpenRouterKey(env: NodeJS.ProcessEnv = process.env): stri
   return typeof value === 'string' && value.length ? value : undefined
 }
 
-export const keyLast4 = (value: string): string => value.slice(-4)
+export const keyLast4 = (value: string): string => value.length < 12 ? '****' : value.slice(-4)
 
 /** The fork starts with subscription AI. Test fixtures retain their original local setup unless explicitly configured. */
 export function configuredAi(s: Settings, env: NodeJS.ProcessEnv = process.env, fake = false): AiSettings {

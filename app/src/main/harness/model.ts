@@ -3,7 +3,7 @@ import type { Llm } from '../notes/enhance'
 import type { NotesModel } from '../notes/model'
 import { assertRunning, HarnessError, inStage } from './process'
 
-type Completion = (prompt: string, directory: string, signal?: AbortSignal) => Promise<string>
+type Completion = (prompt: string, directory: string, signal?: AbortSignal, maxOutputTokens?: number) => Promise<string>
 
 /** One UTF-8 byte per token, including Cyrillic and JSON escaping; framing has its own reserved headroom. */
 export const countTokens = (text: string): number => Buffer.byteLength(JSON.stringify(text), 'utf8') - 2
@@ -46,7 +46,7 @@ export function createHarnessModel(o: { settings: AiSettings; tempDir: string; s
           // CLI output limits are enforced in bytes; the token limit above is also part of the model instruction.
           // Do not truncate an answer: that could turn valid notes/JSON into a misleading partial result.
           const outputLimit = requested * 16
-          const answer = await inStage(o.tempDir, stop, directory => o.complete(request, directory, stop))
+          const answer = await inStage(o.tempDir, stop, directory => o.complete(request, directory, stop, requested))
           assertRunning(stop)
           if (!answer.trim()) throw new HarnessError('The AI harness returned an empty final answer.')
           if (Buffer.byteLength(answer, 'utf8') > outputLimit) throw new HarnessError('The AI answer exceeded the configured output budget. Try a smaller request.')

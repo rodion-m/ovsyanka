@@ -28,7 +28,7 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
   const common = { settings: selected, tempDir, signal: processes.signal }
   return {
     model: createHarnessModel({ ...common, complete: selected.backend === 'porch' ? porch.text
-      : selected.backend === 'openrouter' ? (prompt, _directory, signal) => router!.text(prompt, signal!)
+      : selected.backend === 'openrouter' ? (prompt, _directory, signal, maxOutputTokens) => router!.text(prompt, signal!, maxOutputTokens)
         : (prompt, directory, signal) => agy({ prompt, directory, signal }) }),
     transcriber(callbacks: Parameters<typeof createHarnessTranscriber>[1]) {
       return createHarnessTranscriber({ ...common, transcribe: request => selected.backend === 'porch'

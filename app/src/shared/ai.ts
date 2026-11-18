@@ -66,6 +66,8 @@ export type AiUsage = {
   todayUsd: number
   thirtyDayUsd: number
   transcriptionPerHourUsd: Record<string, number>
+  costUnknown: boolean
+  missingCostCount: number
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)

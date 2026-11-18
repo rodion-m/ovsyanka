@@ -154,8 +154,8 @@ describe('OpenRouter catalog prices and ordering', () => {
     const gemini = model('google/gemini-3.8-flash', textModels)
     const whisper = model('openai/whisper-1', sttModels)
     const mai = model('microsoft/mai-transcribe-2', sttModels)
-    // Stage 0 measured Gemini 3.8 Flash at 25 audio tokens/second: .000000825*25*3600 + .000004125*500*60.
-    expect(estimateOpenRouterPricePerHour(gemini, 'chat')).toBeCloseTo(0.198, 5)
+    // Completion usage includes reasoning: 11,986 tokens / 5 min; estimate is compared with fixture costs below.
+    expect(estimateOpenRouterPricePerHour(gemini, 'chat')).toBeCloseTo(0.667, 2)
     expect(estimateOpenRouterPricePerHour(whisper, 'stt')).toBeCloseTo(0.36, 8)
     expect(estimateOpenRouterPricePerHour(mai, 'stt')).toBeUndefined()
 
@@ -164,10 +164,20 @@ describe('OpenRouter catalog prices and ordering', () => {
     const whisperOption = transcription.find(option => option.id === whisper.id)
     expect(geminiOption).toBeDefined()
     expect(whisperOption).toBeDefined()
-    expect(geminiOption?.price?.perHourUsd).toBeCloseTo(0.198, 5)
+    expect(geminiOption?.price?.perHourUsd).toBeCloseTo(0.6675, 4)
     expect(geminiOption?.price?.estimated).toBe(true)
     expect(whisperOption?.price?.perHourUsd).toBeCloseTo(0.36, 8)
     expect(whisperOption?.price?.estimated).toBe(true)
+  })
+
+  it('keeps the hourly audio estimate within 30% of measured live fixture costs', () => {
+    const gemini = model('google/gemini-3.8-flash', textModels)
+    const estimate = estimateOpenRouterPricePerHour(gemini, 'chat')!
+    for (const [file, seconds] of [['chat-60s.json', 60], ['chat-5m.json', 300]] as const) {
+      const fixture = JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/openrouter/live/${file}`, import.meta.url)), 'utf8')) as { usage: { cost: number } }
+      const measuredPerHour = fixture.usage.cost * 3_600 / seconds
+      expect(Math.abs(estimate - measuredPerHour) / measuredPerHour).toBeLessThanOrEqual(0.3)
+    }
   })
 
   it('sorts equal dates and prices by ID, and puts missing values last', () => {

@@ -12,7 +12,13 @@ export const OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1'
 export const OPENROUTER_CHAT_URL = `${OPENROUTER_API_BASE}/chat/completions`
 export const OPENROUTER_AUDIO_URL = OPENROUTER_CHAT_URL
 export const OPENROUTER_MAX_ATTEMPTS = 3
-const RESPONSE_LIMIT = 8 * 1024 * 1024
+const RESPONSE_LIMIT = 1024 * 1024
+const RECOMMENDED_CAPABILITIES: OpenRouterModel = {
+  id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', created: 0,
+  context_length: 1_000_000, architecture: { input_modalities: ['text', 'audio'], output_modalities: ['text'] },
+  pricing: { prompt: '0.000000825', completion: '0.000004125', audio: '0.000000825' }, top_provider: { max_completion_tokens: 65_536 },
+  supported_parameters: ['structured_outputs', 'reasoning', 'temperature'], reasoning: { supported_efforts: ['low', 'medium', 'high'] },
+}
 
 export type OpenRouterModelLookup = (model: string) => Promise<OpenRouterModel | undefined>
 export type OpenRouterSleep = (ms: number, signal?: AbortSignal) => Promise<void>
@@ -28,7 +34,7 @@ export type OpenRouterLogEntry = {
 
 export type OpenRouterDependencies = {
   settings: AiSettings
-  key: Pick<OpenRouterKeyStore, 'read'>
+  key: Pick<OpenRouterKeyStore, 'read'> & Partial<Pick<OpenRouterKeyStore, 'markRejected'>>
   fetch: OpenRouterKeyFetch
   userData?: string
   lookupModel?: OpenRouterModelLookup
@@ -51,8 +57,8 @@ function stringValue(value: unknown): string | undefined {
 }
 
 function safeDiagnostic(value: unknown): string | undefined {
-  const text = stringValue(value)?.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 120)
-  return text || undefined
+  const text = stringValue(value)
+  return text && text.length <= 120 && /^[A-Za-z0-9_.:-]+$/.test(text) ? text : undefined
 }
 
 function safeModel(value: string): string {
@@ -101,7 +107,7 @@ export function classifyOpenRouterError(status: number, body: unknown): ErrorSha
   else if (status === 413 || type.includes('too_large') || type.includes('payload')) code = 'too-large'
   else if (status === 429 || type.includes('rate_limit') || type.includes('rate-limit')) code = 'rate-limit'
   else if (status === 408 || status === 504 || status === 524 || type.includes('timeout')) code = 'timeout'
-  else if (type.includes('moderation') || type.includes('content_filter') || (record(error?.metadata)?.reasons !== undefined)) code = 'moderation'
+  else if (type.includes('moderation') || type.includes('content_filter') || signal.includes('content_filter') || signal.includes('refusal') || (record(error?.metadata)?.reasons !== undefined)) code = 'moderation'
   else if (signal.includes('openrouter_in_flight_budget') || signal.includes('in_flight_budget')) code = 'rate-limit'
   else if (signal.includes('openrouter_credits') || signal.includes('credits')) code = 'credits'
   else if (signal.includes('openrouter_key_limit') || signal.includes('key_limit') || signal.includes('budget')) code = 'budget'
@@ -178,8 +184,7 @@ function supportsStructured(model: OpenRouterModel | undefined): boolean {
   return !!model?.supported_parameters?.includes('structured_outputs')
 }
 
-function maxTokensFor(prompt: string, model: OpenRouterModel | undefined): number {
-  const requested = Number(prompt.match(/Limit the answer to at most (\d+) tokens\./)?.[1] ?? 2_048)
+function maxTokensFor(requested: number, model: OpenRouterModel | undefined): number {
   const wanted = Math.max(1, Math.min(8_192, Number.isSafeInteger(requested) ? requested : 2_048)) + 16_384
   const cap = model?.top_provider?.max_completion_tokens
   return typeof cap === 'number' && Number.isFinite(cap) && cap > 0 ? Math.min(wanted, cap) : wanted
@@ -240,10 +245,10 @@ export class OpenRouterAdapter {
 
   private async model(model: string): Promise<OpenRouterModel | undefined> {
     const found = await this.dependencies.lookupModel?.(model)
-    return found ?? cachedModel(this.dependencies.userData, model)
+    return found ?? await cachedModel(this.dependencies.userData, model) ?? (model === RECOMMENDED_CAPABILITIES.id ? RECOMMENDED_CAPABILITIES : undefined)
   }
 
-  private async fetchWithTimeout(url: string, init: RequestInit, signal: AbortSignal, audio: boolean): Promise<Response> {
+  private async fetchWithTimeout<T>(url: string, init: RequestInit, signal: AbortSignal, audio: boolean, consume: (response: Response) => Promise<T>): Promise<T> {
     const timeoutMs = Math.max(this.dependencies.settings.timeoutSeconds, audio ? 600 : 0) * 1_000
     const controller = new AbortController()
     let timedOut = false
@@ -254,7 +259,7 @@ export class OpenRouterAdapter {
       if (signal.aborted) throw aborted()
       const response = await this.dependencies.fetch(url, { ...init, signal: controller.signal })
       if (timedOut) throw new HarnessError('OpenRouter request timed out.', 'timeout')
-      return response
+      return await consume(response)
     } catch (error) {
       if (signal.aborted) throw aborted()
       if (timedOut) throw new HarnessError('OpenRouter request timed out.', 'timeout')
@@ -276,15 +281,31 @@ export class OpenRouterAdapter {
       const logAttempt = () => this.log({ model: safeModel(model), status, ...(errorType ? { error_type: errorType } : {}), ...(generationId ? { generationId } : {}), durationMs: Math.max(0, this.now() - started), bodySize, ...(costUsd === undefined ? {} : { costUsd }) })
       try {
         const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
-        response = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+        const result = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
           method: 'POST', headers, body: JSON.stringify(body),
-        }, signal, audio)
+        }, signal, audio, async received => {
+          response = received
+          status = received.status
+          const length = Number(received.headers.get('Content-Length'))
+          if (Number.isFinite(length) && length > RESPONSE_LIMIT) throw new HarnessError('OpenRouter returned an oversized response.', 'too-large')
+          const reader = received.body?.getReader()
+          if (!reader) return await received.text()
+          const chunks: Uint8Array[] = []; let size = 0
+          while (true) {
+            const part = await reader.read()
+            if (part.done) break
+            size += part.value.byteLength
+            if (size > RESPONSE_LIMIT) { await reader.cancel(); throw new HarnessError('OpenRouter returned an oversized response.', 'too-large') }
+            chunks.push(part.value)
+          }
+          return new TextDecoder().decode(Buffer.concat(chunks.map(chunk => Buffer.from(chunk))))
+        })
+        const text = result
+        if (!response) throw new HarnessError('OpenRouter did not return a response.', 'bad-response')
         status = response.status
-        const text = await response.text()
         bodySize = Buffer.byteLength(text, 'utf8')
-        if (bodySize > RESPONSE_LIMIT) throw new HarnessError('OpenRouter returned an oversized response.', 'too-large')
         let parsed: unknown
-        try { parsed = JSON.parse(text) } catch { throw new HarnessError('OpenRouter returned an invalid response.', 'bad-response') }
+        try { parsed = text ? JSON.parse(text) : undefined } catch { if (responseOk(response)) throw new HarnessError('OpenRouter returned an invalid response.', 'bad-response') }
         const object = record(parsed)
         generationId = safeDiagnostic(object?.id) ?? safeDiagnostic(response.headers.get('X-Generation-Id'))
         if (generationId?.includes(key)) generationId = undefined
@@ -292,12 +313,13 @@ export class OpenRouterAdapter {
         costUsd = usage.costUsd
         errorType = errorTypeOf(object)
         if (errorType?.includes(key)) errorType = undefined
-        if (usage.costUsd !== undefined) await this.dependencies.usage?.record({ model, task, costUsd: usage.costUsd, audioSeconds: seconds, costUnknown: costUnknown && usage.costUsd === 0 && seconds > 0 }).catch(() => undefined)
-        const errorBody = object?.error !== undefined
+        if (responseOk(response) && !object?.error) await this.dependencies.usage?.record({ model, task, costUsd: usage.costUsd ?? 0, audioSeconds: seconds, costUnknown: costUnknown && usage.costUsd === 0 && seconds > 0, costMissing: usage.costUsd === undefined }).catch(() => undefined)
+        const errorBody = object?.error != null
         if (!responseOk(response) || errorBody) {
           const classified = classifyOpenRouterError(status, object)
           const code = classified.code
-          lastError = new HarnessError(`OpenRouter request failed (${code}).`, code)
+          if (code === 'auth') this.dependencies.key.markRejected?.(key, 'auth')
+          lastError = new HarnessError(`OpenRouter request failed (${code}).`, code, attempt + 1)
           const retryAfterMs = parseRetryAfter(response, this.now())
           const classifiedType = classified.errorType
           errorType = classifiedType && !classifiedType.includes(key) ? classifiedType : errorType
@@ -319,17 +341,20 @@ export class OpenRouterAdapter {
         return content.content
       } catch (error) {
         if (signal.aborted) throw aborted()
-        if (error instanceof HarnessError && error.code && retryable(error.code) && attempt + 1 < OPENROUTER_MAX_ATTEMPTS) {
-          lastError = error
+        const harnessError = error instanceof HarnessError
+          ? (error.attempts ? error : new HarnessError(error.message, error.code, attempt + 1))
+          : undefined
+        if (harnessError?.code && retryable(harnessError.code) && attempt + 1 < OPENROUTER_MAX_ATTEMPTS) {
+          lastError = harnessError
           logAttempt()
           await this.sleep(attempt === 0 ? 2_000 : 8_000, signal)
           continue
         }
-        if (error instanceof HarnessError) {
+        if (harnessError) {
           logAttempt()
-          throw error
+          throw harnessError
         }
-        lastError = new HarnessError('OpenRouter request failed.', 'network')
+        lastError = new HarnessError('OpenRouter request failed.', 'network', attempt + 1)
         logAttempt()
         if (attempt + 1 < OPENROUTER_MAX_ATTEMPTS) {
           await this.sleep(attempt === 0 ? 2_000 : 8_000, signal)
@@ -341,14 +366,14 @@ export class OpenRouterAdapter {
     throw lastError ?? new HarnessError('OpenRouter request failed.', 'network')
   }
 
-  async text(prompt: string, signal: AbortSignal): Promise<string> {
+  async text(prompt: string, signal: AbortSignal, maxOutputTokens = 2_048): Promise<string> {
     assertRunning(signal)
     const modelId = this.dependencies.settings.openrouterTextModel
     const model = await this.model(modelId)
     const body: Record<string, unknown> = {
       model: modelId,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: maxTokensFor(prompt, model),
+      max_tokens: maxTokensFor(maxOutputTokens, model),
       ...(supportsEffort(model, this.dependencies.settings.textEffort) ? { reasoning: { effort: this.dependencies.settings.textEffort } } : {}),
       ...(providerFor(this.dependencies.settings.openrouterDataPolicy, false) ? { provider: providerFor(this.dependencies.settings.openrouterDataPolicy, false) } : {}),
       stream: false,
@@ -368,13 +393,14 @@ export class OpenRouterAdapter {
     const body: Record<string, unknown> = {
       model: modelId,
       messages: [{ role: 'user', content: [
-        { type: 'text', text: [TRANSCRIPTION_RULES, language, request.instructions].filter(Boolean).join('\n') },
+        { type: 'text', text: ['Return only one JSON object matching {"language":"...","error":"...","segments":[{"start":0,"end":0,"text":"..."}]}.', TRANSCRIPTION_RULES, language, request.instructions].filter(Boolean).join('\n') },
         { type: 'input_audio', input_audio: { data: audio.toString('base64'), format: 'wav' } },
       ] }],
       ...(supportsStructured(model) ? { response_format: { type: 'json_schema', json_schema: { name: 'transcript', strict: true, schema: STRICT_TRANSCRIPT_SCHEMA } } } : {}),
       ...(supportsEffort(model, clampTranscriptionEffort(this.dependencies.settings.transcriptionEffort)) ? { reasoning: { effort: clampTranscriptionEffort(this.dependencies.settings.transcriptionEffort) } } : {}),
       ...(providerFor(this.dependencies.settings.openrouterDataPolicy, true) ? { provider: providerFor(this.dependencies.settings.openrouterDataPolicy, true) } : {}),
-      max_tokens: maxAudioTokensFor(model),
+      max_tokens: Math.min(request.maxOutputTokens ?? 48_000, maxAudioTokensFor(model)),
+      ...(model?.supported_parameters?.includes('temperature') || (!model && modelId === RECOMMENDED_CAPABILITIES.id) ? { temperature: 0 } : {}),
       stream: false,
     }
     return this.request(modelId, body, request.signal, true, 'transcription', audioSeconds(audio), paidModel(model, modelId))

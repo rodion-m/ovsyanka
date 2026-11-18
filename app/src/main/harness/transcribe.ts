@@ -11,17 +11,22 @@ const TRANSCRIPT_PROPERTIES = {
   language: { type: 'string' }, error: { type: 'string' },
   segments: { type: 'array', items: { type: 'object', properties: {
     start: { type: 'number' }, end: { type: 'number' }, speaker: { type: 'string' }, text: { type: 'string' },
-  }, required: ['start', 'end', 'text'], additionalProperties: false } },
+  }, required: ['start', 'end', 'text'] } },
 }
 
 /** The native CLI historically requires only its authoritative segments field. */
 export const TRANSCRIPT_SCHEMA: Record<string, unknown> = {
-  type: 'object', additionalProperties: false, properties: TRANSCRIPT_PROPERTIES, required: ['segments'],
+  type: 'object', properties: TRANSCRIPT_PROPERTIES, required: ['segments'],
 }
 
-/** OpenRouter strict structured outputs require every declared top-level property. */
+/** OpenRouter strict structured outputs require every declared property. */
 export const STRICT_TRANSCRIPT_SCHEMA: Record<string, unknown> = {
-  type: 'object', additionalProperties: false, properties: TRANSCRIPT_PROPERTIES, required: ['language', 'error', 'segments'],
+  type: 'object', additionalProperties: false, properties: {
+    language: TRANSCRIPT_PROPERTIES.language, error: TRANSCRIPT_PROPERTIES.error,
+    segments: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+      start: { type: 'number' }, end: { type: 'number' }, text: { type: 'string' },
+    }, required: ['start', 'end', 'text'] } },
+  }, required: ['language', 'error', 'segments'],
 }
 
 /** Rules shared by the OpenRouter audio request and the CLI prompt. File/tool instructions stay CLI-only. */
@@ -36,18 +41,22 @@ type TranscribeOptions = {
   language: () => string | undefined
   onLanguage: (track: Track, language: string, chars: number, locked: boolean) => void
 }
-export type AudioRequest = { directory: string; language?: string; instructions: string; prompt: string; signal: AbortSignal }
+export type AudioRequest = { directory: string; language?: string; instructions: string; prompt: string; maxOutputTokens?: number; signal: AbortSignal }
 
 /** Audio requests get at least this long: a packed batch can take far longer than a text answer. */
 export const MIN_AUDIO_TIMEOUT_SECONDS = 600
 
 /** Find the first complete JSON object in a provider answer, skipping prose, fences and a UTF-8 BOM. */
 function firstJsonObject(text: string): unknown | undefined {
+  try { return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text) as unknown } catch { /* extract below */ }
   const source = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+  let work = 0
   for (let start = 0; start < source.length; start++) {
     if (source[start] !== '{') continue
+    if (++work > 32) return undefined
     let depth = 0, quoted = false, escaped = false
     for (let at = start; at < source.length; at++) {
+      if (++work > 2_000_000) return undefined
       const c = source[at]
       if (quoted) {
         if (escaped) escaped = false
@@ -70,23 +79,23 @@ function firstJsonObject(text: string): unknown | undefined {
 export function parseTranscript(text: string, duration: number): Transcript {
   if (!Number.isFinite(duration) || duration < 0) throw new HarnessError('Invalid recording duration.')
   const value = firstJsonObject(text)
-  if (value === undefined) throw new HarnessError('The AI harness did not return valid transcript JSON.')
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HarnessError('The AI harness returned an invalid transcript.')
+  if (value === undefined) throw new HarnessError('The remote AI did not return valid transcript JSON.', 'bad-response')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HarnessError('The remote AI returned an invalid transcript.', 'bad-response')
   const object = value as Record<string, unknown>
-  if (object.error !== undefined && typeof object.error !== 'string') throw new HarnessError('The AI harness returned an invalid transcript error field.')
-  if (typeof object.error === 'string' && object.error.trim()) throw new HarnessError('The AI harness could not listen to the recording. Check native audio support and file-read permissions in the CLI.')
-  if (object.language !== undefined && (typeof object.language !== 'string' || object.language.length > 80)) throw new HarnessError('The AI harness returned an invalid transcript language.')
-  if (!Array.isArray(object.segments) || object.segments.length > 10_000) throw new HarnessError('The AI harness returned an invalid transcript segment list.')
+  if (object.error != null && typeof object.error !== 'string') throw new HarnessError('The remote AI returned an invalid transcript error field.', 'bad-response')
+  if (typeof object.error === 'string' && object.error.trim()) throw new HarnessError('The remote AI could not listen to the recording.', 'bad-response')
+  if (object.language !== undefined && (typeof object.language !== 'string' || object.language.length > 80)) throw new HarnessError('The remote AI returned an invalid transcript language.', 'bad-response')
+  if (!Array.isArray(object.segments) || object.segments.length > 10_000) throw new HarnessError('The remote AI returned an invalid transcript segment list.', 'bad-response')
   const segments: Transcript['segments'] = []
   const tolerance = Math.max(2, duration * 0.02)
   for (const segment of object.segments) {
-    if (!segment || typeof segment !== 'object' || Array.isArray(segment)) throw new HarnessError('The AI harness returned an invalid transcript segment.')
+    if (!segment || typeof segment !== 'object' || Array.isArray(segment)) throw new HarnessError('The remote AI returned an invalid transcript segment.', 'bad-response')
     const { start, end, text: said } = segment as Record<string, unknown>
     if (typeof start !== 'number' || typeof end !== 'number' || !Number.isFinite(start) || !Number.isFinite(end)
       || start < 0 || end < start || start > duration + tolerance || end > duration + tolerance) {
-      throw new HarnessError('The AI harness returned transcript timestamps outside the recording.')
+      throw new HarnessError('The remote AI returned timestamps outside the recording.', 'no-timestamps')
     }
-    if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The AI harness returned invalid transcript text.')
+    if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The remote AI returned invalid transcript text.', 'bad-response')
     // models sometimes wrap quoted names in backslashes (\Имя\, \\Имя\\) or leave a lone \ between spaces;
     // they never belong in speech. Windows paths (C:\dir\file) keep theirs: only runs at word edges or between spaces go
     const clean = said
@@ -138,10 +147,11 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
       ...(language ? [`Expected spoken language: ${language}.`] : []), instructions,
     ].join('\n')
     if (lowClear) console.log(`transcriber sending ${chunk.track} chunk at ${chunk.startMs} ms: ${duration.toFixed(1)} s of audio with ${chunk.clearMs} ms of clear speech, without the vocabulary line`)
+    const maxOutputTokens = 48_000
     const response = await inStage(o.tempDir, o.signal, async directory => {
       await writeFile(join(directory, 'audio.wav'), wavBytes(chunk.samples), { mode: 0o600 })
       assertRunning(o.signal)
-      return o.transcribe({ directory, language, instructions, prompt, signal: o.signal })
+      return o.transcribe({ directory, language, instructions, prompt, maxOutputTokens, signal: o.signal })
     })
     assertRunning(o.signal)
     let transcript: Transcript

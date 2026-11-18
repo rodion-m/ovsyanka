@@ -67,6 +67,13 @@ describe('AI settings fields', () => {
     expect(html).not.toContain('id="ai-outputLanguage"')
   })
 
+  it('labels an OpenRouter locked backend and summarizes its OpenRouter transcription model', () => {
+    const locked = { backend: { variable: 'YOGURT_AI_BACKEND', value: 'openrouter' } }
+    const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend: 'openrouter' }), change() {}, locked }))
+    expect(html).toContain('OpenRouter model and key controls are configured in stage 6.')
+    expect(status(prefs({ active: aiSettings({ backend: 'openrouter' }) }))).toContain('OpenRouter · google/gemini-3.8-flash')
+  })
+
   it('hides the inactive local output-language override without changing the saved provider value', () => {
     const saved = aiSettings({ backend: 'local', outputLanguage: 'ru' })
     const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: saved, change() {} }))

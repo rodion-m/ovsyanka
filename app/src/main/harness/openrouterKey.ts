@@ -25,6 +25,7 @@ export type OpenRouterKeyStoreOptions = {
   /** A developer-only launch key. It remains memory-only and is never written to disk. */
   envKey?: string
   now?: () => number
+  baseUrl?: string
 }
 
 type KeyMetadata = { label?: string; remainingUsd?: number | null; checkedAt?: number }
@@ -42,14 +43,20 @@ function remaining(value: unknown): number | null | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function keyData(value: unknown): KeyMetadata {
+function keyData(value: unknown, key: string): KeyMetadata {
   const root = record(value)
   const data = record(root?.data) ?? root
   const limit = remaining(data?.limit_remaining)
   return {
-    ...(safeLabel(data?.label) ? { label: safeLabel(data?.label) } : {}),
+    ...(safeLabel(data?.label) && !containsKeyFragment(data?.label as string, key) ? { label: safeLabel(data?.label) } : {}),
     ...(limit === undefined ? {} : { remainingUsd: limit }),
   }
+}
+
+function containsKeyFragment(label: string, key: string): boolean {
+  if (key.length < 8) return label.includes(key)
+  for (let i = 0; i <= key.length - 8; i++) if (label.includes(key.slice(i, i + 8))) return true
+  return false
 }
 
 function responseOk(response: Response): boolean {
@@ -129,27 +136,37 @@ export class OpenRouterKeyStore {
 
   private async request(key: string, signal?: AbortSignal): Promise<{ status: number; response: Response; body: unknown }> {
     let response: Response
+    const controller = new AbortController()
+    let timedOut = false
+    const relay = () => controller.abort()
+    const timer = setTimeout(() => { timedOut = true; controller.abort() }, 15_000)
+    signal?.addEventListener('abort', relay, { once: true })
     try {
-      response = await this.options.fetch(OPENROUTER_KEY_URL, {
-        method: 'GET', signal,
+      response = await this.options.fetch(`${(this.options.baseUrl ?? 'https://openrouter.ai/api/v1').replace(/\/$/, '')}/key`, {
+        method: 'GET', signal: controller.signal,
         headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
       })
     } catch (error) {
+      clearTimeout(timer); signal?.removeEventListener('abort', relay)
       if (signal?.aborted) throw new HarnessError('The OpenRouter key check was cancelled.', 'network')
+      if (timedOut) throw new HarnessError('OpenRouter key check timed out.', 'timeout')
       throw new HarnessError('Could not reach OpenRouter to check the key.', 'network')
     }
     let body: unknown = undefined
     try { body = await response.json() as unknown } catch { /* the status below is enough for rejection */ }
+    finally { clearTimeout(timer); signal?.removeEventListener('abort', relay) }
+    if (timedOut) throw new HarnessError('OpenRouter key check timed out.', 'timeout')
     return { status: response.status, response, body }
   }
 
   private async verify(key: string, signal?: AbortSignal): Promise<{ status: AiKeyStatus; accepted: boolean }> {
     const result = await this.request(key, signal)
     if (!responseOk(result.response)) {
-      const problem = result.status === 401 ? 'auth' : result.status >= 500 ? 'unavailable' : 'bad-response'
-      return { status: statusFor('keychain', key, {}, 'rejected', problem), accepted: false }
+      const transient = result.status === 408 || result.status === 429 || result.status >= 500
+      const problem = result.status === 401 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : transient ? 'unavailable' : 'bad-response'
+      return { status: statusFor('keychain', key, {}, transient ? 'unchecked' : 'rejected', problem), accepted: transient }
     }
-    const metadata = { ...keyData(result.body), checkedAt: this.now() }
+    const metadata = { ...keyData(result.body, key), checkedAt: this.now() }
     return { status: statusFor('keychain', key, metadata, 'ok'), accepted: true }
   }
 
@@ -172,9 +189,11 @@ export class OpenRouterKeyStore {
     if (!checked.accepted) return checked.status
     try {
       await mkdir(join(this.options.userData, 'secrets'), { recursive: true, mode: 0o700 })
+      await chmod(join(this.options.userData, 'secrets'), 0o700)
       const temporary = `${this.file}.${process.pid}.${randomUUID()}.tmp`
       try {
         const encrypted = this.options.safeStorage.encryptString(key)
+        if (this.options.safeStorage.decryptString(encrypted) !== key) throw new Error('OpenRouter key encryption round-trip failed')
         await writeFile(temporary, encrypted, { mode: 0o600 })
         await chmod(temporary, 0o600)
         await rename(temporary, this.file)
@@ -194,12 +213,13 @@ export class OpenRouterKeyStore {
     const source: 'keychain' | 'env' = this.options.envKey !== undefined ? 'env' : 'keychain'
     const result = await this.request(key, signal)
     if (!responseOk(result.response)) {
-      const problem = result.status === 401 ? 'auth' : result.status >= 500 ? 'unavailable' : 'bad-response'
-      const status = statusFor(source, key, {}, 'rejected', problem)
+      const transient = result.status === 408 || result.status === 429 || result.status >= 500
+      const problem = result.status === 401 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : transient ? 'unavailable' : 'bad-response'
+      const status = statusFor(source, key, {}, transient ? 'unchecked' : 'rejected', problem)
       this.checked = { key, status }
       return status
     }
-    const status = statusFor(source, key, { ...keyData(result.body), checkedAt: this.now() }, 'ok')
+    const status = statusFor(source, key, { ...keyData(result.body, key), checkedAt: this.now() }, 'ok')
     this.checked = { key, status }
     return status
   }
@@ -209,6 +229,13 @@ export class OpenRouterKeyStore {
     this.checked = undefined
     await rm(this.file, { force: true }).catch(() => undefined)
     return this.status()
+  }
+
+  markRejected(keyValue?: string, problem: AiProblemCode = 'auth'): void {
+    const key = this.options.envKey ?? keyValue ?? this.checked?.key
+    if (!key) return
+    const source = this.options.envKey !== undefined ? 'env' : 'keychain'
+    this.checked = { key, status: statusFor(source, key, {}, 'rejected', problem) }
   }
 
   /** Read the key for one request. The file is decrypted again on every call. */

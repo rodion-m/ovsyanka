@@ -40,13 +40,14 @@ describe('AI preferences IPC', () => {
     const fakeKey = `sk-or-v1-${'abcdef0123456789'.repeat(4)}`
     const openrouter = {
       status: vi.fn(async () => ({ state: 'unchecked' as const, source: 'env' as const, last4: fakeKey.slice(-4) })),
+      check: vi.fn(async () => ({ state: 'unchecked' as const, source: 'env' as const, last4: fakeKey.slice(-4) })),
       set: vi.fn(async () => ({ state: 'rejected' as const, source: 'keychain' as const, last4: fakeKey.slice(-4), problem: 'auth' as const })),
       clear: vi.fn(async () => ({ state: 'none' as const })),
     }
-    const usage = { summary: vi.fn(async () => ({ todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {} })) }
+    const usage = { summary: vi.fn(async () => ({ todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, costUnknown: false, missingCostCount: 0 })) }
     hookAiPreferences({ file, active: aiSettings({ backend: 'openrouter' }), restart, check, env: {}, openrouterKey: fakeKey, openrouter, usage })
     expect(call<AiPreferences>('ai:get').locked).toEqual({ openrouterKey: { variable: 'YOGURT_OPENROUTER_API_KEY', value: fakeKey.slice(-4) } })
-    for (const response of [await call('ai.openrouter.keyStatus'), await call('ai.openrouter.setKey', fakeKey), await call('ai.openrouter.clearKey'), await call('ai.openrouter.usage')]) {
+    for (const response of [await call('ai.openrouter.keyStatus'), await call('ai.openrouter.setKey', fakeKey), await call('ai.openrouter.checkKey'), await call('ai.openrouter.clearKey'), await call('ai.openrouter.usage')]) {
       expect(JSON.stringify(response)).not.toContain(fakeKey)
     }
   })

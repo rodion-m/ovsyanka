@@ -7,11 +7,10 @@ import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
 import { ModelPicker, type ModelPickerGroup } from './ModelPicker'
 import './AiSettings.css'
 
-// Stage 4 adds the backend before the picker copy is added; the renderer still renders the generic key here.
 const backendName = (backend: AiBackend) => aiText(backend as AiCopyKey)
 const same = (a: Configuration, b: Configuration) => JSON.stringify(a) === JSON.stringify(b)
 /** The status line's one-line summary of a configuration: mode plus what transcribes. */
-const summary = (s: Configuration) => backendName(s.backend) + (s.backend === 'local' ? '' : ` · ${s.backend === 'porch' ? s.transcriptionProfile : s.transcriptionModel}`)
+const summary = (s: Configuration) => backendName(s.backend) + (s.backend === 'local' ? '' : ` · ${s.backend === 'porch' ? s.transcriptionProfile : s.backend === 'openrouter' ? s.openrouterTranscriptionModel : s.transcriptionModel}`)
 const lock = (locked: AiPreferences['locked'], key: string) => (locked as Record<string, { variable: string; value: string }> | undefined)?.[key]
 const lockHelp = (locked: AiPreferences['locked'], key: string) => {
   const field = lock(locked, key)
@@ -118,7 +117,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
     </Row>
   }
   return <>
-    {select('ai-backend', aiText('backend'), shown.backend, (['agy', 'porch', 'local'] as const).map(v => [v, backendName(v)]), v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
+    {select('ai-backend', aiText('backend'), shown.backend, [...(['agy', 'porch', 'local'] as const).map(v => [v, backendName(v)] as [string, string]), ...(lock(locked, 'backend')?.value === 'openrouter' ? [['openrouter', backendName('openrouter')] as [string, string]] : [])], v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
     <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(shown.backend === 'local' ? 'localHelp' : 'subscription')}</p>
     {shown.backend !== 'local' && <>
       {shown.backend === 'agy' && <p className="ai-settings-note">{aiText('defaultModel')}</p>}
@@ -140,6 +139,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
         </Row>
         <p className="ai-settings-note">{aiText('porchTextNote')}</p>
       </>}
+      {shown.backend === 'openrouter' && <p className="ai-settings-note">{aiText('openrouterStage6')}</p>}
       {shown.backend === 'agy'
         ? picker('transcriptionModel', 'audioModel', catalog.transcription, ['recommended', 'audio'], undefined, ['medium', 'high'])
         : shown.backend === 'porch' ? null : input('transcriptionModel', 'audioModel')}

@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createOpenRouterKeyStore, OPENROUTER_KEY_FILE, type OpenRouterKeyFetch, type SafeStorageLike } from '../src/main/harness/openrouterKey'
+import { keyLast4 } from '../src/main/settings'
 
 const KEY = `sk-or-v1-${'0123456789abcdef'.repeat(4)}`
 const roots: string[] = []
@@ -39,6 +40,10 @@ function answer(body: unknown, status = 200): Response {
 }
 
 describe('OpenRouter key storage', () => {
+  it('never reveals short values as a last-four label', () => {
+    expect(keyLast4('tiny')).toBe('****')
+    expect(keyLast4(KEY)).toBe(KEY.slice(-4))
+  })
   it('encrypts with restrictive permissions, checks before saving, and only exposes metadata', async () => {
     const userData = await root()
     const fetch = vi.fn<OpenRouterKeyFetch>(async () => answer({ data: { label: 'meeting key', limit_remaining: 4.2 } }))
@@ -108,6 +113,15 @@ describe('OpenRouter key storage', () => {
     expect(await store.read()).toBe(KEY)
     expect(await store.clear()).toEqual({ state: 'unchecked', source: 'env', last4: KEY.slice(-4) })
     await expect(stat(join(userData, OPENROUTER_KEY_FILE))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('drops labels containing any eight character key fragment and saves during transient outages', async () => {
+    const userData = await root()
+    const transient = createOpenRouterKeyStore({ userData, safeStorage: storage(), fetch: async () => answer({ error: {} }, 503) })
+    expect(await transient.set(KEY)).toMatchObject({ state: 'unchecked', problem: 'unavailable' })
+    expect(await transient.read()).toBe(KEY)
+    const labeled = createOpenRouterKeyStore({ userData, safeStorage: storage(), fetch: async () => answer({ data: { label: `team ${KEY.slice(16, 24)} account` } }) })
+    expect(await labeled.set(KEY)).not.toHaveProperty('label')
   })
 
   it('passes the key-leak sentinel through save, check, 401, 500 and IPC-shaped responses', async () => {

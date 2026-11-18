@@ -40,6 +40,7 @@ export type YogurtApi = {
       keyStatus(): Promise<import('./ai').AiKeyStatus>
       setKey(key: string): Promise<import('./ai').AiKeyStatus>
       clearKey(): Promise<import('./ai').AiKeyStatus>
+      checkKey(): Promise<import('./ai').AiKeyStatus>
       usage(): Promise<import('./ai').AiUsage>
     }
     /** False while recording, transcription or other work prevents a safe restart. */

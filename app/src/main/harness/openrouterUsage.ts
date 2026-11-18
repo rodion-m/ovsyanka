@@ -14,14 +14,15 @@ export type OpenRouterUsageEntry = {
   audioSeconds?: number
   /** OpenRouter reported zero cost for a non-free audio model; keep zero and mark it rather than estimating. */
   costUnknown?: boolean
+  costMissing?: boolean
 }
 
 type ModelUsage = { textCostUsd: number; transcriptionCostUsd: number; audioSeconds: number; costUnknown: boolean }
-type UsageDay = { costUsd: number; textCostUsd: number; transcriptionCostUsd: number; audioSeconds: number; costUnknown: boolean; models: Record<string, ModelUsage> }
+type UsageDay = { costUsd: number; textCostUsd: number; transcriptionCostUsd: number; audioSeconds: number; costUnknown: boolean; missingCostCount: number; models: Record<string, ModelUsage> }
 type UsageFile = { schema: 1; days: Record<string, UsageDay> }
 
 function empty(): UsageFile { return { schema: 1, days: {} } }
-function dateOf(at: number): string { return new Date(at).toISOString().slice(0, 10) }
+function dateOf(at: number): string { const date = new Date(at); return new Date(at - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10) }
 function finite(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value) && value >= 0 }
 
 function usageDay(value: unknown): UsageDay {
@@ -45,6 +46,7 @@ function usageDay(value: unknown): UsageDay {
     transcriptionCostUsd: finite(raw.transcriptionCostUsd) ? raw.transcriptionCostUsd : 0,
     audioSeconds: finite(raw.audioSeconds) ? raw.audioSeconds : 0,
     costUnknown: raw.costUnknown === true,
+    missingCostCount: finite(raw.missingCostCount) ? raw.missingCostCount : 0,
     models,
   }
 }
@@ -97,11 +99,12 @@ export class OpenRouterUsage {
       const now = this.now()
       const file = await this.read()
       const date = dateOf(now)
-      const day = file.days[date] ?? { costUsd: 0, textCostUsd: 0, transcriptionCostUsd: 0, audioSeconds: 0, costUnknown: false, models: {} }
+      const day = file.days[date] ?? { costUsd: 0, textCostUsd: 0, transcriptionCostUsd: 0, audioSeconds: 0, costUnknown: false, missingCostCount: 0, models: {} }
       const model = day.models[entry.model] ?? { textCostUsd: 0, transcriptionCostUsd: 0, audioSeconds: 0, costUnknown: false }
       day.costUsd += entry.costUsd
       day.audioSeconds += entry.audioSeconds ?? 0
       if (entry.costUnknown) { day.costUnknown = true; model.costUnknown = true }
+      if (entry.costMissing) { day.missingCostCount++; day.costUnknown = true; model.costUnknown = true }
       if (entry.task === 'text') { day.textCostUsd += entry.costUsd; model.textCostUsd += entry.costUsd }
       else { day.transcriptionCostUsd += entry.costUsd; model.transcriptionCostUsd += entry.costUsd; model.audioSeconds += entry.audioSeconds ?? 0 }
       day.models[entry.model] = model
@@ -120,13 +123,18 @@ export class OpenRouterUsage {
     const file = await this.read()
     let todayUsd = 0, thirtyDayUsd = 0
     const modelCost: Record<string, number> = {}, modelSeconds: Record<string, number> = {}
+    let costUnknown = false, missingCostCount = 0
+    const unknownModels = new Set<string>()
     for (const [date, day] of Object.entries(file.days)) {
       const at = Date.parse(`${date}T00:00:00.000Z`)
       if (date === today) todayUsd += day.costUsd
       if (Number.isFinite(at) && at >= cutoff) thirtyDayUsd += day.costUsd
+      if (date === today) costUnknown ||= day.costUnknown
+      missingCostCount += day.missingCostCount
       for (const [model, usage] of Object.entries(day.models)) {
         modelCost[model] = (modelCost[model] ?? 0) + usage.transcriptionCostUsd
         modelSeconds[model] = (modelSeconds[model] ?? 0) + usage.audioSeconds
+        if (usage.costUnknown) unknownModels.add(model)
       }
     }
     const transcriptionPerHourUsd: Record<string, number> = {}
@@ -134,7 +142,8 @@ export class OpenRouterUsage {
       const seconds = modelSeconds[model] ?? 0
       if (seconds > 0) transcriptionPerHourUsd[model] = modelCost[model] / (seconds / 3_600)
     }
-    return { todayUsd, thirtyDayUsd, transcriptionPerHourUsd }
+    for (const model of unknownModels) delete transcriptionPerHourUsd[model]
+    return { todayUsd, thirtyDayUsd, transcriptionPerHourUsd, costUnknown, missingCostCount }
   }
 }
 

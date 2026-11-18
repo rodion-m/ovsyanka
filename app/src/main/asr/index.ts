@@ -334,7 +334,7 @@ export function hookTranscription(p: {
         return
       }
       // chunks that already failed enough automatic sends wait for the Retry button
-      const send = o?.retry ? metas : metas.filter((e) => e.attempts < SPOOL_MAX_ATTEMPTS)
+      const send = o?.retry ? metas : metas.filter((e) => !e.blocked && e.attempts < SPOOL_MAX_ATTEMPTS)
       if (!send.length) return
       // the meeting's frozen spoken language lives in the sidecars; the first entry that recorded one wins
       const spoken = send.map((e) => e.spoken).find((s): s is Spoken => s === 'en' || s === 'ru' || s === 'multi')

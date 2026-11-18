@@ -18,7 +18,7 @@ export function hookAiPreferences(o: {
   check?: (settings: AiSettings) => Promise<AiCheck>
   env?: NodeJS.ProcessEnv
   openrouterKey?: string
-  openrouter?: Pick<OpenRouterKeyStore, 'status' | 'set' | 'clear'>
+  openrouter?: Pick<OpenRouterKeyStore, 'status' | 'set' | 'clear' | 'check'>
   usage?: Pick<OpenRouterUsage, 'summary'>
 }) {
   const active = aiSettings(o.active)
@@ -74,5 +74,6 @@ export function hookAiPreferences(o: {
   ipcMain.handle('ai.openrouter.keyStatus', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.status() : { state: 'none' })
   ipcMain.handle('ai.openrouter.setKey', async (_e, value: unknown): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.set(typeof value === 'string' ? value : '') : { state: 'unavailable' })
   ipcMain.handle('ai.openrouter.clearKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.clear() : { state: 'none' })
-  ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {} })
+  ipcMain.handle('ai.openrouter.checkKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.check() : { state: 'none' })
+  ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, costUnknown: false, missingCostCount: 0 })
 }

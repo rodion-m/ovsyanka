@@ -71,7 +71,8 @@ export const OPENROUTER_STT_ENDPOINT = '/api/v1/audio/transcriptions'
 export const OPENROUTER_TEXT_CONTEXT_MINIMUM = 32_000
 /** Stage 0 measured Gemini 3.8 Flash chat-audio input at 25 tokens per second. */
 export const OPENROUTER_AUDIO_TOKENS_PER_SECOND = 25
-export const OPENROUTER_AUDIO_OUTPUT_TOKENS_PER_MINUTE = 500
+/** Completion includes reasoning tokens. Measured fixture rate: 11,986 tokens / 5 audio minutes. */
+export const OPENROUTER_AUDIO_OUTPUT_TOKENS_PER_MINUTE = 2_397
 export const OPENROUTER_HOURLY_PRICE_MIN_USD = 0.005
 export const OPENROUTER_HOURLY_PRICE_MAX_USD = 3
 export const OPENROUTER_EXPIRING_SOON_DAYS = 30

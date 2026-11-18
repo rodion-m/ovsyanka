@@ -7,6 +7,7 @@ import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
 import type { Spoken } from '../../shared/spoken'
+import type { AiProblemCode } from '../../shared/ai'
 import { takeBatch, type Batch } from './batch'
 
 type Out = Omit<Segment, 'id'>
@@ -37,7 +38,7 @@ export function createPipeline(p: {
   /** remote path only (batchMs > 0): each track's first batch goes once its oldest queued chunk is this old in meeting time; every later batch waits batchMs. Local reads stay unchanged. */
   firstBatchMs?: number
   /** remote path only (batchMs > 0): every queued chunk is kept on disk until its lines are saved, so a quit or crash can send it again */
-  spool?: { add(chunk: Chunk, spoken?: Spoken): string | undefined; remove(keys: string[]): void; bump?(key: string): void }
+  spool?: { add(chunk: Chunk, spoken?: Spoken): string | undefined; remove(keys: string[]): void; bump?(key: string, attempts?: number): void; block?(key: string): void }
   /** the meeting's spoken language setting as its sidecars should remember it; read each time a chunk is queued */
   spoken?: () => Spoken | undefined
   /** for tests: stand in for the echo detector */
@@ -210,14 +211,17 @@ export function createPipeline(p: {
         console.error(`transcribing a ${t} chunk failed`, e)
         // a closed pipeline or an aborted request (the app is going away) is never retried
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
-        if (retries > 0 && !cancelled) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        const code = typeof e === 'object' && e !== null && 'code' in e ? (e as { code?: AiProblemCode }).code : undefined
+        const attempts = typeof e === 'object' && e !== null && 'attempts' in e ? Number((e as { attempts?: unknown }).attempts) : 0
+        const permanent: AiProblemCode[] = ['auth', 'credits', 'budget', 'model-gone', 'no-provider', 'moderation', 'truncated', 'bad-response', 'no-key', 'keychain', 'no-timestamps']
+        if (retries > 0 && !cancelled && !(code && permanent.includes(code)) && !(Number.isSafeInteger(attempts) && attempts >= 3)) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
         // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
         // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
         // chunks that never went out count nothing
         for (const s of sources) {
           const key = spoolKeys.get(s)
           spoolKeys.delete(s)
-          if (!cancelled && key !== undefined) { try { p.spool?.bump?.(key) } catch (err) { console.error('counting a transcription retry failed', err) } }
+          if (!cancelled && key !== undefined) { try { if (code && permanent.includes(code)) p.spool?.block?.(key); else p.spool?.bump?.(key, Number.isSafeInteger(attempts) && attempts > 0 ? attempts : 1) } catch (err) { console.error('counting a transcription retry failed', err) } }
         }
         warn('transcribe-failed'); settle(t, chunkEnd)
       })

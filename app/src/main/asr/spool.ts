@@ -25,6 +25,7 @@ export type SpooledEntry = {
   startMs: number
   clearMs?: number
   attempts: number
+  blocked?: boolean
   /** length of the kept audio, ms */
   durationMs: number
   /** the spoken language the meeting had when this was queued */
@@ -47,7 +48,8 @@ export type AudioSpool = ChunkSpool & {
   load(entries: readonly SpooledEntry[]): SpooledChunk[]
   list(): SpooledChunk[]
   /** counts one more failed send of this chunk (its sidecar is rewritten) */
-  bump(key: string): void
+  bump(key: string, attempts?: number): void
+  block(key: string): void
 }
 
 export const spoolDirOf = (meetingDir: string): string => join(meetingDir, SPOOL_DIR)
@@ -99,7 +101,7 @@ export function createSpool(dir: string): AudioSpool {
 
   /** the sidecar's metadata, or undefined when it is not a readable entry; the sound file's size backs durationMs for older sidecars */
   const metaOf = (key: string): SpooledEntry | undefined => {
-    let meta: { track?: unknown; startMs?: unknown; clearMs?: unknown; attempts?: unknown; durationMs?: unknown; spoken?: unknown }
+    let meta: { track?: unknown; startMs?: unknown; clearMs?: unknown; attempts?: unknown; durationMs?: unknown; spoken?: unknown; blocked?: unknown }
     try { meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) } catch { return undefined }
     if ((meta.track !== 'me' && meta.track !== 'them') || typeof meta.startMs !== 'number' || !Number.isFinite(meta.startMs)) return undefined
     let size: number
@@ -110,6 +112,7 @@ export function createSpool(dir: string): AudioSpool {
       key, track: meta.track, startMs: meta.startMs, durationMs,
       ...(typeof meta.clearMs === 'number' && Number.isFinite(meta.clearMs) ? { clearMs: meta.clearMs } : {}),
       attempts: typeof meta.attempts === 'number' && Number.isInteger(meta.attempts) && meta.attempts > 0 ? meta.attempts : 0,
+      ...(meta.blocked === true ? { blocked: true } : {}),
       ...(meta.spoken === 'en' || meta.spoken === 'ru' || meta.spoken === 'multi' ? { spoken: meta.spoken } : {}),
     }
   }
@@ -174,12 +177,20 @@ export function createSpool(dir: string): AudioSpool {
       return this.entries().flatMap((e) => this.load([e]))
     },
 
-    bump(key: string): void {
+    bump(key: string, attempts = 1): void {
       try {
         const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { attempts?: unknown }
-        meta.attempts = (typeof meta.attempts === 'number' && Number.isInteger(meta.attempts) ? meta.attempts : 0) + 1
+        meta.attempts = (typeof meta.attempts === 'number' && Number.isInteger(meta.attempts) ? meta.attempts : 0) + attempts
         writeAtomic(fileOf(key, 'json'), JSON.stringify(meta))
       } catch (e) { console.error('counting a transcription retry failed', e) }
+    },
+
+    block(key: string): void {
+      try {
+        const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { blocked?: unknown }
+        meta.blocked = true
+        writeAtomic(fileOf(key, 'json'), JSON.stringify(meta))
+      } catch (e) { console.error('marking a transcription as blocked failed', e) }
     },
 
     remove(keys: string[]): void {

@@ -83,6 +83,22 @@ describe('OpenRouter text adapter', () => {
     expect(body.provider).toBeUndefined()
     expect(body.reasoning).toBeUndefined()
   })
+
+  it('uses static recommended capabilities on the production harness path', async () => {
+    const rootPath = await root(), bodies: Record<string, unknown>[] = []
+    const harness = createSubscriptionHarness({ settings: settings(), tempDir: join(rootPath, 'stage'), openrouter: {
+      key: key(), fetch: async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer({ choices: [{ message: { content: JSON.stringify({ segments: [] }) } }] }) },
+    } })
+    const transcriber = harness.transcriber({ prompt: () => '', language: () => undefined, onLanguage: vi.fn() })
+    await transcriber({ track: 'me', startMs: 0, samples: new Float32Array(16_000), clearMs: 500 })
+    expect(bodies[0]).toMatchObject({ response_format: { json_schema: { strict: true } }, reasoning: { effort: 'medium' }, max_tokens: 48_000, temperature: 0 })
+    const schema = (bodies[0].response_format as { json_schema: { schema: Record<string, unknown> } }).json_schema.schema
+    expect(schema.required).toEqual(Object.keys(schema.properties as object))
+    const properties = schema.properties as { segments: { items: { properties: Record<string, unknown>; required: string[] } } }
+    expect(properties.segments.items.required).toEqual(Object.keys(properties.segments.items.properties))
+    expect(properties.segments.items.properties).not.toHaveProperty('speaker')
+    harness.stop()
+  })
 })
 
 describe('OpenRouter audio adapter', () => {
@@ -104,6 +120,7 @@ describe('OpenRouter audio adapter', () => {
     const content = (requests[0].messages as Array<{ content: Array<{ type: string; text?: string; input_audio?: { data: string; format: string } }> }>)[0].content
     const text = content.find(part => part.type === 'text')?.text ?? ''
     expect(text).toContain('Names and vocabulary (context only; never invent speech from them): Ada and Zentric')
+    expect(text).toContain('Return only one JSON object matching')
     expect(text).not.toContain('./audio.wav')
     expect(text).not.toContain('view_file')
     const audio = content.find(part => part.type === 'input_audio')?.input_audio
@@ -155,6 +172,21 @@ describe('OpenRouter audio adapter', () => {
 })
 
 describe('OpenRouter errors and retries', () => {
+  it('keeps the timeout active after headers arrive until the body finishes', async () => {
+    vi.useFakeTimers()
+    let bodyController: ReadableStreamDefaultController<Uint8Array> | undefined
+    const fetch: OpenRouterKeyFetch = async (_url, init) => {
+      const stream = new ReadableStream<Uint8Array>({ start(controller) { bodyController = controller; init?.signal?.addEventListener('abort', () => controller.error(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true }) } })
+      return new Response(stream, { status: 200 })
+    }
+    const adapter = createOpenRouter({ settings: settings({ timeoutSeconds: 10 }), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {} })
+    const pending = adapter.text('body stall', signal())
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'timeout' })
+    await vi.waitFor(() => expect(bodyController).toBeDefined())
+    await vi.runAllTimersAsync()
+    await assertion
+    expect(bodyController).toBeDefined()
+  })
   it.each([
     [401, { error: { type: 'invalid_api_key' } }, 'auth'],
     [402, { error: { metadata: { limit_source: 'openrouter_credits' } } }, 'credits'],
@@ -223,7 +255,7 @@ describe('OpenRouter errors and retries', () => {
     expect(JSON.stringify(logs)).toContain('google/gemini-3.8-flash')
   })
 
-  it('accepts the Stage 0 ZDR success shape as a normal provider response', async () => {
+  it('treats the max_tokens=1 ZDR fixture as a genuine truncated response', async () => {
     const requests: Record<string, unknown>[] = []
     const adapter = createOpenRouter({ settings: settings({ openrouterDataPolicy: 'zdr' }), key: key(), fetch: async (_url, init) => {
       requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
@@ -232,15 +264,59 @@ describe('OpenRouter errors and retries', () => {
     await expect(adapter.text('ZDR boundary', signal())).rejects.toMatchObject({ code: 'truncated' })
     expect(requests[0].provider).toEqual({ zdr: true })
   })
+
+  it('classifies null content without length as bad-response', async () => {
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch: async () => answer({ choices: [{ message: { content: null } }] }), lookupModel: async () => model(), log: () => {} })
+    await expect(adapter.text('empty', signal())).rejects.toMatchObject({ code: 'bad-response' })
+  })
+
+  it.each([[429, 'rate-limit'], [502, 'unavailable']] as const)('keeps %s status semantics with an HTML body', async (status, code) => {
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch: async () => new Response('<html>gateway failure</html>', { status, headers: { 'Retry-After': '1' } }), lookupModel: async () => model(), sleep: async () => {} })
+    await expect(adapter.text('html', signal())).rejects.toMatchObject({ code })
+  })
+
+  it.each([[429, 'rate-limit'], [502, 'unavailable']] as const)('keeps %s status semantics with an empty body', async (status, code) => {
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch: async () => new Response(null, { status, headers: { 'Retry-After': '1' } }), lookupModel: async () => model(), sleep: async () => {} })
+    await expect(adapter.text('empty', signal())).rejects.toMatchObject({ code })
+  })
 })
 
 describe('OpenRouter usage and spooled pipeline', () => {
+  it('does not retry permanent adapter errors in the real pipeline and shares the bounded retry budget for 429', async () => {
+    const originalSetTimeout = globalThis.setTimeout
+    const retryTimer = vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler, timeout, ...args) => originalSetTimeout(handler, timeout === 5_000 ? 0 : timeout, ...args))
+    const rootPath = await root()
+    const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000) }
+    for (const [code, status, body] of [
+      ['auth', 401, { error: { type: 'invalid_api_key' } }],
+      ['credits', 402, { error: { metadata: { limit_source: 'openrouter_credits' } } }],
+      ['truncated', 200, { choices: [{ finish_reason: 'length', message: { content: null } }] }],
+    ] as const) {
+      const spool = createSpool(spoolDirOf(join(rootPath, code))), fetch = vi.fn<OpenRouterKeyFetch>(async () => answer(body, status))
+      const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), log: () => {} })
+      const keyInSpool = spool.add(chunk)!
+      const pipeline = createPipeline({ meetingId: code, batchMs: 1, spool, transcribe: async () => { await router.text('failure', signal()); return [] }, save: () => {}, emit: () => {} })
+      pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
+      expect(fetch).toHaveBeenCalledOnce()
+      expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true })
+    }
+    const spool = createSpool(spoolDirOf(join(rootPath, '429'))), fetch = vi.fn<OpenRouterKeyFetch>(async () => answer({ error: { type: 'rate_limit' } }, 429))
+    const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {}, log: () => {} })
+    const keyInSpool = spool.add(chunk)!
+    const pipeline = createPipeline({ meetingId: '429', batchMs: 1, spool, transcribe: async () => { await router.text('429', signal()); return [] }, save: () => {}, emit: () => {} })
+    pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
+    expect(fetch).toHaveBeenCalledTimes(3)
+    expect(spool.entries()[0]).toMatchObject({ attempts: 3 })
+    expect(spool.entries()[0]).not.toHaveProperty('blocked')
+    retryTimer.mockRestore()
+  })
+
   it('stores only daily cost/audio aggregates and reports measured transcription hourly cost', async () => {
     const rootPath = await root(), clock = { at: Date.parse('2026-11-18T12:00:00Z') }
     const usage = createOpenRouterUsage({ userData: rootPath, now: () => clock.at })
     await usage.record({ model: 'google/gemini-3.8-flash', task: 'transcription', costUsd: 0.22, audioSeconds: 3_600 })
     await usage.record({ model: 'google/gemini-3.8-flash', task: 'text', costUsd: 0.08 })
-    expect(await usage.summary()).toEqual({ todayUsd: 0.3, thirtyDayUsd: 0.3, transcriptionPerHourUsd: { 'google/gemini-3.8-flash': 0.22 } })
+    expect(await usage.summary()).toEqual({ todayUsd: 0.3, thirtyDayUsd: 0.3, transcriptionPerHourUsd: { 'google/gemini-3.8-flash': 0.22 }, costUnknown: false, missingCostCount: 0 })
     const stored = JSON.parse(await readFile(join(rootPath, 'openrouter-usage.json'), 'utf8')) as Record<string, unknown>
     expect(JSON.stringify(stored)).not.toContain('segments')
     expect(JSON.stringify(stored)).not.toContain('request')
@@ -268,6 +344,7 @@ describe('OpenRouter usage and spooled pipeline', () => {
     const fetch = vi.fn<OpenRouterKeyFetch>()
       .mockResolvedValueOnce(answer({ error: { metadata: { limit_source: 'openrouter_credits' } } }, 402))
       .mockResolvedValueOnce(answer({ error: { metadata: { limit_source: 'openrouter_credits' } } }, 402))
+      .mockResolvedValueOnce(answer({ error: { metadata: { limit_source: 'openrouter_credits' } } }, 402))
     const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {}, log: () => {} })
     const transcriber = createHarnessTranscriber({ settings: settings(), tempDir: join(rootPath, 'stage'), signal: signal(), transcribe: request => router.transcribe(request) }, {
       prompt: () => '', language: () => undefined, onLanguage: vi.fn(),
@@ -281,6 +358,7 @@ describe('OpenRouter usage and spooled pipeline', () => {
     retryTimer.mockRestore()
     expect(saved).toEqual([])
     expect(spool.hasEntries()).toBe(true)
+    expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true })
 
     const goodFetch: OpenRouterKeyFetch = async () => answer({ choices: [{ message: { content: JSON.stringify({ segments: [{ start: 0, end: 0.5, text: 'После пополнения.' }] }) } }] })
     const goodRouter = createOpenRouter({ settings: settings(), key: key(), fetch: goodFetch, lookupModel: async () => model(), log: () => {} })
@@ -293,16 +371,16 @@ describe('OpenRouter usage and spooled pipeline', () => {
     await recoveredPipeline.finish()
     expect(saved).toEqual(['После пополнения.'])
     expect(spool.hasEntries()).toBe(false)
-    expect(bodies).toHaveLength(2)
+    expect(bodies).toHaveLength(1)
   })
 
   it('aborts a long request through harness.stop and leaves the batch spooled', async () => {
     const rootPath = await root(), started = vi.fn()
-    const fetch: OpenRouterKeyFetch = async (_url, init) => new Promise((_resolve, reject) => {
+    const fetch: OpenRouterKeyFetch = async (_url, init) => {
       started()
-      const signal = init?.signal as AbortSignal
-      signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true })
-    })
+      const stream = new ReadableStream<Uint8Array>({ start(controller) { init?.signal?.addEventListener('abort', () => controller.error(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true }) } })
+      return new Response(stream, { status: 200 })
+    }
     const harness = createSubscriptionHarness({ settings: settings(), tempDir: join(rootPath, 'stage'), openrouter: { key: key(), fetch, lookupModel: async () => model(), log: () => {} } })
     const spool = createSpool(spoolDirOf(join(rootPath, 'meeting')))
     const transcriber = harness.transcriber({ prompt: () => '', language: () => undefined, onLanguage: vi.fn() })
