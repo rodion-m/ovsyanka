@@ -34,6 +34,8 @@ export type OpenRouterModelsDependencies = {
   fetch: OpenRouterFetch
   now?: OpenRouterModelsClock
   timeoutMs?: number
+  /** Accepted only by fake/test launches; production uses the OpenRouter API host. */
+  baseUrl?: string
 }
 
 export type OpenRouterOptionsRequest = { refresh?: boolean }
@@ -146,8 +148,10 @@ export class OpenRouterModels {
       }, this.timeoutMs)
     })
     try {
+      const base = this.dependencies.baseUrl?.replace(/\/$/, '')
+      const requestUrl = base ? `${base}${url.slice(OPENROUTER_MODELS_URL.length)}` : url
       const response = await Promise.race([
-        this.dependencies.fetch(url, {
+        this.dependencies.fetch(requestUrl, {
           signal: controller.signal,
           headers: { Accept: 'application/json' },
         }),
@@ -245,6 +249,8 @@ async function defaultOpenRouterModels(): Promise<OpenRouterModels> {
       models: createOpenRouterModels({
         userData,
         fetch: electron.net.fetch.bind(electron.net) as unknown as OpenRouterFetch,
+        ...(!electron.app.isPackaged && process.env.YOGURT_FAKE === '1' && process.env.YOGURT_TEST_OPENROUTER_URL
+          ? { baseUrl: process.env.YOGURT_TEST_OPENROUTER_URL } : {}),
       }),
     }
   }

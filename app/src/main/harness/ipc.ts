@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { aiSettings, validAiSettings, type AiCheck, type AiKeyStatus, type AiPreferences, type AiSettings, type AiUsage } from '../../shared/ai'
+import { aiSettings, validAiSettings, type AiCheck, type AiKeyStatus, type AiPreferences, type AiProbeResult, type AiSettings, type AiUsage } from '../../shared/ai'
 import { configuredAi, keyLast4, loadSettings, updateSettings } from '../settings'
 import { checkHarness } from './index'
 import { getAiOptions } from './aiOptions'
@@ -20,6 +20,7 @@ export function hookAiPreferences(o: {
   openrouterKey?: string
   openrouter?: Pick<OpenRouterKeyStore, 'status' | 'set' | 'clear' | 'check'>
   usage?: Pick<OpenRouterUsage, 'summary'>
+  probe?: (settings: AiSettings, task: 'text' | 'transcription') => Promise<AiProbeResult>
   onAiConfigChanged?: () => void | Promise<void>
 }) {
   const active = aiSettings(o.active)
@@ -69,7 +70,7 @@ export function hookAiPreferences(o: {
   ipcMain.handle('ai:options', async (_e, request: unknown) => {
     if (!request || typeof request !== 'object' || Array.isArray(request)) throw new Error('Invalid AI options request')
     const value = request as Record<string, unknown>
-    if (value.backend !== 'agy' && value.backend !== 'porch') throw new Error('Unsupported AI options backend')
+    if (value.backend !== 'agy' && value.backend !== 'porch' && value.backend !== 'openrouter') throw new Error('Unsupported AI options backend')
     if (value.refresh !== undefined && typeof value.refresh !== 'boolean') throw new Error('Invalid AI options refresh flag')
     for (const field of ['agyPath', 'porchPath'] as const) {
       if (value[field] !== undefined && (typeof value[field] !== 'string' || value[field].length > 4096)) throw new Error('Invalid AI executable path')
@@ -88,4 +89,10 @@ export function hookAiPreferences(o: {
   ipcMain.handle('ai.openrouter.clearKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.clear() : { state: 'none' })
   ipcMain.handle('ai.openrouter.checkKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.check() : { state: 'none' })
   ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, transcriptionCostUnknown: false, textCostUnknown: false, missingCostCount: 0 })
+  ipcMain.handle('ai.openrouter.probe', async (_e, value: unknown, task: unknown): Promise<AiProbeResult> => {
+    const settings = checked(value)
+    if (settings.backend !== 'openrouter' || (task !== 'text' && task !== 'transcription')) throw new Error('Invalid OpenRouter test request')
+    if (!o.probe) return { ok: false, elapsedMs: 0, message: 'OpenRouter tests are unavailable.' }
+    return o.probe(settings, task)
+  })
 }

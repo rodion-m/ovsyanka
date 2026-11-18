@@ -73,6 +73,7 @@ export type AiUsage = {
   textCostUnknown: boolean
   missingCostCount: number
 }
+export type AiProbeResult = { ok: boolean; elapsedMs: number; message?: string; costUsd?: number }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const oneOf = <T extends string>(v: unknown, values: readonly T[], fallback: T): T => values.includes(v as T) ? v as T : fallback

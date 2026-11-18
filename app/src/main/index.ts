@@ -73,6 +73,7 @@ import { createSubscriptionHarness } from './harness'
 import { hookAiPreferences } from './harness/ipc'
 import { createOpenRouterKeyStore } from './harness/openrouterKey'
 import { createOpenRouterUsage } from './harness/openrouterUsage'
+import { probeOpenRouter } from './harness/openrouterTest'
 import { createIndexer } from './library/indexer'
 import { hookConversations } from './library/conversations'
 import { hookShare } from './share'
@@ -508,11 +509,13 @@ app.whenReady().then(() => {
   const settings = loadSettings(join(userDataDir(), 'settings.json'))
   const ai = configuredAi(settings, process.env, isFake())
   const openrouterKey = createOpenRouterKeyStore({ userData: userDataDir(), safeStorage, envKey: launchOpenRouterKey,
-    fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch })
+    fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch,
+    ...(!app.isPackaged && isFake() && process.env.YOGURT_TEST_OPENROUTER_URL ? { baseUrl: process.env.YOGURT_TEST_OPENROUTER_URL } : {}) })
   const openrouterUsage = createOpenRouterUsage({ userData: userDataDir() })
   const subscription = ai.backend !== 'local'
   const harness = subscription ? createSubscriptionHarness({ settings: ai, tempDir: join(userDataDir(), 'harness-tmp'),
-    openrouter: { key: openrouterKey, fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch, userData: userDataDir(), usage: openrouterUsage } }) : undefined
+    openrouter: { key: openrouterKey, fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch, userData: userDataDir(), usage: openrouterUsage,
+      ...(!app.isPackaged && isFake() && process.env.YOGURT_TEST_OPENROUTER_URL ? { baseUrl: process.env.YOGURT_TEST_OPENROUTER_URL } : {}) } }) : undefined
   // the theme picked in Settings; the system's when none
   nativeTheme.themeSource = settings.theme ?? 'system'
   setLanguage(localeOf(settings, systemLocale()))
@@ -564,7 +567,12 @@ app.whenReady().then(() => {
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
   themWarnOn = loadSettings(settingsFile).themSilenceWarn !== false
-  hookAiPreferences({ file: settingsFile, active: ai, openrouterKey: launchOpenRouterKey, openrouter: openrouterKey, usage: openrouterUsage, restart: () => {
+  hookAiPreferences({ file: settingsFile, active: ai, openrouterKey: launchOpenRouterKey, openrouter: openrouterKey, usage: openrouterUsage, probe: (settings, task) => probeOpenRouter({
+    settings, task, key: openrouterKey, fetch: net.fetch.bind(net) as unknown as import('./harness/openrouterKey').OpenRouterKeyFetch,
+    userData: userDataDir(), usage: openrouterUsage, audioFixture: app.isPackaged
+      ? join(process.resourcesPath, 'openrouter-test.wav') : join(app.getAppPath(), 'resources/openrouter-test.wav'),
+    ...(!app.isPackaged && isFake() && process.env.YOGURT_TEST_OPENROUTER_URL ? { baseUrl: process.env.YOGURT_TEST_OPENROUTER_URL } : {}),
+  }), restart: () => {
     if (activeMeeting() || transcribing() || finishing || queue.busy()) return false
     if (isFake()) { relaunched++; return true }
     stripAppImageEnv()

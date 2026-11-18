@@ -15,7 +15,19 @@
 .ai-settings-status[data-error=true] { color:var(--ink); }
 .ai-settings-result { display:block;margin-top:4px;color:var(--muted);white-space:pre-wrap; }
 .ai-settings-pending { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.openrouter-fields { display:contents; }
+.openrouter-key-controls,.openrouter-model-controls { display:flex;align-items:flex-start;gap:7px;flex-wrap:wrap;max-width:100%; }
+.openrouter-key-controls .settings-name-field { flex:1 1 210px; }
+.openrouter-key-buttons { display:flex;gap:6px; }
+.openrouter-key-link { flex-basis:100%;font-size:11px;color:var(--muted); }
+.openrouter-same { display:flex;gap:8px;align-items:center;padding:10px 20px 10px 36%;font-size:12px; }
+.openrouter-same input { accent-color:var(--accent); }
+.openrouter-picker-toolbar { display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--line);font-size:11px; }
+.openrouter-picker-toolbar button { border:0;background:transparent;color:var(--ink);cursor:pointer;padding:4px 6px;border-radius:4px; }
+.openrouter-picker-toolbar button[aria-pressed=true] { background:var(--surface-2);font-weight:600; }
+.openrouter-picker-toolbar span { color:var(--muted);margin-left:auto; }
 @media(max-width:600px) {
   .ai-settings-form .settings-row { display:block; }
   .ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:100%;margin-top:8px; }
+  .openrouter-same { padding-left:20px; }
 }

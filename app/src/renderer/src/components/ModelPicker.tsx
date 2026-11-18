@@ -38,7 +38,7 @@ export type ModelPickerProps = {
 
 const hintKey: Record<Exclude<AiHint, 'unavailable'>, AiCopyKey> = {
   audio: 'hintAudio', verified: 'hintVerified', fast: 'hintFast', cheap: 'hintCheap',
-  free: 'hintFree', tokens: 'hintTokens', expiring: 'hintExpiring',
+  free: 'hintFree', tokens: 'hintTokens', expiring: 'hintExpiring', experimental: 'sttExperimental',
 }
 const money = (usd: number) => usd < 0.01 ? usd.toPrecision(1) : usd.toFixed(2)
 const monthYear = (seconds: number) => new Intl.DateTimeFormat(language(), { month: 'short', year: 'numeric' }).format(new Date(seconds * 1000))
@@ -59,6 +59,7 @@ function facts(option: AiOption): string {
   return [
     option.id,
     ...option.hints.filter(h => h !== 'unavailable').map(h => aiText(hintKey[h])),
+    ...(option.hints.includes('experimental') ? [aiText('sttExperimentalHint')] : []),
     option.detail,
     price(option),
     option.addedAt === undefined ? undefined : aiTextF('addedOn', { when: monthYear(option.addedAt) }),
@@ -216,6 +217,7 @@ function OptionRow({ id, option, current, highlighted, select }: { id: string; o
     <span className="model-picker-check" aria-hidden="true">{option.id === current && <Check size={13} />}</span>
     <span className="model-picker-name">{option.label}</span>
     <span className="model-picker-hints">{option.hints.filter(h => h !== 'unavailable').map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>
-    <span className="model-picker-sub">{option.disabledReason === 'backend-unavailable' ? aiText('profileUnavailable') : option.disabledReason ?? facts(option)}</span>
+    <span className="model-picker-sub">{option.disabledReason === 'backend-unavailable' ? aiText('profileUnavailable') : option.disabledReason === 'soon' ? aiText('sttSoon') : option.disabledReason ?? facts(option)}</span>
+    {option.hints.includes('experimental') && <span className="model-picker-sub">{aiText('sttExperimentalHint')}</span>}
   </div>
 }

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, RefreshCw } from 'lucide-react'
 import { validAiSettings, type AiBackend, type AiCheck, type AiEffort, type AiOutputLanguage, type AiPreferences, type AiSettings as Configuration } from '../../../shared/ai'
-import { agyTextOptions, agyTranscriptionOptions, validCustomId, type AiOption, type AiOptions } from '../../../shared/aiCatalog'
+import { agyTextOptions, agyTranscriptionOptions, sortAiOptions, validCustomId, type AiOption, type AiOptions, type AiSortMode } from '../../../shared/aiCatalog'
 import { useLanguage } from '../i18n'
 import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
+import { aiProblemText } from './aiCopy'
 import { ModelPicker, type ModelPickerGroup } from './ModelPicker'
 import './AiSettings.css'
 
@@ -65,12 +66,17 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
   const [catalogBusy, setCatalogBusy] = useState(false)
   const refreshCatalog = async () => {
     setCatalogBusy(true)
-    try { setCatalog(await window.yogurt.ai.options({ backend: shown.backend === 'porch' ? 'porch' : 'agy', refresh: true, agyPath: shown.agyPath, porchPath: shown.porchPath })) }
-    catch { setCatalog(shown.backend === 'porch' ? { transcription: [], text: [], source: 'builtin', problem: 'unavailable' } : { ...AGY_BUILTIN_OPTIONS, problem: 'unavailable' }) }
+    try { setCatalog(await window.yogurt.ai.options({ backend: shown.backend === 'openrouter' ? 'openrouter' : shown.backend === 'porch' ? 'porch' : 'agy', refresh: true, agyPath: shown.agyPath, porchPath: shown.porchPath })) }
+    catch { setCatalog(shown.backend === 'porch' || shown.backend === 'openrouter' ? { transcription: [], text: [], source: 'builtin', problem: 'unavailable' } : { ...AGY_BUILTIN_OPTIONS, problem: 'unavailable' }) }
     finally { setCatalogBusy(false) }
   }
   useEffect(() => {
-    if (shown.backend === 'porch') {
+    if (shown.backend === 'openrouter') {
+      setCatalogBusy(true)
+      void window.yogurt.ai.options({ backend: 'openrouter' }).then(setCatalog)
+        .catch(() => setCatalog({ transcription: [], text: [], source: 'builtin', problem: 'unavailable' }))
+        .finally(() => setCatalogBusy(false))
+    } else if (shown.backend === 'porch') {
       setCatalog({ transcription: [], text: [], source: 'builtin' })
       setCatalogBusy(true)
       void window.yogurt.ai.options({ backend: 'porch', agyPath: shown.agyPath, porchPath: shown.porchPath })
@@ -117,7 +123,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
     </Row>
   }
   return <>
-    {select('ai-backend', aiText('backend'), shown.backend, [...(['agy', 'porch', 'local'] as const).map(v => [v, backendName(v)] as [string, string]), ...(lock(locked, 'backend')?.value === 'openrouter' ? [['openrouter', backendName('openrouter')] as [string, string]] : [])], v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
+    {select('ai-backend', aiText('backend'), shown.backend, [...(['agy', 'porch', 'openrouter', 'local'] as const).map(v => [v, backendName(v)] as [string, string])], v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
     <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(shown.backend === 'local' ? 'localHelp' : 'subscription')}</p>
     {shown.backend !== 'local' && <>
       {shown.backend === 'agy' && <p className="ai-settings-note">{aiText('defaultModel')}</p>}
@@ -139,7 +145,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
         </Row>
         <p className="ai-settings-note">{aiText('porchTextNote')}</p>
       </>}
-      {shown.backend === 'openrouter' && <p className="ai-settings-note">{aiText('openrouterStage6')}</p>}
+    {shown.backend === 'openrouter' && <OpenRouterFields value={shown} change={change} locked={locked?.openrouterKey} catalog={catalog} busy={catalogBusy} refresh={() => void refreshCatalog()} />}
       {shown.backend === 'agy'
         ? picker('transcriptionModel', 'audioModel', catalog.transcription, ['recommended', 'audio'], undefined, ['medium', 'high'])
         : shown.backend === 'porch' || shown.backend === 'openrouter' ? null : input('transcriptionModel', 'audioModel')}
@@ -169,6 +175,122 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
   </>
 }
 
+/** OpenRouter credentials are read straight from the input and the input is cleared before awaiting IPC. */
+function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { value: Configuration; change(patch: Partial<Configuration>): void; locked?: NonNullable<AiPreferences['locked']>['openrouterKey']; catalog: AiOptions; busy: boolean; refresh(): void }) {
+  const keyInput = useRef<HTMLInputElement>(null)
+  const [keyStatus, setKeyStatus] = useState<import('../../../shared/ai').AiKeyStatus>()
+  const [editingKey, setEditingKey] = useState(false)
+  const [keyBusy, setKeyBusy] = useState(false)
+  const [keyError, setKeyError] = useState(false)
+  const [keyCheckMs, setKeyCheckMs] = useState<number>()
+  const [sort, setSort] = useState<AiSortMode>('newest')
+  const [usage, setUsage] = useState<import('../../../shared/ai').AiUsage>()
+  const [usageUnknown, setUsageUnknown] = useState(false)
+  const [probeBusy, setProbeBusy] = useState<'text' | 'transcription' | null>(null)
+  const [probeResults, setProbeResults] = useState<Partial<Record<'text' | 'transcription', import('../../../shared/ai').AiProbeResult>>>({})
+  useEffect(() => {
+    let active = true
+    void window.yogurt.ai.openrouter.keyStatus().then(status => { if (active) setKeyStatus(status) }).catch(() => { if (active) setKeyStatus({ state: 'unavailable' }) })
+    void window.yogurt.ai.openrouter.usage().then(summary => { if (active) setUsage(summary) }).catch(() => { if (active) setUsageUnknown(true) })
+    return () => { active = false }
+  }, [])
+  const saveKey = async () => {
+    const input = keyInput.current
+    if (!input || !input.value) return
+    const pastedKey = input.value
+    input.value = ''
+    const started = performance.now()
+    setKeyBusy(true); setKeyError(false)
+    try { const status = await window.yogurt.ai.openrouter.setKey(pastedKey); setKeyCheckMs(performance.now() - started); setKeyStatus(status); setKeyError(status.state !== 'ok' && status.state !== 'unchecked'); if (status.state === 'ok' || status.state === 'unchecked') setEditingKey(false) }
+    catch { setKeyError(true) }
+    finally { setKeyBusy(false) }
+  }
+  const checkKey = async () => {
+    const started = performance.now()
+    setKeyBusy(true); setKeyError(false)
+    try { const status = await window.yogurt.ai.openrouter.checkKey(); setKeyCheckMs(performance.now() - started); setKeyStatus(status); setKeyError(status.state !== 'ok') }
+    catch { setKeyError(true) }
+    finally { setKeyBusy(false) }
+  }
+  const removeKey = async () => {
+    setKeyBusy(true)
+    try { setKeyStatus(await window.yogurt.ai.openrouter.clearKey()); setEditingKey(false) }
+    catch { setKeyError(true) }
+    finally { setKeyBusy(false) }
+  }
+  const probe = async (task: 'text' | 'transcription') => {
+    setProbeBusy(task)
+    try { const result = await window.yogurt.ai.openrouter.probe(value, task); setProbeResults(previous => ({ ...previous, [task]: result })) }
+    catch { setProbeResults(previous => ({ ...previous, [task]: { ok: false, elapsedMs: 0, message: aiText('checkFailed') } })) }
+    finally { setProbeBusy(null) }
+  }
+  const probeButton = (task: 'text' | 'transcription') => <button type="button" className="workspace-button" disabled={keyStatus?.state !== 'ok' || probeBusy !== null} onClick={() => void probe(task)}>{aiText(probeBusy === task ? 'testing' : 'test')}</button>
+  const probeResult = (task: 'text' | 'transcription') => {
+    const result = probeResults[task]
+    return result && <p className="ai-settings-status" role={result.ok ? 'status' : 'alert'} data-error={!result.ok}>
+      {aiText(result.ok ? 'testPassed' : 'checkFailed')} · {(result.elapsedMs / 1000).toFixed(1)}s{result.costUsd === undefined ? '' : ` · $${result.costUsd.toFixed(4)}`}
+      {result.message && <span className="ai-settings-result">{result.message}</span>}
+    </p>
+  }
+  const audioAll = catalog.transcription.map(option => ({
+    ...option,
+    hints: option.hints.includes('experimental') ? option.hints : [...option.hints, 'experimental' as const],
+    ...((option.group === 'stt' || option.kind === 'stt') ? { disabledReason: 'soon' } : {}),
+  }))
+  const audioOptions = sortAiOptions(audioAll, sort)
+  const textOptions = sortAiOptions(catalog.text, sort)
+  const audioOption = audioAll.find(option => option.id === value.openrouterTranscriptionModel)
+  const keyLast4 = keyStatus && 'last4' in keyStatus ? keyStatus.last4 : ''
+  const audioMissing = catalog.source === 'live' && !!catalog.fetchedAt && !audioAll.some(option => option.id === value.openrouterTranscriptionModel)
+  const textMissing = catalog.source === 'live' && !!catalog.fetchedAt && !textOptions.some(option => option.id === value.openrouterTextModel)
+  const sttOnly = value.openrouterTranscriptionKind === 'stt' || audioOption?.group === 'stt' || (audioOption && audioOption.kind === 'stt')
+  const sameModel = !sttOnly && value.openrouterTranscriptionKind === 'chat' && value.openrouterTranscriptionModel === value.openrouterTextModel
+  const groups = pickerGroups(['recommended', 'audio', 'stt', 'free'])
+  const updated = catalog.fetchedAt ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(catalog.fetchedAt) : undefined
+  return <div className="openrouter-fields" data-testid="openrouter-fields">
+    <Row id="ai-openrouter-key" label={aiText('keyLabel')} help={locked ? aiTextF('lockedByEnv', { VAR: locked.variable }) : aiText('keyStored')}>
+      <div className="openrouter-key-controls">
+        {locked ? <input key="locked-key" id="ai-openrouter-key" className="settings-name-field" value={`sk-or-v1-••••••••${keyLast4}`} readOnly aria-describedby="ai-openrouter-key-help" />
+          : editingKey || !keyStatus || keyStatus.state === 'none' || keyStatus.state === 'unreadable' || keyStatus.state === 'unavailable'
+            ? <input key="paste-key" id="ai-openrouter-key" data-testid="ai-openrouter-key" ref={keyInput} className="settings-name-field" type="text" autoComplete="off" spellCheck={false} placeholder={aiText('keyPaste')} onKeyDown={event => { if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'v') event.preventDefault() }} onPaste={event => { event.preventDefault(); const text = event.clipboardData.getData('text'); if (keyInput.current) { keyInput.current.value = text; keyInput.current.focus(); void saveKey() } }} />
+            : <input key="masked-key" id="ai-openrouter-key" className="settings-name-field" value={`sk-or-v1-••••••••${keyLast4}`} readOnly aria-describedby="ai-openrouter-key-help" />}
+        <div className="openrouter-key-buttons">
+          {locked ? <button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void checkKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button>
+            : !keyStatus || keyStatus.state === 'none' || keyStatus.state === 'unreadable' || keyStatus.state === 'unavailable' || editingKey
+              ? <button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void saveKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button>
+              : <><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void checkKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => { setEditingKey(true); setTimeout(() => keyInput.current?.focus(), 0) }}>{aiText('keyReplace')}</button><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void removeKey()}>{aiText('keyRemove')}</button></>}
+        </div>
+        {!locked && <a className="openrouter-key-link" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">{aiText('keyGet')}</a>}
+      </div>
+    </Row>
+    <p className="ai-settings-note">{keyStatus?.state === 'ok' ? `${typeof keyStatus.remainingUsd === 'number' ? aiTextF('keyOk', { label: keyStatus.label || 'OpenRouter', x: keyStatus.remainingUsd.toFixed(2) }) : `${aiText('keyWorks')}${keyStatus.label ? ` · “${keyStatus.label}”` : ''}${keyStatus.remainingUsd === null ? ` · ${aiText('keyNoLimit')}` : ''}`}${keyCheckMs === undefined ? '' : ` · ${(keyCheckMs / 1000).toFixed(1)}s`}` : keyError || keyStatus?.state === 'rejected' ? aiText('keyInvalid') : keyStatus?.state === 'unavailable' ? aiText('keychainUnavailable') : keyStatus?.state === 'unreadable' ? aiText('keyUnreadable') : aiText('keyAdvice')}</p>
+    {keyStatus?.state === 'ok' && <p className="ai-settings-note">{aiText('keyAdvice')}</p>}
+    <Row id="ai-openrouter-transcriptionModel" label={aiText('audioModel')} help={aiText('testQuota')}>
+      <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-transcriptionModel" value={value.openrouterTranscriptionModel} options={audioOptions} groups={groups} allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={audioMissing ? aiTextF('modelMissing', { model: value.openrouterTranscriptionModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => { const picked = audioAll.find(option => option.id === id); const kind = picked?.group === 'stt' || picked?.kind === 'stt' ? 'stt' : 'chat'; change({ openrouterTranscriptionModel: id, openrouterTranscriptionKind: kind, ...(kind === 'chat' && sameModel ? { openrouterTextModel: id } : {}) }) }} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
+        {probeButton('transcription')}
+      </div>
+    </Row>
+    {probeResult('transcription')}
+    <Row id="ai-openrouter-transcriptionEffort" label={aiText('audioEffort')}><span className="settings-select-wrap"><select id="ai-openrouter-transcriptionEffort" data-testid="ai-openrouter-transcriptionEffort" className="settings-select" value={value.transcriptionEffort} onChange={event => change({ transcriptionEffort: event.target.value as AiEffort })}><option value="medium">{aiText('medium')}</option><option value="high">{aiText('high')}</option></select><ChevronDown size={14} aria-hidden="true" /></span></Row>
+    <label className="openrouter-same"><input type="checkbox" checked={sameModel} disabled={!!sttOnly} aria-describedby={sttOnly ? 'ai-openrouter-stt-only' : undefined} onChange={event => change({ openrouterTextModel: event.target.checked ? value.openrouterTranscriptionModel : (textOptions.find(option => option.id !== value.openrouterTranscriptionModel)?.id ?? 'openai/gpt-4o-mini') })} />{aiText('sameModel')}</label>
+    {sttOnly && <p id="ai-openrouter-stt-only" className="ai-settings-note">{aiText('sttOnly')}</p>}
+    <Row id="ai-openrouter-textModel" label={aiText('textModel')} help={aiText('testQuota')}>
+      <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-textModel" value={value.openrouterTextModel} options={textOptions} groups={pickerGroups(['recommended', 'text', 'free'])} allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={textMissing ? aiTextF('modelMissing', { model: value.openrouterTextModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => change({ openrouterTextModel: id })} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
+        {probeButton('text')}
+      </div>
+    </Row>
+    {probeResult('text')}
+    <Row id="ai-openrouter-textEffort" label={aiText('textEffort')}><span className="settings-select-wrap"><select id="ai-openrouter-textEffort" data-testid="ai-openrouter-textEffort" className="settings-select" value={value.textEffort} onChange={event => change({ textEffort: event.target.value as AiEffort })}><option value="low">{aiText('low')}</option><option value="medium">{aiText('medium')}</option><option value="high">{aiText('high')}</option></select><ChevronDown size={14} aria-hidden="true" /></span></Row>
+    {selectOpenRouterPolicy(value, change)}
+    {usage && <p className="ai-settings-note" data-testid="openrouter-usage">{aiTextF('spend', { a: `$${usage.todayUsd.toFixed(2)}`, b: `$${usage.thirtyDayUsd.toFixed(2)}` })}</p>}
+    {(usageUnknown || usage?.transcriptionCostUnknown || usage?.textCostUnknown || (usage?.missingCostCount ?? 0) > 0) && <p className="ai-settings-note">{aiText('spendUnknown')}</p>}
+  </div>
+}
+
+function selectOpenRouterPolicy(value: Configuration, change: (patch: Partial<Configuration>) => void) {
+  return <Row id="ai-openrouter-dataPolicy" label={aiText('dataPolicy')} help={aiText('dataHelp')}><span className="settings-select-wrap"><select id="ai-openrouter-dataPolicy" data-testid="ai-openrouter-dataPolicy" className="settings-select" value={value.openrouterDataPolicy} onChange={event => change({ openrouterDataPolicy: event.target.value as Configuration['openrouterDataPolicy'] })}><option value="deny">{aiText('dataDeny')}</option><option value="zdr">{aiText('dataZdr')}</option><option value="any">{aiText('dataAny')}</option></select><ChevronDown size={14} aria-hidden="true" /></span></Row>
+}
+
 /** One line for what runs now; a second line only while different saved settings wait for a restart no launch variable blocks. */
 export function AiStatus({ preferences, busy, dirty, restart }: { preferences: AiPreferences; busy: 'save' | 'check' | 'restart' | null; dirty: boolean; restart(): void }) {
   const { active, saved, restartRequired, locked } = preferences
@@ -190,6 +312,7 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
   const [notice, setNotice] = useState<AiCopyKey>()
   const [failed, setFailed] = useState(false)
   const [check, setCheck] = useState<AiCheck>()
+  const [aiProblem, setAiProblem] = useState<import('../../../shared/ai').AiProblemEvent | null>(null)
   const accept = useCallback((next: AiPreferences) => { setPreferences(next); setDraft(next.saved); onPreferences?.(next) }, [onPreferences])
   const load = useCallback(async () => {
     setFailed(false); setNotice(undefined)
@@ -197,6 +320,7 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
     catch { setFailed(true); setNotice('loadFailed') }
   }, [accept])
   useEffect(() => { void load() }, [load])
+  useEffect(() => window.yogurt.ai.onProblem(problem => setAiProblem(problem.code ? problem : null)), [])
   const change = (patch: Partial<Configuration>) => { setDraft(previous => previous && { ...previous, ...patch }); setNotice(undefined); setCheck(undefined); setFailed(false) }
   const valid = draft && validAiSettings(draft)
   const dirty = !!draft && !!preferences && !same(draft, preferences.saved)
@@ -232,6 +356,7 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
       {failed && <div className="ai-settings-actions"><button type="button" className="workspace-button" onClick={() => void load()}>{aiText('retry')}</button></div>}
     </div> : <form className="settings-group ai-settings-form" onSubmit={e => { e.preventDefault(); void save() }}>
       <AiStatus preferences={preferences} busy={busy} dirty={dirty} restart={() => void restart()} />
+      {aiProblem && <p className="ai-settings-status" data-testid="ai-openrouter-problem" role="alert">{aiProblemText(aiProblem.code!, aiProblem.model)}</p>}
       <fieldset disabled={!!busy}>
         <AiSettingsFields value={draft} change={change} locked={preferences.locked} />
         {!valid && <p className="ai-settings-status" role="alert" data-error="true">{aiText('invalid')}</p>}

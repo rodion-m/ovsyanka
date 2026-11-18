@@ -172,7 +172,7 @@ export function Settings({ revision = 0, focus }: { revision?: number; focus?: s
 
           <p className="settings-privacy" data-testid="settings-ai-privacy"><Lock size={12} aria-hidden="true" />{ai?.active.backend === 'local'
             ? osWords({ mac: t('Your meetings, notes and audio stay on this Mac.'), other: t('Your meetings, notes and audio stay on this computer.') })
-            : aiText(ai ? 'privacySubscription' : 'privacyUnknown')}</p>
+            : ai?.active.backend === 'openrouter' ? aiText('privacyOpenRouter') : aiText(ai ? 'privacySubscription' : 'privacyUnknown')}</p>
         </div>
       </div>
     </div>

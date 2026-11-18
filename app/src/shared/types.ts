@@ -36,18 +36,19 @@ export type YogurtApi = {
     save(settings: import('./ai').AiSettings): Promise<import('./ai').AiPreferences>
     /** Availability/version only: no model call or account verification. */
     check(settings: import('./ai').AiSettings): Promise<import('./ai').AiCheck>
-    options(request: { backend: 'agy' | 'porch'; refresh?: boolean; agyPath?: string; porchPath?: string }): Promise<import('./aiCatalog').AiOptions>
-    /** Current transcription problem; code null clears it after a later successful request. */
-    onProblem(cb: (problem: AiProblemEvent) => void): () => void
-    /** Current problem for a note opened after the event was first emitted. */
-    problemState(meetingId: string): Promise<AiProblemEvent | null>
+    options(request: { backend: 'agy' | 'porch' | 'openrouter'; refresh?: boolean; agyPath?: string; porchPath?: string }): Promise<import('./aiCatalog').AiOptions>
     openrouter: {
       keyStatus(): Promise<import('./ai').AiKeyStatus>
       setKey(key: string): Promise<import('./ai').AiKeyStatus>
       clearKey(): Promise<import('./ai').AiKeyStatus>
       checkKey(): Promise<import('./ai').AiKeyStatus>
       usage(): Promise<import('./ai').AiUsage>
+      probe(settings: import('./ai').AiSettings, task: 'text' | 'transcription'): Promise<import('./ai').AiProbeResult>
     }
+    /** Current transcription problem; code null clears it after a later successful request. */
+    onProblem(cb: (problem: AiProblemEvent) => void): () => void
+    /** Current problem for a note opened after the event was first emitted. */
+    problemState(meetingId: string): Promise<AiProblemEvent | null>
     /** False while recording, transcription or other work prevents a safe restart. */
     restart(): Promise<boolean>
   }

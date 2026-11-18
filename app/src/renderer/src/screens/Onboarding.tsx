@@ -19,10 +19,11 @@ import { aiText } from '../components/aiCopy'
 export function Onboarding({ state, plan, onDone }: { state: SetupState; plan: OnboardingPlan; onDone(): void }) {
   // The default fork uses a provider. Avoid a local-only privacy promise while preferences are loading.
   const [subscription, setSubscription] = useState(true)
+  const [openrouter, setOpenrouter] = useState(false)
   useEffect(() => {
     let current = true
     void Promise.resolve().then(() => window.yogurt.ai.get()).then(p => {
-      if (current) setSubscription(p.active.backend !== 'local')
+      if (current) { setSubscription(p.active.backend !== 'local'); setOpenrouter(p.active.backend === 'openrouter') }
     }).catch(() => {})
     return () => { current = false }
   }, [])
@@ -41,7 +42,7 @@ export function Onboarding({ state, plan, onDone }: { state: SetupState; plan: O
   const progress = { n: stage === 'intro' ? 0 : first + i, total: first + screens.length }
   return (
     <div data-testid="onboarding" data-phase={state.phase} data-stage={stage} className="setup-screen">
-      {stage === 'intro' ? <Welcome state={state} progress={progress} onDone={introDone} subscription={subscription} />
+      {stage === 'intro' ? <Welcome state={state} progress={progress} onDone={introDone} subscription={subscription} openrouter={openrouter} />
         : stage === 'steps' && screen ? <PermissionScreen key={screen.id} screen={screen} state={state} progress={progress} onNext={next} subscription={subscription} />
           : <Ready state={state} subscription={subscription} />}
     </div>
@@ -99,13 +100,13 @@ function useFocus(ref: RefObject<HTMLButtonElement | null>, deps: unknown[]) {
 }
 
 /** What Yogurt is, in the website's words */
-function Welcome({ state, progress, onDone, subscription }: { state: SetupState; progress: Progress; onDone(): void; subscription: boolean }) {
+function Welcome({ state, progress, onDone, subscription, openrouter }: { state: SetupState; progress: Progress; onDone(): void; subscription: boolean; openrouter: boolean }) {
   const c = screenCopy('welcome', subscription)
   const primary = useRef<HTMLButtonElement>(null)
   useFocus(primary, [])
   return (
     <Layout
-      testId="intro-page" step="welcome" motionKey="welcome" art={<WelcomeArt />} title={c.title} text={c.text} progress={progress} state={state} subscription={subscription}
+      testId="intro-page" step="welcome" motionKey="welcome" art={<WelcomeArt />} title={c.title} text={openrouter ? aiText('privacyOpenRouter') : c.text} progress={progress} state={state} subscription={subscription}
       actions={<button ref={primary} data-testid="intro-next" onClick={onDone} className="ob-button primary no-drag">{t('Get started')}</button>}
     />
   )

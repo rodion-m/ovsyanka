@@ -26,6 +26,7 @@ const api: YogurtApi = {
       clearKey: () => ipcRenderer.invoke('ai.openrouter.clearKey'),
       checkKey: () => ipcRenderer.invoke('ai.openrouter.checkKey'),
       usage: () => ipcRenderer.invoke('ai.openrouter.usage'),
+      probe: (settings, task) => ipcRenderer.invoke('ai.openrouter.probe', settings, task),
     },
   },
   setup: {

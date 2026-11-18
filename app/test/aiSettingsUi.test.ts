@@ -70,10 +70,21 @@ describe('AI settings fields', () => {
   it('labels an OpenRouter locked backend and summarizes its OpenRouter transcription model', () => {
     const locked = { backend: { variable: 'YOGURT_AI_BACKEND', value: 'openrouter' } }
     const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend: 'openrouter' }), change() {}, locked }))
-    expect(html).toContain('OpenRouter model and key controls are configured in stage 6.')
+    expect(html).toContain('ai-openrouter-transcriptionModel')
+    expect(html).toContain('Same model for summaries and questions')
     expect(html).not.toContain('id="ai-transcriptionModel"')
     expect(html).not.toContain('id="ai-transcriptionEffort"')
     expect(status(prefs({ active: aiSettings({ backend: 'openrouter' }) }))).toContain('OpenRouter · google/gemini-3.8-flash')
+  })
+
+  it('locks an environment-provided OpenRouter key and reveals only its tail', () => {
+    const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend: 'openrouter' }), change() {}, locked: {
+      openrouterKey: { variable: 'YOGURT_OPENROUTER_API_KEY', value: '789a' },
+    } }))
+    expect(html).toContain('Set at launch by YOGURT_OPENROUTER_API_KEY. It can&#x27;t be changed here.')
+    expect(html).toContain('sk-or-v1-••••••••')
+    expect(html).toContain('readOnly=""')
+    expect(html).not.toContain('789a')
   })
 
   it('hides the inactive local output-language override without changing the saved provider value', () => {

@@ -31,3 +31,7 @@ it("only Windows and Linux carry the speed check's clip: a Mac never times its s
 it('the Linux build starts through the launcher that picks X11 on Wayland (#8)', () => {
   expect(config).toMatch(/^afterPack: scripts\/linux-launcher\.cjs$/m)
 })
+
+it('ships the short OpenRouter transcription probe outside the application archive', () => {
+  expect(config).toContain('from: resources/openrouter-test.wav\n    to: openrouter-test.wav')
+})

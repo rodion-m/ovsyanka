@@ -4,7 +4,7 @@ export type { AiProblemCode, OpenRouterAudioKind } from './ai'
 // ---- OpenRouter catalog types and pure functions ----
 
 /** Labels used by the model picker. Keep the OpenRouter vocabulary separate from agy entries. */
-export type AiHint = 'audio' | 'verified' | 'fast' | 'cheap' | 'free' | 'tokens' | 'expiring' | 'unavailable'
+export type AiHint = 'audio' | 'verified' | 'fast' | 'cheap' | 'free' | 'tokens' | 'expiring' | 'experimental' | 'unavailable'
 
 export type AiOption = {
   id: string
