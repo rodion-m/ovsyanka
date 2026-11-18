@@ -154,7 +154,8 @@ describe('AI settings fields', () => {
   })
 
   it('shows actionable remote transcription problems in Russian and English across locale fallback', () => {
-    expect(aiProblemText('credits', undefined, 'en')).toContain('Add credits, then press Retry')
+    expect(aiProblemText('credits', undefined, 'en')).toContain('Add credits')
+    expect(aiProblemText('credits', undefined, 'en')).toContain('Yogurt will continue by itself')
     expect(aiProblemText('no-key', undefined, 'ru')).toContain('Добавьте API-ключ OpenRouter')
     expect(aiProblemText('model-gone', 'vendor/model', 'ru')).toContain('vendor/model')
     expect(aiProblemText('auth', undefined, 'de')).toContain('OpenRouter rejected the key')

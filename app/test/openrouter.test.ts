@@ -86,7 +86,7 @@ describe('OpenRouter text adapter', () => {
   it('omits optional parameters when the cached model does not advertise them and omits provider for any policy', async () => {
     let body!: Record<string, unknown>
     const fetch: OpenRouterKeyFetch = async (_url, init) => { body = JSON.parse(String(init?.body)); return answer({ choices: [{ message: { content: 'done' } }] }) }
-    const adapter = createOpenRouter({ settings: settings({ openrouterDataPolicy: 'any', textEffort: 'high' }), key: key(), fetch, lookupModel: async () => model({ supported_parameters: [], reasoning: undefined }) })
+    const adapter = createOpenRouter({ settings: settings({ openrouterTextModel: 'acme/no-optional-parameters', openrouterDataPolicy: 'any', textEffort: 'high' }), key: key(), fetch, lookupModel: async () => model({ id: 'acme/no-optional-parameters', supported_parameters: [], reasoning: undefined }) })
     await expect(adapter.text('plain', signal())).resolves.toBe('done')
     expect(body.provider).toBeUndefined()
     expect(body.reasoning).toBeUndefined()

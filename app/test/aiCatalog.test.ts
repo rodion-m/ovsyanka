@@ -36,6 +36,7 @@ function rawModel(overrides: Record<string, unknown> = {}): Record<string, unkno
     endpoints: ['/api/v1/chat/completions'],
     pricing: { prompt: '0.000001', completion: '0.000002', audio: '0.000001' },
     context_length: 32_000,
+    top_provider: { max_completion_tokens: 48_000 },
     supported_parameters: ['structured_outputs'],
     reasoning: { supported_efforts: ['low', 'medium', 'high'] },
     expiration_date: null,

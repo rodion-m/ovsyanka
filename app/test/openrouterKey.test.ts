@@ -141,10 +141,16 @@ describe('OpenRouter key storage', () => {
 
     vi.useFakeTimers()
     try {
-      const hanging = createOpenRouterKeyStore({ userData: await root(), safeStorage: storage(), fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
-      }) })
+      let requestStarted!: () => void
+      const started = new Promise<void>(resolve => { requestStarted = resolve })
+      const hanging = createOpenRouterKeyStore({ userData: await root(), safeStorage: storage(), fetch: async (_url, init) => {
+        requestStarted()
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+        })
+      } })
       const saved = hanging.set(KEY)
+      await started
       await vi.advanceTimersByTimeAsync(15_000)
       await expect(saved).resolves.toMatchObject({ state: 'unchecked', problem: 'timeout' })
       expect(await hanging.read()).toBe(KEY)

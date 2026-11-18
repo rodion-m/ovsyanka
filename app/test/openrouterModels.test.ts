@@ -9,6 +9,7 @@ import {
   OPENROUTER_MODELS_TIMEOUT_MS,
   OPENROUTER_MODELS_URL,
   OPENROUTER_TRANSCRIPTION_MODELS_URL,
+  validatedOpenRouterModelsCache,
   type OpenRouterFetch,
   type OpenRouterModelsCache,
 } from '../src/main/harness/openrouterModels'
@@ -56,6 +57,12 @@ async function nextTurn(): Promise<void> {
 }
 
 describe('OpenRouter model cache and network boundary', () => {
+  it('rejects stale capability data by default but can retain it for picker refreshes', () => {
+    const stale = seedCache(nowOnSnapshotDate - OPENROUTER_MODELS_FRESHNESS_MS - 1)
+    expect(validatedOpenRouterModelsCache(stale, nowOnSnapshotDate)).toBeUndefined()
+    expect(validatedOpenRouterModelsCache(stale, nowOnSnapshotDate, { allowStale: true })).toMatchObject({ fetchedAt: stale.fetchedAt })
+  })
+
   it('uses a fresh real cache file without making either network request', async () => {
     const userData = await root()
     const fetchedAt = nowOnSnapshotDate

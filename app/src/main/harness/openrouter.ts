@@ -59,7 +59,7 @@ function stringValue(value: unknown): string | undefined {
 
 function safeDiagnostic(value: unknown, key?: string): string | undefined {
   const text = stringValue(value)
-  if (!text || text.length > 120 || !/^[A-Za-z0-9_.:-]+$/.test(text)) return undefined
+  if (!text || text.length > 120 || !/^[A-Za-z0-9_./:-]+$/.test(text)) return undefined
   if (key && key.length >= 8) for (let i = 0; i <= key.length - 8; i++) if (text.includes(key.slice(i, i + 8))) return undefined
   return text
 }
