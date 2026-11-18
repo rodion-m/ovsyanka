@@ -9,6 +9,7 @@ import type { RecordingStart } from './meeting'
 import { createCrashPolicy } from './crashPolicy'
 import { helperFile } from '../shared/platform'
 import type { AiProblemEvent } from '../shared/ai'
+import { childEnvironment } from './childEnv'
 
 /**
  * Recording a meeting: yogurt-audio writes me.m4a and them.m4a (Windows and Linux: me.ogg and them.ogg, Ogg Opus) into the meeting's folder and streams
@@ -215,7 +216,7 @@ export function startCapture(meetingDir: string, o?: CaptureOpts): Capture {
   mkdirSync(meetingDir, { recursive: true })
   if (isFake()) return new Capture(fakeCaptureProc(meetingDir, o?.startMs ?? 0, { speech: !!o?.speech, part: o?.part, mic: o?.mic }), { startMs: o?.startMs })
   // straight from Yogurt, never through a shell: Windows leaves the helper's parent's process tree (Yogurt) out of the call audio
-  const child = spawn(audioHelperPath(), captureArgs(meetingDir, o), { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+  const child = spawn(audioHelperPath(), captureArgs(meetingDir, o), { env: childEnvironment(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
   child.stderr.on('data', (d: Buffer) => console.info('yogurt-audio:', d.toString().trim()))
   // a missing or broken helper is a crash, not an exception in the main process
   child.on('error', (e) => { console.error('yogurt-audio failed to start', e); child.emit('exit', null, null) })
@@ -226,7 +227,7 @@ export function startCapture(meetingDir: string, o?: CaptureOpts): Capture {
 export function joinParts(meetingDir: string): Promise<void> {
   if (isFake()) { joinFakeParts(meetingDir); return Promise.resolve() }
   return new Promise((resolve, reject) => {
-    const child = spawn(audioHelperPath(), ['join', '--dir', meetingDir], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+    const child = spawn(audioHelperPath(), ['join', '--dir', meetingDir], { env: childEnvironment(), stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
     child.stderr.on('data', (d: Buffer) => console.info('yogurt-audio join:', d.toString().trim()))
     child.on('error', reject)
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`yogurt-audio join exited with ${code}`))))
@@ -238,7 +239,7 @@ export async function prepareAppend(meetingDir: string): Promise<{ part: number;
   mkdirSync(meetingDir, { recursive: true })
   await joinParts(meetingDir)
   const durationMs = isFake() ? fakeAudioDuration(meetingDir) : await new Promise<number>((resolve, reject) => {
-    execFile(audioHelperPath(), ['inspect', '--dir', meetingDir], { timeout: 15_000, maxBuffer: 16_384, windowsHide: true }, (error, stdout) => {
+    execFile(audioHelperPath(), ['inspect', '--dir', meetingDir], { env: childEnvironment(), timeout: 15_000, maxBuffer: 16_384, windowsHide: true }, (error, stdout) => {
       if (error) { reject(error); return }
       try {
         const value = JSON.parse(stdout).durationMs

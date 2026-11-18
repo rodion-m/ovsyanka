@@ -7,6 +7,7 @@ import { hasTrayHost, nextTrayEvent, trayItems, trayLook, type TrayItem } from '
 import { onLanguage, t } from '../shared/i18n'
 import { onRecordingEvent, recordingPaused } from './capture'
 import type { CalEvent } from './calendar'
+import { childEnvironment } from './childEnv'
 
 function iconPath(name = 'tray'): string {
   const candidates = [
@@ -19,7 +20,7 @@ function iconPath(name = 'tray'): string {
 /** Linux: is there a tray (a StatusNotifier host) to show the icon in? GNOME has one only with its AppIndicator extension. */
 export const linuxTrayHost = (): Promise<boolean> => new Promise((done) => {
   execFile('dbus-send', ['--session', '--print-reply', '--dest=org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus.NameHasOwner', 'string:org.kde.StatusNotifierWatcher'],
-    { timeout: 3000 }, (error, stdout) => done(!error && hasTrayHost(stdout)))
+    { env: childEnvironment(), timeout: 3000 }, (error, stdout) => done(!error && hasTrayHost(stdout)))
 })
 
 /**

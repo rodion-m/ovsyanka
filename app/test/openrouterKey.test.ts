@@ -124,6 +124,33 @@ describe('OpenRouter key storage', () => {
     expect(await labeled.set(KEY)).not.toHaveProperty('label')
   })
 
+  it('saves an unchecked key when verification returns an unreadable success body', async () => {
+    const userData = await root()
+    const store = createOpenRouterKeyStore({ userData, safeStorage: storage(), fetch: async () => new Response('not-json', { status: 200 }) })
+    expect(await store.set(KEY)).toMatchObject({ state: 'unchecked', problem: 'bad-response' })
+    expect(await store.read()).toBe(KEY)
+  })
+
+  it('saves an encrypted unchecked key when /key rejects or hangs, and reports no-key as none', async () => {
+    const userData = await root()
+    const rejected = createOpenRouterKeyStore({ userData, safeStorage: storage(), fetch: async () => { throw new Error('offline') } })
+    expect(await rejected.set(KEY)).toMatchObject({ state: 'unchecked', problem: 'network' })
+    expect(await rejected.check()).toMatchObject({ state: 'unchecked', problem: 'network' })
+    const missing = createOpenRouterKeyStore({ userData: await root(), safeStorage: storage(), fetch: vi.fn() })
+    expect(await missing.check()).toEqual({ state: 'none' })
+
+    vi.useFakeTimers()
+    try {
+      const hanging = createOpenRouterKeyStore({ userData: await root(), safeStorage: storage(), fetch: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+      }) })
+      const saved = hanging.set(KEY)
+      await vi.advanceTimersByTimeAsync(15_000)
+      await expect(saved).resolves.toMatchObject({ state: 'unchecked', problem: 'timeout' })
+      expect(await hanging.read()).toBe(KEY)
+    } finally { vi.useRealTimers() }
+  })
+
   it('passes the key-leak sentinel through save, check, 401, 500 and IPC-shaped responses', async () => {
     const userData = await root()
     const bodies = [

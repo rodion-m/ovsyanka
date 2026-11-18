@@ -1,6 +1,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import type { EngineEvent, EngineMessage, EngineRequest } from '../shared/engine-protocol'
 import type { GpuProbe } from './hardware'
+import { childEnvironment } from './childEnv'
 
 export class InsufficientMemoryError extends Error { name = 'InsufficientMemoryError' }
 /** Windows and Linux: the graphics card took too long (or crashed), so the engine starts again without it; try once more */
@@ -92,7 +93,9 @@ export class UtilityEngine implements Engine {
 
   private ensure(): UtilityProcess {
     if (this.proc) return this.proc
-    const proc = utilityProcess.fork(this.workerPath, [], { serviceName: 'Yogurt Notes', ...(this.cpuOnly ? { env: { ...process.env, YOGURT_ENGINE_GPU: 'off' } } : {}) })
+    const env = childEnvironment()
+    if (this.cpuOnly) env.YOGURT_ENGINE_GPU = 'off'
+    const proc = utilityProcess.fork(this.workerPath, [], { serviceName: 'Yogurt Notes', env })
     this.loaded = false
     proc.on('message', (e: EngineEvent) => {
       const p = this.pending.get(e.id)

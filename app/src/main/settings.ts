@@ -65,6 +65,8 @@ export const autoUpdateOn = (s: Settings): boolean => s.autoUpdate !== false
 export function consumeOpenRouterKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const value = env.YOGURT_OPENROUTER_API_KEY
   delete env.YOGURT_OPENROUTER_API_KEY
+  // It is not an accepted key source, and must not be inherited by Electron relaunches.
+  delete env.OPENROUTER_API_KEY
   return typeof value === 'string' && value.length ? value : undefined
 }
 

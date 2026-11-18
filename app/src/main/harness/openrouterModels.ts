@@ -51,10 +51,11 @@ function finiteTime(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
-function cacheModels(value: unknown): OpenRouterModelsCache | undefined {
+export function validatedOpenRouterModelsCache(value: unknown, now = Date.now()): OpenRouterModelsCache | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const raw = value as Record<string, unknown>
   if (raw.schema !== OPENROUTER_MODELS_CACHE_SCHEMA || !finiteTime(raw.fetchedAt)) return undefined
+  if (raw.fetchedAt > now || now - raw.fetchedAt > OPENROUTER_MODELS_FRESHNESS_MS) return undefined
   const text = Array.isArray(raw.text)
     ? raw.text.map(model => normalizeOpenRouterResponse({ data: [model] })[0]).filter((model): model is OpenRouterModel => !!model)
     : []
@@ -109,7 +110,7 @@ export class OpenRouterModels {
   private async readCache(): Promise<OpenRouterModelsCache | undefined> {
     try {
       const body = JSON.parse(await readFile(this.cachePath, 'utf8')) as unknown
-      return cacheModels(body)
+      return validatedOpenRouterModelsCache(body, this.now())
     } catch {
       return undefined
     }

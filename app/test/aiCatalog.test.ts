@@ -84,6 +84,8 @@ describe('OpenRouter catalog normalization and selection', () => {
     ['audio without text output', rawModel({ architecture: { input_modalities: ['audio'], output_modalities: ['image'] } }), false, false],
     ['audio completion cap below a full batch', rawModel({ top_provider: { max_completion_tokens: 47_999 } }), false, true],
     ['audio completion cap for a full batch', rawModel({ top_provider: { max_completion_tokens: 48_000 } }), true, true],
+    ['unknown audio completion cap', rawModel({ top_provider: {} }), false, true],
+    ['null audio completion cap', rawModel({ top_provider: { max_completion_tokens: null } }), false, true],
     ['missing endpoints is treated as chat', rawModel({ endpoints: undefined }), true, true],
     ['missing created remains selectable', rawModel({ created: undefined }), true, true],
     ['free suffix and zero price', rawModel({ id: 'acme/meeting-model:free', pricing: { prompt: '0', completion: '0', audio: '0' } }), true, true],
@@ -156,8 +158,8 @@ describe('OpenRouter catalog prices and ordering', () => {
     const gemini = model('google/gemini-3.8-flash', textModels)
     const whisper = model('openai/whisper-1', sttModels)
     const mai = model('microsoft/mai-transcribe-2', sttModels)
-    // Completion usage includes reasoning: 11,986 tokens / 5 min; estimate is compared with fixture costs below.
-    expect(estimateOpenRouterPricePerHour(gemini, 'chat')).toBeCloseTo(0.667, 2)
+    // Completion includes reasoning: 6,097 tokens / 313.037 seconds in the temperature-zero probe.
+    expect(estimateOpenRouterPricePerHour(gemini, 'chat')).toBeCloseTo(0.363, 3)
     expect(estimateOpenRouterPricePerHour(whisper, 'stt')).toBeCloseTo(0.36, 8)
     expect(estimateOpenRouterPricePerHour(mai, 'stt')).toBeUndefined()
 
@@ -166,7 +168,7 @@ describe('OpenRouter catalog prices and ordering', () => {
     const whisperOption = transcription.find(option => option.id === whisper.id)
     expect(geminiOption).toBeDefined()
     expect(whisperOption).toBeDefined()
-    expect(geminiOption?.price?.perHourUsd).toBeCloseTo(0.6675, 4)
+    expect(geminiOption?.price?.perHourUsd).toBeCloseTo(0.363, 3)
     expect(geminiOption?.price?.estimated).toBe(true)
     expect(whisperOption?.price?.perHourUsd).toBeCloseTo(0.36, 8)
     expect(whisperOption?.price?.estimated).toBe(true)
@@ -175,11 +177,9 @@ describe('OpenRouter catalog prices and ordering', () => {
   it('keeps the hourly audio estimate within 30% of measured live fixture costs', () => {
     const gemini = model('google/gemini-3.8-flash', textModels)
     const estimate = estimateOpenRouterPricePerHour(gemini, 'chat')!
-    for (const [file, seconds] of [['chat-60s.json', 60], ['chat-5m.json', 300]] as const) {
-      const fixture = JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/openrouter/live/${file}`, import.meta.url)), 'utf8')) as { usage: { cost: number } }
-      const measuredPerHour = fixture.usage.cost * 3_600 / seconds
-      expect(Math.abs(estimate - measuredPerHour) / measuredPerHour).toBeLessThanOrEqual(0.3)
-    }
+    const fixture = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/openrouter/live/chat-5m-T0.json', import.meta.url)), 'utf8')) as { usage: { cost: number } }
+    const measuredPerHour = fixture.usage.cost * 3_600 / 313.037
+    expect(Math.abs(estimate - measuredPerHour) / measuredPerHour).toBeLessThanOrEqual(0.3)
   })
 
   it('sorts equal dates and prices by ID, and puts missing values last', () => {

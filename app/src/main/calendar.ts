@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { helperFile } from '../shared/platform'
 import type { Person } from './store'
 import { noteOwnEmail } from './vocab'
+import { childEnvironment } from './childEnv'
 
 /** One meeting on the calendar, times in ms */
 export type CalEvent = { id: string; title: string; start: number; end: number; attendees: Person[]; url: string | null; calendar?: CalendarSource; aliases?: string[] }
@@ -30,7 +31,7 @@ export function helperPath(): string {
 export function createHelperRunner(path: () => string) {
   const running = new Set<ChildProcess>()
   const run: Helper = (args) => new Promise((resolve, reject) => {
-    const child = execFile(path(), args, { timeout: 150_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+    const child = execFile(path(), args, { env: childEnvironment(), timeout: 150_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       running.delete(child)
       if (err) return reject(new Error(stderr.trim() || err.message))
       try { resolve(JSON.parse(stdout)) } catch { reject(new Error('The Mac helper gave an answer Yogurt could not read.')) }

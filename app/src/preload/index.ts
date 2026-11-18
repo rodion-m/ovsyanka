@@ -18,7 +18,7 @@ const api: YogurtApi = {
       ipcRenderer.on('ai:problem', on)
       return () => { ipcRenderer.removeListener('ai:problem', on) }
     },
-    problemState: () => ipcRenderer.invoke('ai:problem-state'),
+    problemState: (meetingId: string) => ipcRenderer.invoke('ai:problem-state', meetingId),
     restart: () => ipcRenderer.invoke('ai:restart'),
     openrouter: {
       keyStatus: () => ipcRenderer.invoke('ai.openrouter.keyStatus'),

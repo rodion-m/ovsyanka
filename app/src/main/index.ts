@@ -58,7 +58,7 @@ import { macFullName } from './user'
 import { setJargon, setOwnerName } from './vocab'
 import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
-import type { AiProblemEvent } from '../shared/ai'
+import { AiProblemState } from './aiProblems'
 import { installAppMenu } from './appMenu'
 import { UtilityEngine } from './engine'
 import { createNotesModel } from './notes/model'
@@ -100,7 +100,8 @@ logToFile(join(userDataDir(), 'logs', 'main.log'))
 process.on('unhandledRejection', (err) => console.error('unhandled rejection', err))
 process.on('uncaughtException', (err) => console.error('uncaught exception', err))
 
-// Consume the developer-only key before any relaunch or child process can inherit it.
+// Consume the developer-only key before any relaunch or child process can inherit it. It is
+// deliberately single-launch: in-app relaunches do not carry either OpenRouter env key forward.
 const launchOpenRouterKey = consumeOpenRouterKey()
 
 // Linux on Wayland: once more through XWayland, so the widget and the card can float (display.ts)
@@ -570,6 +571,9 @@ app.whenReady().then(() => {
     app.relaunch(relaunchOptions(process.platform, app.isPackaged, process.execPath, process.env.APPIMAGE))
     app.quit()
     return true
+  }, onAiConfigChanged: async () => {
+    const meetings = meetingsWithSpool(join(userDataDir(), 'meetings'))
+    await Promise.all(meetings.map(id => recoverTranscription(id)))
   } })
   setCalendarSelection(() => loadSettings(settingsFile).hiddenCalendarIds ?? [])
   const me = () => loadSettings(settingsFile).myName?.trim() || macName()
@@ -586,8 +590,14 @@ app.whenReady().then(() => {
   callNamesRef = callNames
   // Windows and Linux: whisper left the graphics card in a meeting, so the speed check (timed with it) runs again next start
   onWhisperGpuOff(() => speedStore(speedFile()).forget())
-  let currentAiProblem: AiProblemEvent | null = null
-  ipcMain.handle('ai:problem-state', () => currentAiProblem)
+  const currentAiProblems = new AiProblemState()
+  ipcMain.handle('ai:problem-state', (_e, meetingId: unknown) => typeof meetingId === 'string' ? currentAiProblems.forMeeting(meetingId) : null)
+  onMeetingStart(meeting => {
+    for (const event of currentAiProblems.reset(meeting.id)) {
+      if (win && !win.isDestroyed()) win.webContents.send('ai:problem', event)
+      tell({ t: 'ai-problem', problem: event })
+    }
+  })
   hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
     const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
     const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
@@ -602,10 +612,9 @@ app.whenReady().then(() => {
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
     aiProblem: (problem) => {
-      if (!problem && !currentAiProblem) return
-      const event: AiProblemEvent = problem ? { ...problem, at: Date.now() } : { code: null, at: Date.now() }
-      currentAiProblem = problem ? event : null
-      win?.webContents.send('ai:problem', event)
+      const event = currentAiProblems.update(problem)
+      if (!event) return
+      if (win && !win.isDestroyed()) win.webContents.send('ai:problem', event)
       tell({ t: 'ai-problem', problem: event })
     },
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, firstBatchMs: 60_000, maxQueuedMs: 15 * 60_000 } : {}),

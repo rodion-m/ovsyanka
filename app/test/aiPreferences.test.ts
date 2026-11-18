@@ -25,11 +25,39 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('AI preferences IPC', () => {
+  it('triggers spool recovery after settings save and a saved unchecked key', async () => {
+    const resumed = vi.fn()
+    const openrouter = {
+      status: vi.fn(async () => ({ state: 'none' as const })), check: vi.fn(async () => ({ state: 'none' as const })),
+      set: vi.fn(async () => ({ state: 'unchecked' as const, source: 'keychain' as const, last4: 'abcd', problem: 'network' as const })),
+      clear: vi.fn(async () => ({ state: 'none' as const })),
+    }
+    hookAiPreferences({ file, active, restart, check, env: {}, openrouter, onAiConfigChanged: resumed })
+    call('ai:save', aiSettings({ backend: 'openrouter' }))
+    expect(resumed).toHaveBeenCalledOnce()
+    await call('ai.openrouter.setKey', `sk-or-v1-${'abcdef0123456789'.repeat(4)}`)
+    expect(resumed).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns a saved unchecked key even when background recovery rejects', async () => {
+    const originalError = console.error
+    console.error = vi.fn()
+    try {
+      const openrouter = {
+        status: vi.fn(async () => ({ state: 'none' as const })), check: vi.fn(async () => ({ state: 'none' as const })),
+        set: vi.fn(async () => ({ state: 'unchecked' as const, source: 'keychain' as const, last4: 'abcd', problem: 'network' as const })),
+        clear: vi.fn(async () => ({ state: 'none' as const })),
+      }
+      hookAiPreferences({ file, active, restart, check, env: {}, openrouter, onAiConfigChanged: async () => { throw new Error('offline') } })
+      await expect(call('ai.openrouter.setKey', 'key')).resolves.toMatchObject({ state: 'unchecked', problem: 'network' })
+    } finally { console.error = originalError }
+  })
+
   it('accepts OpenRouter settings and validates model IDs without reading a generic API-key variable', () => {
     const env = { YOGURT_AI_BACKEND: 'openrouter', YOGURT_OPENROUTER_API_KEY: 'launch-only', OPENROUTER_API_KEY: 'must-not-be-read' }
     expect(consumeOpenRouterKey(env)).toBe('launch-only')
     expect(env.YOGURT_OPENROUTER_API_KEY).toBeUndefined()
-    expect(env.OPENROUTER_API_KEY).toBe('must-not-be-read')
+    expect(env.OPENROUTER_API_KEY).toBeUndefined()
     expect(configuredAi({}, env).backend).toBe('openrouter')
     const value = aiSettings({ backend: 'openrouter', openrouterTextModel: 'vendor/model:reasoning' })
     expect(value.openrouterTextModel).toBe('vendor/model:reasoning')
@@ -44,7 +72,7 @@ describe('AI preferences IPC', () => {
       set: vi.fn(async () => ({ state: 'rejected' as const, source: 'keychain' as const, last4: fakeKey.slice(-4), problem: 'auth' as const })),
       clear: vi.fn(async () => ({ state: 'none' as const })),
     }
-    const usage = { summary: vi.fn(async () => ({ todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, costUnknown: false, missingCostCount: 0 })) }
+    const usage = { summary: vi.fn(async () => ({ todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, transcriptionCostUnknown: false, textCostUnknown: false, missingCostCount: 0 })) }
     hookAiPreferences({ file, active: aiSettings({ backend: 'openrouter' }), restart, check, env: {}, openrouterKey: fakeKey, openrouter, usage })
     expect(call<AiPreferences>('ai:get').locked).toEqual({ openrouterKey: { variable: 'YOGURT_OPENROUTER_API_KEY', value: fakeKey.slice(-4) } })
     for (const response of [await call('ai.openrouter.keyStatus'), await call('ai.openrouter.setKey', fakeKey), await call('ai.openrouter.checkKey'), await call('ai.openrouter.clearKey'), await call('ai.openrouter.usage')]) {

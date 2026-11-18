@@ -153,18 +153,20 @@ export class OpenRouterKeyStore {
       throw new HarnessError('Could not reach OpenRouter to check the key.', 'network')
     }
     let body: unknown = undefined
-    try { body = await response.json() as unknown } catch { /* the status below is enough for rejection */ }
+    let unreadableBody = false
+    try { body = await response.json() as unknown } catch { unreadableBody = responseOk(response) }
     finally { clearTimeout(timer); signal?.removeEventListener('abort', relay) }
     if (timedOut) throw new HarnessError('OpenRouter key check timed out.', 'timeout')
+    if (unreadableBody) throw new HarnessError('OpenRouter returned an unreadable key-check response.', 'bad-response')
     return { status: response.status, response, body }
   }
 
   private async verify(key: string, signal?: AbortSignal): Promise<{ status: AiKeyStatus; accepted: boolean }> {
     const result = await this.request(key, signal)
     if (!responseOk(result.response)) {
-      const transient = result.status === 408 || result.status === 429 || result.status >= 500
-      const problem = result.status === 401 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : transient ? 'unavailable' : 'bad-response'
-      return { status: statusFor('keychain', key, {}, transient ? 'unchecked' : 'rejected', problem), accepted: transient }
+      const problem = result.status === 401 || result.status === 403 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : result.status >= 500 ? 'unavailable' : 'bad-response'
+      const rejected = result.status === 401 || result.status === 403
+      return { status: statusFor('keychain', key, {}, rejected ? 'rejected' : 'unchecked', problem), accepted: !rejected }
     }
     const metadata = { ...keyData(result.body, key), checkedAt: this.now() }
     return { status: statusFor('keychain', key, metadata, 'ok'), accepted: true }
@@ -185,8 +187,6 @@ export class OpenRouterKeyStore {
     if (this.options.envKey !== undefined) return this.status()
     if (!isOpenRouterKey(key)) return statusFor('keychain', typeof key === 'string' ? key : '', {}, 'rejected', 'auth')
     if (!this.encryptionAvailable()) return { state: 'unavailable' }
-    const checked = await this.verify(key, signal)
-    if (!checked.accepted) return checked.status
     try {
       await mkdir(join(this.options.userData, 'secrets'), { recursive: true, mode: 0o700 })
       await chmod(join(this.options.userData, 'secrets'), 0o700)
@@ -196,8 +196,14 @@ export class OpenRouterKeyStore {
         if (this.options.safeStorage.decryptString(encrypted) !== key) throw new Error('OpenRouter key encryption round-trip failed')
         await writeFile(temporary, encrypted, { mode: 0o600 })
         await chmod(temporary, 0o600)
+        let checked: { status: AiKeyStatus; accepted: boolean }
+        try { checked = await this.verify(key, signal) }
+        catch (error) {
+          const problem = error instanceof HarnessError && error.code ? error.code : 'network'
+          checked = { status: statusFor('keychain', key, {}, 'unchecked', problem), accepted: true }
+        }
+        if (!checked.accepted) return checked.status
         await rename(temporary, this.file)
-        await chmod(this.file, 0o600)
         this.checked = { key, status: checked.status }
         return checked.status
       } finally {
@@ -209,13 +215,25 @@ export class OpenRouterKeyStore {
   }
 
   async check(signal?: AbortSignal): Promise<AiKeyStatus> {
-    const key = await this.keyForRequest()
+    let key: string
+    try { key = await this.keyForRequest() }
+    catch (error) {
+      if (error instanceof HarnessError && error.code === 'no-key') return { state: 'none' }
+      if (error instanceof HarnessError && error.code === 'keychain') return { state: 'unavailable', problem: error.code } as AiKeyStatus
+      throw error
+    }
     const source: 'keychain' | 'env' = this.options.envKey !== undefined ? 'env' : 'keychain'
-    const result = await this.request(key, signal)
+    let result: Awaited<ReturnType<OpenRouterKeyStore['request']>>
+    try { result = await this.request(key, signal) }
+    catch (error) {
+      const problem = error instanceof HarnessError && error.code ? error.code : 'network'
+      const status = statusFor(source, key, {}, 'unchecked', problem)
+      this.checked = { key, status }
+      return status
+    }
     if (!responseOk(result.response)) {
-      const transient = result.status === 408 || result.status === 429 || result.status >= 500
-      const problem = result.status === 401 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : transient ? 'unavailable' : 'bad-response'
-      const status = statusFor(source, key, {}, transient ? 'unchecked' : 'rejected', problem)
+      const problem = result.status === 401 || result.status === 403 ? 'auth' : result.status === 408 ? 'timeout' : result.status === 429 ? 'rate-limit' : result.status >= 500 ? 'unavailable' : 'bad-response'
+      const status = statusFor(source, key, {}, result.status === 401 || result.status === 403 ? 'rejected' : 'unchecked', problem)
       this.checked = { key, status }
       return status
     }

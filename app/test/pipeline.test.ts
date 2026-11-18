@@ -222,32 +222,14 @@ describe('pipeline with long remote batches', () => {
     expect(s.saved.map((x) => x.text)).toEqual(['end words'])
   })
 
-  it('retries a failed batch once after 5 s, then delivers its lines', async () => {
-    vi.useFakeTimers()
-    try {
-      let n = 0
-      const s = setup((c) => { n++; if (n === 1) throw new Error('boom'); return [line(c, 'retried words')] }, { batchMs: 60_000 })
-      s.speak('them', 0); s.speak('them', 2000)
-      const done = s.p.finish()
-      await vi.advanceTimersByTimeAsync(5000)
-      await done
-      expect(n).toBe(2)
-      expect(s.saved.map((x) => x.text)).toEqual(['retried words'])
-      expect(s.warns).toEqual([])
-    } finally { vi.useRealTimers() }
-  })
-
-  it('warns and drops the batch only after the retry fails too', async () => {
-    vi.useFakeTimers()
-    try {
-      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000 })
-      s.speak('them', 0)
-      const done = s.p.finish()
-      await vi.advanceTimersByTimeAsync(5000)
-      await done
-      expect(s.warns).toEqual(['transcribe-failed'])
-      expect(s.saved).toEqual([])
-    } finally { vi.useRealTimers() }
+  it('does not resend a failed batch inside the pipeline', async () => {
+    let n = 0
+    const s = setup(() => { n++; throw new Error('boom') }, { batchMs: 60_000 })
+    s.speak('them', 0); s.speak('them', 2000)
+    await s.p.finish()
+    expect(n).toBe(1)
+    expect(s.saved).toEqual([])
+    expect(s.warns).toEqual(['transcribe-failed'])
   })
 
   it('does not retry an aborted batch', async () => {
@@ -351,18 +333,13 @@ describe('pipeline audio spool (remote path only)', () => {
     expect(f.removed.flat()).toEqual(f.added.map((_, i) => `k${i}`))
   })
 
-  it('keeps the audio when the batch fails even after its retry', async () => {
-    vi.useFakeTimers()
-    try {
-      const f = fakeSpool()
-      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
-      s.speak('them', 0)
-      const done = s.p.finish()
-      await vi.advanceTimersByTimeAsync(5000)
-      await done
-      expect(s.warns).toEqual(['transcribe-failed'])
-      expect(f.removed).toEqual([])
-    } finally { vi.useRealTimers() }
+  it('keeps the audio when the batch fails', async () => {
+    const f = fakeSpool()
+    const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
+    s.speak('them', 0)
+    await s.p.finish()
+    expect(s.warns).toEqual(['transcribe-failed'])
+    expect(f.removed).toEqual([])
   })
 
   it('keeps the audio when the batch is aborted', async () => {
@@ -398,19 +375,13 @@ describe('pipeline audio spool (remote path only)', () => {
     expect(s.saved).toHaveLength(2)
   })
 
-  it('counts one attempt per chunk only when its batch fails for good', async () => {
-    vi.useFakeTimers()
-    try {
-      const f = fakeSpool()
-      const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
-      s.speak('them', 0); s.speak('them', 5000)
-      const done = s.p.finish()
-      await vi.advanceTimersByTimeAsync(5000) // first send + the one in-pipeline retry
-      await done
-      // every queued chunk went out in the failed batch: one bump each, not one per send
-      expect(f.bumped.slice().sort()).toEqual(f.added.map((_, i) => `k${i}`).sort())
-      expect(f.removed).toEqual([])
-    } finally { vi.useRealTimers() }
+  it('counts one attempt per chunk for its one failed send', async () => {
+    const f = fakeSpool()
+    const s = setup(() => { throw new Error('boom') }, { batchMs: 60_000, spool: f.spool })
+    s.speak('them', 0); s.speak('them', 5000)
+    await s.p.finish()
+    expect(f.bumped.slice().sort()).toEqual(f.added.map((_, i) => `k${i}`).sort())
+    expect(f.removed).toEqual([])
   })
 
   it('counts no attempt for an aborted batch', async () => {

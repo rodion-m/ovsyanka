@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { aiSettings, type AiSettings } from '../src/shared/ai'
-import { createOpenRouter, type OpenRouterLogEntry } from '../src/main/harness/openrouter'
+import { aiSettings, type AiProblemUpdate, type AiSettings } from '../src/shared/ai'
+import { classifyOpenRouterError, createOpenRouter, type OpenRouterLogEntry } from '../src/main/harness/openrouter'
 import { HarnessError } from '../src/main/harness/process'
-import { createOpenRouterUsage } from '../src/main/harness/openrouterUsage'
+import { createOpenRouterUsage, openRouterLocalDateKey } from '../src/main/harness/openrouterUsage'
 import type { OpenRouterKeyFetch } from '../src/main/harness/openrouterKey'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
 import { createHarnessTranscriber, parseTranscript } from '../src/main/harness/transcribe'
@@ -76,6 +76,13 @@ describe('OpenRouter text adapter', () => {
     expect(body.messages).toEqual([{ role: 'user', content: 'Limit the answer to at most 2048 tokens.' }])
   })
 
+  it('logs a provider model mismatch without failing an otherwise valid response', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch: async () => answer({ model: 'other/provider-model', choices: [{ message: { content: 'valid' } }] }), lookupModel: async () => model() })
+    await expect(adapter.text('model mismatch', signal())).resolves.toBe('valid')
+    expect(info).toHaveBeenCalledWith('openrouter response model differs from request', { requested: 'google/gemini-3.8-flash', returned: 'other/provider-model' })
+  })
+
   it('omits optional parameters when the cached model does not advertise them and omits provider for any policy', async () => {
     let body!: Record<string, unknown>
     const fetch: OpenRouterKeyFetch = async (_url, init) => { body = JSON.parse(String(init?.body)); return answer({ choices: [{ message: { content: 'done' } }] }) }
@@ -103,6 +110,57 @@ describe('OpenRouter text adapter', () => {
 })
 
 describe('OpenRouter audio adapter', () => {
+  it('rejects an oversized body as permanent even when reader cancellation rejects', async () => {
+    const fetch = vi.fn<OpenRouterKeyFetch>(async () => new Response(new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)) },
+      cancel() { return Promise.reject(new Error('cancel failed')) },
+    })))
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), log: () => {} })
+    await expect(adapter.text('large', signal())).rejects.toMatchObject({ code: 'too-large', permanent: true })
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it('retries an unsupported optional parameter once without optional parameters, keeping JSON instructions', async () => {
+    const rootPath = await root(), bodies: Record<string, unknown>[] = []
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    const fetch: OpenRouterKeyFetch = async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      if (bodies.length === 1) return answer({ error: { type: 'invalid_request_error', message: 'unsupported parameter response_format' } }, 400)
+      return answer({ choices: [{ message: { content: JSON.stringify({ segments: [] }) } }] })
+    }
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model({ supported_parameters: ['structured_outputs', 'reasoning', 'temperature'] }), log: () => {} })
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })).resolves.toBe(JSON.stringify({ segments: [] }))
+    expect(bodies).toHaveLength(2)
+    expect(bodies[0]).toHaveProperty('response_format')
+    for (const optional of ['response_format', 'reasoning', 'temperature']) expect(bodies[1]).not.toHaveProperty(optional)
+    const content = (bodies[1].messages as Array<{ content: Array<{ text?: string }> }>)[0].content[0].text
+    expect(content).toContain('Return only one JSON object matching')
+  })
+
+  it('validates model lookup identity and merges missing recommended seed capabilities', async () => {
+    const rootPath = await root(), bodies: Record<string, unknown>[] = []
+    await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
+    const modelCache = {
+      schema: 1, fetchedAt: Date.now() - 25 * 60 * 60 * 1000, text: [model({
+        architecture: { input_modalities: [], output_modalities: [] }, pricing: {}, context_length: undefined,
+        supported_parameters: [], reasoning: undefined, top_provider: {},
+      })],
+      stt: [model({ id: 'other/stt', architecture: { input_modalities: ['audio'], output_modalities: ['transcription'] }, endpoints: ['/api/v1/audio/transcriptions'] })], probes: {},
+    }
+    await writeFile(join(rootPath, 'openrouter-models.json'), JSON.stringify(modelCache))
+    const fetch: OpenRouterKeyFetch = async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return answer({ choices: [{ message: { content: 'ok' } }] }) }
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch, userData: rootPath, lookupModel: async () => model({ id: 'wrong/model' }), log: () => {} })
+    await adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })
+    expect(bodies[0].reasoning).toEqual({ effort: 'medium' })
+    expect(bodies[0].temperature).toBe(0)
+    expect(bodies[0]).toHaveProperty('response_format')
+    await writeFile(join(rootPath, 'openrouter-models.json'), JSON.stringify({ ...modelCache, fetchedAt: Date.now(), text: [model({ supported_parameters: [], reasoning: undefined, top_provider: {} })] }))
+    await adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })
+    expect(bodies[1].reasoning).toEqual({ effort: 'medium' })
+    expect(bodies[1].temperature).toBe(0)
+    expect(bodies[1]).toHaveProperty('response_format')
+  })
+
   it('sends the exact WAV through chat, omits CLI file instructions, preserves vocabulary rules, and reaches parseTranscript', async () => {
     const rootPath = await root()
     const requests: Record<string, unknown>[] = []
@@ -135,6 +193,13 @@ describe('OpenRouter audio adapter', () => {
       provider: { require_parameters: true, data_collection: 'deny' },
       stream: false,
     })
+  })
+
+  it('uses a local error for an unreadable staged WAV and does not call OpenRouter', async () => {
+    const rootPath = await root(), fetch = vi.fn<OpenRouterKeyFetch>()
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model() })
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })).rejects.toMatchObject({ code: 'local-audio', permanent: true })
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('passes the Stage 0 60-second raw body through the adapter and real transcript parser', async () => {
@@ -173,6 +238,20 @@ describe('OpenRouter audio adapter', () => {
 })
 
 describe('OpenRouter errors and retries', () => {
+  it('keeps unsupported optional-parameter 400s eligible for automatic recovery', () => {
+    expect(classifyOpenRouterError(400, { error: { type: 'invalid_request_error', message: 'unsupported parameter response_format' } })).toMatchObject({ code: 'bad-response', permanent: false })
+  })
+
+  it.each([
+    ['finish reason', { choices: [{ finish_reason: 'content_filter', message: { content: 'blocked' } }] }],
+    ['native finish reason', { choices: [{ native_finish_reason: 'content_filter', message: { content: 'blocked' } }] }],
+    ['refusal', { choices: [{ message: { refusal: 'blocked' } }] }],
+  ])('marks a 200 %s response as permanent moderation', async (_name, body) => {
+    const fetch = vi.fn<OpenRouterKeyFetch>(async () => answer(body))
+    const adapter = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {} })
+    await expect(adapter.text('moderated', signal())).rejects.toMatchObject({ code: 'moderation', permanent: true })
+    expect(fetch).toHaveBeenCalledOnce()
+  })
   it('keeps the timeout active after headers arrive until the body finishes', async () => {
     vi.useFakeTimers()
     let bodyController: ReadableStreamDefaultController<Uint8Array> | undefined
@@ -283,15 +362,24 @@ describe('OpenRouter errors and retries', () => {
 })
 
 describe('OpenRouter usage and spooled pipeline', () => {
+  it('does not let a throwing problem-clear callback undo successful lines or resend a batch', async () => {
+    const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000) }
+    const saved: string[] = [], transcribe = vi.fn(async () => [{ track: 'them' as const, startMs: 0, endMs: 100, text: 'saved' }])
+    const pipeline = createPipeline({ meetingId: 'clear-throw', batchMs: 1, transcribe, save: lines => saved.push(...lines.map(line => line.text)), emit: () => {}, onAiProblem: problem => { if (problem.code === null) throw new Error('window closed') } })
+    pipeline.enqueue(chunk)
+    await pipeline.finish()
+    expect(saved).toEqual(['saved'])
+    expect(transcribe).toHaveBeenCalledOnce()
+  })
+
   it('does not retry permanent adapter errors in the real pipeline and shares the bounded retry budget for 429', async () => {
-    const originalSetTimeout = globalThis.setTimeout
-    const retryTimer = vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler, timeout, ...args) => originalSetTimeout(handler, timeout === 5_000 ? 0 : timeout, ...args))
     const rootPath = await root()
     const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000) }
-    for (const [code, status, body] of [
-      ['auth', 401, { error: { type: 'invalid_api_key' } }],
-      ['credits', 402, { error: { metadata: { limit_source: 'openrouter_credits' } } }],
-      ['truncated', 200, { choices: [{ finish_reason: 'length', message: { content: null } }] }],
+    for (const [code, status, body, blocked] of [
+      ['auth', 401, { error: { type: 'invalid_api_key' } }, false],
+      ['credits', 402, { error: { metadata: { limit_source: 'openrouter_credits' } } }, false],
+      ['truncated', 200, { choices: [{ finish_reason: 'length', message: { content: null } }] }, true],
+      ['too-large', 413, { error: { message: 'payload too large' } }, true],
     ] as const) {
       const spool = createSpool(spoolDirOf(join(rootPath, code))), fetch = vi.fn<OpenRouterKeyFetch>(async () => answer(body, status))
       const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), log: () => {} })
@@ -299,7 +387,8 @@ describe('OpenRouter usage and spooled pipeline', () => {
       const pipeline = createPipeline({ meetingId: code, batchMs: 1, spool, transcribe: async () => { await router.text('failure', signal()); return [] }, save: () => {}, emit: () => {} })
       pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
       expect(fetch).toHaveBeenCalledOnce()
-      expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true })
+      expect(spool.entries()[0]).toMatchObject({ attempts: blocked ? 0 : 1, ...(blocked ? { blocked: true } : {}) })
+      if (!blocked) expect(spool.entries()[0]).not.toHaveProperty('blocked')
     }
     const spool = createSpool(spoolDirOf(join(rootPath, '429'))), fetch = vi.fn<OpenRouterKeyFetch>(async () => answer({ error: { type: 'rate_limit' } }, 429))
     const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), sleep: async () => {}, log: () => {} })
@@ -307,9 +396,13 @@ describe('OpenRouter usage and spooled pipeline', () => {
     const pipeline = createPipeline({ meetingId: '429', batchMs: 1, spool, transcribe: async () => { await router.text('429', signal()); return [] }, save: () => {}, emit: () => {} })
     pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
     expect(fetch).toHaveBeenCalledTimes(3)
-    expect(spool.entries()[0]).toMatchObject({ attempts: 3 })
+    expect(spool.entries()[0]).toMatchObject({ attempts: 1 })
     expect(spool.entries()[0]).not.toHaveProperty('blocked')
-    retryTimer.mockRestore()
+    const laterChunk = spool.list()[0]
+    const laterPipeline = createPipeline({ meetingId: '429', batchMs: 1, spool, transcribe: async () => [{ track: 'them', startMs: 0, endMs: 250, text: 'recovered automatically' }], save: () => {}, emit: () => {} })
+    laterPipeline.enqueue(laterChunk, laterChunk.key)
+    await laterPipeline.finish()
+    expect(spool.hasEntries()).toBe(false)
   })
 
   it('emits a no-key problem once through the real pipeline without making an HTTP request', async () => {
@@ -317,11 +410,13 @@ describe('OpenRouter usage and spooled pipeline', () => {
     const fetch = vi.fn<OpenRouterKeyFetch>()
     const router = createOpenRouter({ settings: settings(), key: { read: async () => { throw new HarnessError('missing', 'no-key') } }, fetch, lookupModel: async () => model() })
     const spool = createSpool(spoolDirOf(join(rootPath, 'no-key'))), keyInSpool = spool.add(chunk)!
-    const problems: Array<{ code: string; model?: string } | null> = []
+    const problems: AiProblemUpdate[] = []
     const pipeline = createPipeline({ meetingId: 'no-key', batchMs: 1, spool, transcribe: async () => { await router.text('no key', signal()); return [] }, save: () => {}, emit: () => {}, onAiProblem: problem => problems.push(problem) })
     pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
     expect(fetch).not.toHaveBeenCalled()
-    expect(problems).toEqual([{ code: 'no-key', model: 'google/gemini-3.8-flash' }])
+    expect(spool.entries()[0]).toMatchObject({ attempts: 1 })
+    expect(spool.entries()[0]).not.toHaveProperty('blocked')
+    expect(problems).toEqual([{ code: 'no-key', meetingId: 'no-key', track: 'them', model: 'google/gemini-3.8-flash' }])
   })
 
   it('stores only daily cost/audio aggregates and reports measured transcription hourly cost', async () => {
@@ -329,7 +424,7 @@ describe('OpenRouter usage and spooled pipeline', () => {
     const usage = createOpenRouterUsage({ userData: rootPath, now: () => clock.at })
     await usage.record({ model: 'google/gemini-3.8-flash', task: 'transcription', costUsd: 0.22, audioSeconds: 3_600 })
     await usage.record({ model: 'google/gemini-3.8-flash', task: 'text', costUsd: 0.08 })
-    expect(await usage.summary()).toEqual({ todayUsd: 0.3, thirtyDayUsd: 0.3, transcriptionPerHourUsd: { 'google/gemini-3.8-flash': 0.22 }, costUnknown: false, missingCostCount: 0 })
+    expect(await usage.summary()).toEqual({ todayUsd: 0.3, thirtyDayUsd: 0.3, transcriptionPerHourUsd: { 'google/gemini-3.8-flash': 0.22 }, transcriptionCostUnknown: false, textCostUnknown: false, missingCostCount: 0 })
     const stored = JSON.parse(await readFile(join(rootPath, 'openrouter-usage.json'), 'utf8')) as Record<string, unknown>
     expect(JSON.stringify(stored)).not.toContain('segments')
     expect(JSON.stringify(stored)).not.toContain('request')
@@ -342,16 +437,27 @@ describe('OpenRouter usage and spooled pipeline', () => {
     const usage = createOpenRouterUsage({ userData: rootPath, now: () => now })
     const adapter = createOpenRouter({ settings: settings(), key: key(), fetch: async () => answer({ choices: [{ message: { content: JSON.stringify({ segments: [] }) } }], usage: { cost: 0 } }), lookupModel: async () => model(), usage, log: () => {} })
     await adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() })
-    const stored = JSON.parse(await readFile(join(rootPath, 'openrouter-usage.json'), 'utf8')) as { days: Record<string, { costUsd: number; costUnknown: boolean; models: Record<string, { costUnknown: boolean }> }> }
-    const day = stored.days['2026-11-18']
+    const stored = JSON.parse(await readFile(join(rootPath, 'openrouter-usage.json'), 'utf8')) as { days: Record<string, { costUsd: number; transcriptionCostUnknown: boolean; models: Record<string, { transcriptionCostUnknown: boolean }> }> }
+    const day = stored.days[openRouterLocalDateKey(now)]
     expect(day.costUsd).toBe(0)
-    expect(day.costUnknown).toBe(true)
-    expect(day.models['google/gemini-3.8-flash'].costUnknown).toBe(true)
+    expect(day.transcriptionCostUnknown).toBe(true)
+    expect(day.models['google/gemini-3.8-flash'].transcriptionCostUnknown).toBe(true)
+  })
+
+  it('keeps text cost uncertainty separate and only suppresses measured audio prices for recent transcription uncertainty', async () => {
+    const rootPath = await root(), clock = { at: Date.parse('2026-11-18T12:00:00Z') }
+    const usage = createOpenRouterUsage({ userData: rootPath, now: () => clock.at })
+    await usage.record({ model: 'google/gemini-3.8-flash', task: 'transcription', costUsd: 0.22, audioSeconds: 3_600 })
+    await usage.record({ model: 'google/gemini-3.8-flash', task: 'text', costUsd: 0, costMissing: true })
+    expect(await usage.summary()).toMatchObject({ textCostUnknown: true, transcriptionCostUnknown: false, transcriptionPerHourUsd: { 'google/gemini-3.8-flash': 0.22 } })
+    await usage.record({ model: 'google/gemini-3.8-flash', task: 'transcription', costUsd: 0, audioSeconds: 60, costUnknown: true })
+    expect(await usage.summary()).toMatchObject({ transcriptionCostUnknown: true, transcriptionPerHourUsd: {} })
+    clock.at += 31 * 24 * 60 * 60 * 1_000
+    expect(await usage.summary()).toMatchObject({ transcriptionCostUnknown: false, textCostUnknown: false })
+    expect((await usage.summary()).transcriptionPerHourUsd['google/gemini-3.8-flash']).toBeCloseTo(0.22 / (3_660 / 3_600), 6)
   })
 
   it('keeps a credits-failed remote batch on disk, then removes it after a successful recovery', async () => {
-    const originalSetTimeout = globalThis.setTimeout
-    const retryTimer = vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler, timeout, ...args) => originalSetTimeout(handler, timeout === 5_000 ? 0 : timeout, ...args))
     const rootPath = await root(), meeting = join(rootPath, 'meeting'), spool = createSpool(spoolDirOf(meeting))
     const bodies: unknown[] = []
     const fetch = vi.fn<OpenRouterKeyFetch>()
@@ -364,16 +470,16 @@ describe('OpenRouter usage and spooled pipeline', () => {
     })
     const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000), clearMs: 1_000 }
     const saved: string[] = []
-    const problems: Array<{ code: string; model?: string } | null> = []
+    const problems: AiProblemUpdate[] = []
     const pipeline = createPipeline({ meetingId: 'm1', batchMs: 60_000, spool, transcribe: async c => { bodies.push(c); return transcriber(c) }, save: lines => saved.push(...lines.map(line => line.text)), emit: () => {}, onAiProblem: problem => problems.push(problem) })
     pipeline.enqueue(chunk, spool.add(chunk))
     const failed = pipeline.finish()
     await failed
-    retryTimer.mockRestore()
     expect(saved).toEqual([])
     expect(spool.hasEntries()).toBe(true)
-    expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true })
-    expect(problems).toEqual([{ code: 'credits', model: 'google/gemini-3.8-flash' }])
+    expect(spool.entries()[0]).toMatchObject({ attempts: 1 })
+    expect(spool.entries()[0]).not.toHaveProperty('blocked')
+    expect(problems).toEqual([{ code: 'credits', meetingId: 'm1', track: 'them', model: 'google/gemini-3.8-flash' }])
 
     const goodFetch: OpenRouterKeyFetch = async () => answer({ choices: [{ message: { content: JSON.stringify({ segments: [{ start: 0, end: 0.5, text: 'После пополнения.' }] }) } }] })
     const goodRouter = createOpenRouter({ settings: settings(), key: key(), fetch: goodFetch, lookupModel: async () => model(), log: () => {} })
@@ -387,7 +493,7 @@ describe('OpenRouter usage and spooled pipeline', () => {
     expect(saved).toEqual(['После пополнения.'])
     expect(spool.hasEntries()).toBe(false)
     expect(bodies).toHaveLength(1)
-    expect(problems.at(-1)).toBeNull()
+    expect(problems.at(-1)).toMatchObject({ code: null, meetingId: 'm1', track: 'them' })
   })
 
   it('aborts a long request through harness.stop and leaves the batch spooled', async () => {

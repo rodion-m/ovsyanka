@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import type { Spoken } from '../../shared/spoken'
+import { childEnvironment } from '../childEnv'
 
 /**
  * Apple's on-device speech (SpeechAnalyzer and SpeechTranscriber, macOS 26 on Apple Silicon) for the live words: it
@@ -76,7 +77,7 @@ export type SpeechLocales = { available: boolean; supported: string[]; installed
 /** yogurt-audio speech-locales: what the Mac's speech can do; nothing where it can't (an older macOS, an Intel Mac) */
 export function readSpeechLocales(binary: string): Promise<SpeechLocales> {
   return new Promise((resolve) => {
-    execFile(binary, ['speech-locales'], { timeout: 20_000 }, (err, stdout) => {
+    execFile(binary, ['speech-locales'], { env: childEnvironment(), timeout: 20_000 }, (err, stdout) => {
       if (err) return resolve({ available: false, supported: [], installed: [] })
       try {
         const j = JSON.parse(stdout) as Partial<SpeechLocales>
@@ -89,7 +90,7 @@ export function readSpeechLocales(binary: string): Promise<SpeechLocales> {
 /** yogurt-audio speech-install LOCALE: Apple's model for that locale, downloaded once (true once it is there) */
 export function installSpeechLocale(binary: string, locale: string): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile(binary, ['speech-install', locale], { timeout: 15 * 60_000 }, (err, stdout) => {
+    execFile(binary, ['speech-install', locale], { env: childEnvironment(), timeout: 15 * 60_000 }, (err, stdout) => {
       if (err) return resolve(false)
       try { resolve((JSON.parse(stdout) as { installed?: unknown }).installed === true) } catch { resolve(false) }
     })

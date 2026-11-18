@@ -79,23 +79,23 @@ function firstJsonObject(text: string): unknown | undefined {
 export function parseTranscript(text: string, duration: number): Transcript {
   if (!Number.isFinite(duration) || duration < 0) throw new HarnessError('Invalid recording duration.')
   const value = firstJsonObject(text)
-  if (value === undefined) throw new HarnessError('The remote AI did not return valid transcript JSON.', 'bad-response')
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HarnessError('The remote AI returned an invalid transcript.', 'bad-response')
+  if (value === undefined) throw new HarnessError('The remote AI did not return valid transcript JSON.', 'bad-response', 0, undefined, true)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HarnessError('The remote AI returned an invalid transcript.', 'bad-response', 0, undefined, true)
   const object = value as Record<string, unknown>
-  if (object.error != null && typeof object.error !== 'string') throw new HarnessError('The remote AI returned an invalid transcript error field.', 'bad-response')
-  if (typeof object.error === 'string' && object.error.trim()) throw new HarnessError('The remote AI could not listen to the recording.', 'bad-response')
-  if (object.language !== undefined && (typeof object.language !== 'string' || object.language.length > 80)) throw new HarnessError('The remote AI returned an invalid transcript language.', 'bad-response')
-  if (!Array.isArray(object.segments) || object.segments.length > 10_000) throw new HarnessError('The remote AI returned an invalid transcript segment list.', 'bad-response')
+  if (object.error != null && typeof object.error !== 'string') throw new HarnessError('The remote AI returned an invalid transcript error field.', 'bad-response', 0, undefined, true)
+  if (typeof object.error === 'string' && object.error.trim()) throw new HarnessError('The remote AI could not listen to the recording.', 'bad-response', 0, undefined, true)
+  if (object.language !== undefined && (typeof object.language !== 'string' || object.language.length > 80)) throw new HarnessError('The remote AI returned an invalid transcript language.', 'bad-response', 0, undefined, true)
+  if (!Array.isArray(object.segments) || object.segments.length > 10_000) throw new HarnessError('The remote AI returned an invalid transcript segment list.', 'bad-response', 0, undefined, true)
   const segments: Transcript['segments'] = []
   const tolerance = Math.max(2, duration * 0.02)
   for (const segment of object.segments) {
-    if (!segment || typeof segment !== 'object' || Array.isArray(segment)) throw new HarnessError('The remote AI returned an invalid transcript segment.', 'bad-response')
+    if (!segment || typeof segment !== 'object' || Array.isArray(segment)) throw new HarnessError('The remote AI returned an invalid transcript segment.', 'bad-response', 0, undefined, true)
     const { start, end, text: said } = segment as Record<string, unknown>
     if (typeof start !== 'number' || typeof end !== 'number' || !Number.isFinite(start) || !Number.isFinite(end)
       || start < 0 || end < start || start > duration + tolerance || end > duration + tolerance) {
-      throw new HarnessError('The remote AI returned timestamps outside the recording.', 'no-timestamps')
+      throw new HarnessError('The remote AI returned timestamps outside the recording.', 'no-timestamps', 0, undefined, true)
     }
-    if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The remote AI returned invalid transcript text.', 'bad-response')
+    if (typeof said !== 'string' || Buffer.byteLength(said, 'utf8') > 64 * 1024) throw new HarnessError('The remote AI returned invalid transcript text.', 'bad-response', 0, undefined, true)
     // models sometimes wrap quoted names in backslashes (\Имя\, \\Имя\\) or leave a lone \ between spaces;
     // they never belong in speech. Windows paths (C:\dir\file) keep theirs: only runs at word edges or between spaces go
     const clean = said

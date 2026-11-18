@@ -7,7 +7,7 @@ import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
 import type { Spoken } from '../../shared/spoken'
-import type { AiProblemCode } from '../../shared/ai'
+import type { AiProblemCode, AiProblemUpdate } from '../../shared/ai'
 import { takeBatch, type Batch } from './batch'
 
 type Out = Omit<Segment, 'id'>
@@ -45,8 +45,8 @@ export function createPipeline(p: {
   echoForTests?: EchoCheck
   /** trouble worth telling the person about; each kind is reported once */
   onWarn?: (kind: Exclude<TranscribeWarn, 'no-speech-model'>) => void
-  /** a remote transcription failure; null clears the last problem after any later success */
-  onAiProblem?: (problem: { code: AiProblemCode; model?: string } | null) => void
+  /** A remote transcription failure or a clear event for that meeting and track. */
+  onAiProblem?: (problem: AiProblemUpdate) => void
   /** who said a line of the other side, as the call app showed it (callNames); null: Them */
   nameOf?: (startMs: number, endMs: number) => string | null
   /** the meeting's spellings of names and companies (vocab.ts respell) */
@@ -179,8 +179,6 @@ export function createPipeline(p: {
   const newest: Record<Track, number> = { me: -Infinity, them: -Infinity }
   /** the meeting is ending: whatever is queued goes out without waiting for a full batch */
   let ending = false
-  /** a failed remote batch is sent once more after this pause; the track stays busy so nothing overtakes it */
-  const RETRY_MS = 5000
 
   /** a packed batch's meeting-time end: its last part's end (the packed length would miss the compressed pauses) */
   const endMsOf = (c: Chunk) => c.parts?.length
@@ -196,19 +194,18 @@ export function createPipeline(p: {
     const c = takeBatch(q, p.batchMs)
     if (!c) { if (!queued('me') && !queued('them')) { const w = idle; idle = []; w.forEach((f) => f()) } return }
     firstSent[t] = true
-    run(t, c, batchMs > 0 ? 1 : 0)
+    run(t, c)
   }
 
-  const run = (t: Track, c: Batch, retries: number) => {
+  const run = (t: Track, c: Batch) => {
     running[t] = true
     const chunkEnd = endMsOf(c)
     /** the queued chunks this batch was packed from (a single chunk is its own source): their spool entries go when its lines are saved */
     const sources = c.sources ?? [c]
-    let retrying = false
     // the call is deferred to a microtask so a synchronous throw takes the same failure path as a rejection
     Promise.resolve().then(() => p.transcribe(c))
       .then((lines) => {
-        p.onAiProblem?.(null)
+        try { p.onAiProblem?.({ code: null, meetingId: p.meetingId, track: t }) } catch (err) { console.error('clearing an AI problem failed', err) }
         onLines(t, lines, c.startMs, chunkEnd, sources)
       })
       // its quick reading goes too: nothing final will replace it
@@ -218,11 +215,9 @@ export function createPipeline(p: {
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
         const code = typeof e === 'object' && e !== null && 'code' in e ? (e as { code?: AiProblemCode }).code : undefined
         const model = typeof e === 'object' && e !== null && 'model' in e && typeof (e as { model?: unknown }).model === 'string' ? (e as { model: string }).model : undefined
-        const attempts = typeof e === 'object' && e !== null && 'attempts' in e ? Number((e as { attempts?: unknown }).attempts) : 0
-        const permanent: AiProblemCode[] = ['auth', 'credits', 'budget', 'model-gone', 'no-provider', 'moderation', 'truncated', 'bad-response', 'no-key', 'keychain', 'no-timestamps']
-        if (retries > 0 && !cancelled && !(code && permanent.includes(code)) && !(Number.isSafeInteger(attempts) && attempts >= 3)) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        const permanent = typeof e === 'object' && e !== null && 'permanent' in e && (e as { permanent?: unknown }).permanent === true
         if (!cancelled && code) {
-          try { p.onAiProblem?.({ code, ...(model ? { model } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
+          try { p.onAiProblem?.({ code, meetingId: p.meetingId, track: t, ...(model ? { model } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
         }
         // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
         // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
@@ -230,11 +225,11 @@ export function createPipeline(p: {
         for (const s of sources) {
           const key = spoolKeys.get(s)
           spoolKeys.delete(s)
-          if (!cancelled && key !== undefined) { try { if (code && permanent.includes(code)) p.spool?.block?.(key); else p.spool?.bump?.(key, Number.isSafeInteger(attempts) && attempts > 0 ? attempts : 1) } catch (err) { console.error('counting a transcription retry failed', err) } }
+          if (!cancelled && key !== undefined) { try { if (permanent) p.spool?.block?.(key); else p.spool?.bump?.(key, 1) } catch (err) { console.error('counting a transcription retry failed', err) } }
         }
         warn('transcribe-failed'); settle(t, chunkEnd)
       })
-      .finally(() => { if (!retrying) { running[t] = false; pump(t) } })
+      .finally(() => { running[t] = false; pump(t) })
   }
 
   const queue = (c: Chunk) => {

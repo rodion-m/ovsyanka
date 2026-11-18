@@ -7,7 +7,8 @@ import { agyAnswer, createAgy } from '../src/main/harness/agy'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
 import { countTokens } from '../src/main/harness/model'
 import { createPorch, exactProfile, porchInstallation } from '../src/main/harness/porch'
-import { executablePath, HarnessProcesses, inStage } from '../src/main/harness/process'
+import { executablePath, HarnessError, HarnessProcesses, inStage } from '../src/main/harness/process'
+import { childEnvironment } from '../src/main/childEnv'
 import { createHarnessTranscriber, parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
 import { takeBatch } from '../src/main/asr/batch'
 import { chunker, type Chunk } from '../src/main/asr/chunker'
@@ -16,6 +17,16 @@ import { enhance, partBudget, splitForContext, summaryPrompt, type Llm } from '.
 
 const roots: string[] = []
 const stoppers: Array<() => void> = []
+it('scrubs both OpenRouter key variables from every child environment', () => {
+  expect(childEnvironment({ OPENROUTER_API_KEY: 'fake', YOGURT_OPENROUTER_API_KEY: 'fake', PATH: '/bin' })).toEqual({ PATH: '/bin' })
+})
+it('preserves the original harness failure when staging cleanup also fails', async () => {
+  const root = await directory()
+  const failure = new HarnessError('oversized', 'too-large', 1, undefined, true)
+  let stage = ''
+  await expect(inStage(root, undefined, async directory => { stage = directory; throw failure }, async () => { throw new Error('cleanup failed') })).rejects.toBe(failure)
+  await rm(stage, { recursive: true, force: true })
+})
 afterEach(async () => {
   stoppers.splice(0).forEach(stop => stop())
   vi.unstubAllEnvs()

@@ -4,11 +4,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { aiSettings } from '../src/shared/ai'
 import { hookAiPreferences } from '../src/main/harness/ipc'
-import { OpenRouterKeyStore } from '../src/main/harness/openrouterKey'
+import { OpenRouterKeyStore, type OpenRouterKeyFetch } from '../src/main/harness/openrouterKey'
 import { openStore } from '../src/main/store'
 import { exportBackup } from '../src/main/backup'
 import { unpack } from '../src/main/zip'
 import { logToFile } from '../src/main/log'
+import { createOpenRouter } from '../src/main/harness/openrouter'
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => handlers.set(name, fn) } }))
@@ -43,7 +44,7 @@ afterEach(async () => {
 })
 
 describe('OpenRouter credential leak sentinel', () => {
-  it('checks real IPC responses, main.log, backup export and encrypted key files', async () => {
+  it('checks save, 401, header-echoing 500, adapter diagnostics, main.log, backup and encrypted files', async () => {
     userData = await mkdtemp(join(tmpdir(), 'yogurt-openrouter-leak-'))
     const dir = userData
     const safeStorage = {
@@ -52,10 +53,19 @@ describe('OpenRouter credential leak sentinel', () => {
       encryptString: (value: string) => Buffer.from(value.split('').reverse().join('')),
       decryptString: (value: Buffer) => value.toString().split('').reverse().join(''),
     }
-    const keyStore = new OpenRouterKeyStore({
-      userData: dir, safeStorage,
-      fetch: async () => new Response(JSON.stringify({ data: { label: `team ${KEY.slice(-8)} account`, limit_remaining: 8 } }), { status: 200 }),
-    })
+    let keyRequests = 0
+    const fetch: OpenRouterKeyFetch = async (url, init) => {
+        if (!String(url).endsWith('/key')) return new Response(JSON.stringify({
+          id: KEY.slice(8, 16), error_type: KEY.slice(16, 24), choices: [{ message: { content: 'safe answer' } }],
+        }), { status: 200 })
+        keyRequests++
+        if (keyRequests === 1) return new Response(JSON.stringify({ data: { label: `team ${KEY.slice(-8)} account`, limit_remaining: 8 } }), { status: 200 })
+        const authorization = (init?.headers as Record<string, string>).Authorization
+        return keyRequests === 2
+          ? new Response(JSON.stringify({ error: { type: 'auth', message: `echo ${authorization}` } }), { status: 401 })
+          : new Response(JSON.stringify({ error: { type: 'provider_unavailable', message: `echo ${authorization}` } }), { status: 500 })
+      }
+    const keyStore = new OpenRouterKeyStore({ userData: dir, safeStorage, fetch })
     hookAiPreferences({
       file: join(dir, 'settings.json'), active: aiSettings({ backend: 'openrouter' }), restart: () => true, env: {}, openrouter: keyStore,
     })
@@ -63,11 +73,11 @@ describe('OpenRouter credential leak sentinel', () => {
     logToFile(join(dir, 'logs', 'main.log'))
     expect(await call('ai.openrouter.setKey', KEY)).toMatchObject({ state: 'ok', source: 'keychain' })
     expect(await call('ai:get')).toMatchObject({ active: { backend: 'openrouter' } })
-    console.info('OpenRouter key status', await call('ai.openrouter.keyStatus'))
-    expect(await call('ai.openrouter.checkKey')).toMatchObject({ state: 'ok', source: 'keychain' })
-    expect(await call('ai.openrouter.usage')).toMatchObject({ costUnknown: false })
-    expect(await call('ai.openrouter.clearKey')).toMatchObject({ state: 'none' })
-    expect(await call('ai.openrouter.setKey', KEY)).toMatchObject({ state: 'ok', source: 'keychain' })
+    expect(await call('ai.openrouter.checkKey')).toMatchObject({ state: 'rejected', problem: 'auth' })
+    expect(await call('ai.openrouter.checkKey')).toMatchObject({ state: 'unchecked', problem: 'unavailable' })
+    expect(await call('ai.openrouter.usage')).toMatchObject({ transcriptionCostUnknown: false, textCostUnknown: false })
+    const adapter = createOpenRouter({ settings: aiSettings({ backend: 'openrouter' }), key: keyStore, fetch })
+    await expect(adapter.text('sentinel request', new AbortController().signal)).resolves.toBe('safe answer')
 
     const store = openStore(join(dir, 'yogurt.db'))
     try {
@@ -78,17 +88,19 @@ describe('OpenRouter credential leak sentinel', () => {
     } finally { store.close() }
 
     const log = await readFile(join(dir, 'logs', 'main.log'), 'utf8')
+    expect(log).toContain('openrouter request')
     expect(log).not.toContain(KEY)
-    expect(log).not.toContain(KEY.slice(-8))
+    for (let i = 0; i <= KEY.length - 8; i++) expect(log).not.toContain(KEY.slice(i, i + 8))
     for (const response of responses) {
       const text = JSON.stringify(response)
       expect(text).not.toContain(KEY)
-      expect(text).not.toContain(KEY.slice(-8))
+      for (let i = 0; i <= KEY.length - 8; i++) expect(text).not.toContain(KEY.slice(i, i + 8))
     }
     for (const file of await filesUnder(dir)) {
       const contents = await readFile(file)
       expect(contents.includes(KEY)).toBe(false)
-      expect(contents.includes(KEY.slice(-8))).toBe(false)
+      const text = contents.toString('utf8')
+      for (let i = 0; i <= KEY.length - 8; i++) expect(text.includes(KEY.slice(i, i + 8))).toBe(false)
     }
   })
 })

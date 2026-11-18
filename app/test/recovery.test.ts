@@ -110,23 +110,20 @@ describe('recovering a pending remote transcript', () => {
     expect(store.meeting(m.id)?.transcriptionPending).not.toBe(true)
   })
 
-  it('a failing transcriber keeps the spool and counts one failed send per chunk', async () => {
-    vi.useFakeTimers()
-    try {
-      const r = rig({ say: () => { throw new Error('provider down') } })
-      const m = meeting()
-      store.updateMeeting(m.id, { transcriptionPending: true })
-      spoolAudio(m.id, [{ track: 'them', startMs: 0 }, { track: 'them', startMs: 2000 }])
-      const done = recoverTranscription(m.id)
-      await vi.advanceTimersByTimeAsync(10_000) // the batch's one in-session retry waits 5 s
-      await done
-      const left = spooled(m.id)
-      expect(left).toHaveLength(2)
-      // two sends (first + in-pipeline retry) failed for good: one attempt counted per chunk, not per send
-      expect(left.map((e) => e.attempts)).toEqual([1, 1])
-      expect(store.meeting(m.id)?.transcriptionPending).toBe(true)
-      expect(r.calls.length).toBeGreaterThan(0)
-    } finally { vi.useRealTimers() }
+  it('counts one failed send and recovers automatically on a later round without Retry', async () => {
+    let failing = true
+    const r = rig({ say: () => { if (failing) throw new Error('provider down'); return [{ track: 'them', startMs: 0, endMs: 500, text: 'recovered' }] } })
+    const m = meeting()
+    store.updateMeeting(m.id, { transcriptionPending: true })
+    spoolAudio(m.id, [{ track: 'them', startMs: 0 }])
+    await recoverTranscription(m.id)
+    expect(spooled(m.id).map(e => e.attempts)).toEqual([1])
+    expect(store.meeting(m.id)?.transcriptionPending).toBe(true)
+    failing = false
+    await recoverTranscription(m.id)
+    expect(r.calls).toHaveLength(2)
+    expect(spooled(m.id)).toEqual([])
+    expect(store.segments(m.id).map(s => s.text)).toEqual(['recovered'])
   })
 
   it('an aborted send counts no attempt', async () => {

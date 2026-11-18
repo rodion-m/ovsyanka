@@ -5,10 +5,11 @@ import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join, resolve } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 import type { AiProblemCode } from '../../shared/ai'
+import { childEnvironment } from '../childEnv'
 
 /** Errors deliberately omit provider diagnostics: they can contain meeting text or credentials. */
 export class HarnessError extends Error {
-  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string) { super(message); this.name = 'HarnessError' }
+  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string, readonly permanent = false) { super(message); this.name = 'HarnessError' }
 }
 
 export function aborted(): Error {
@@ -79,7 +80,7 @@ function signalTree(child: ChildProcess, force: boolean): void {
   if (!child.pid) return
   if (process.platform === 'win32') {
     // taskkill is an OS executable; neither command interpolation nor shell=true is used.
-    const killer = spawn(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], { shell: false, windowsHide: true, stdio: 'ignore' })
+    const killer = spawn(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'taskkill.exe'), ['/PID', String(child.pid), '/T', '/F'], { env: childEnvironment(), shell: false, windowsHide: true, stdio: 'ignore' })
     killer.on('error', () => { try { child.kill() } catch { /* already gone */ } })
     killer.unref()
   } else {
@@ -106,7 +107,7 @@ export class HarnessProcesses {
     const stderrLimit = options.stderrLimit ?? 128 * 1024
     return new Promise<ProcessResult>((resolveResult, reject) => {
       const child = spawn(options.executable, options.args, {
-        cwd: options.cwd, env: options.env ?? process.env, shell: false,
+        cwd: options.cwd, env: childEnvironment(options.env ?? process.env), shell: false,
         detached: process.platform !== 'win32', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
       })
       this.children.add(child)
@@ -200,15 +201,20 @@ export class HarnessProcesses {
   }
 }
 
-export async function inStage<T>(base: string, signal: AbortSignal | undefined, work: (directory: string) => Promise<T>): Promise<T> {
+export async function inStage<T>(base: string, signal: AbortSignal | undefined, work: (directory: string) => Promise<T>, remove: typeof rm = rm): Promise<T> {
   assertRunning(signal)
   await mkdir(base, { recursive: true, mode: 0o700 })
   const directory = await mkdtemp(join(base, 'yogurt-ai-'))
+  let failure: unknown
   try {
     if (process.platform !== 'win32') await chmod(directory, 0o700)
     assertRunning(signal)
     return await work(directory)
+  } catch (error) {
+    failure = error
+    throw error
   } finally {
-    await rm(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 })
+    try { await remove(directory, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 }) }
+    catch (cleanupError) { if (failure === undefined) throw cleanupError }
   }
 }

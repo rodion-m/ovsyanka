@@ -73,8 +73,8 @@ export const OPENROUTER_TEXT_CONTEXT_MINIMUM = 32_000
 export const OPENROUTER_AUDIO_COMPLETION_MINIMUM = 48_000
 /** Stage 0 measured Gemini 3.8 Flash chat-audio input at 25 tokens per second. */
 export const OPENROUTER_AUDIO_TOKENS_PER_SECOND = 25
-/** Completion includes reasoning tokens. Measured fixture rate: 11,986 tokens / 5 audio minutes. */
-export const OPENROUTER_AUDIO_OUTPUT_TOKENS_PER_MINUTE = 2_397
+/** Completion includes reasoning tokens. Temperature-zero full5 probe: 6,097 / 313.037 seconds. */
+export const OPENROUTER_AUDIO_OUTPUT_TOKENS_PER_MINUTE = 1_168
 export const OPENROUTER_HOURLY_PRICE_MIN_USD = 0.005
 export const OPENROUTER_HOURLY_PRICE_MAX_USD = 3
 export const OPENROUTER_EXPIRING_SOON_DAYS = 30
@@ -210,7 +210,7 @@ function isAudioChatModel(model: OpenRouterModel, now: number): boolean {
     && model.architecture.input_modalities.includes('audio')
     && model.architecture.output_modalities.includes('text')
     && endpoint(model, OPENROUTER_CHAT_ENDPOINT)
-    && (completionLimit == null || completionLimit >= OPENROUTER_AUDIO_COMPLETION_MINIMUM)
+    && typeof completionLimit === 'number' && completionLimit >= OPENROUTER_AUDIO_COMPLETION_MINIMUM
 }
 
 function isSttModel(model: OpenRouterModel, now: number): boolean {

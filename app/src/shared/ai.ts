@@ -6,10 +6,10 @@ export type OpenRouterAudioKind = 'chat' | 'stt'
 export type OpenRouterDataPolicy = 'deny' | 'zdr' | 'any'
 export type AiProblemCode = 'auth' | 'credits' | 'budget' | 'rate-limit' | 'model-gone' | 'no-provider'
   | 'unavailable' | 'timeout' | 'network' | 'too-large' | 'moderation' | 'truncated'
-  | 'no-timestamps' | 'bad-response' | 'no-key' | 'keychain'
+  | 'no-timestamps' | 'bad-response' | 'no-key' | 'keychain' | 'local-audio'
 /** Main-to-renderer notice about the last remote transcription failure; a null code clears it. */
-export type AiProblemEvent = { code: AiProblemCode | null; model?: string; at: number }
-export type AiProblemUpdate = { code: AiProblemCode; model?: string } | null
+export type AiProblemEvent = { code: AiProblemCode | null; meetingId: string; track: 'me' | 'them'; model?: string; at: number }
+export type AiProblemUpdate = { code: AiProblemCode; meetingId: string; track: 'me' | 'them'; model?: string } | { code: null; meetingId: string; track: 'me' | 'them' }
 
 export type AiSettings = {
   backend: AiBackend
@@ -69,7 +69,8 @@ export type AiUsage = {
   todayUsd: number
   thirtyDayUsd: number
   transcriptionPerHourUsd: Record<string, number>
-  costUnknown: boolean
+  transcriptionCostUnknown: boolean
+  textCostUnknown: boolean
   missingCostCount: number
 }
 

@@ -4,6 +4,7 @@ import { Notification } from 'electron'
 import { t } from '../shared/i18n'
 import type { Access } from './permissions'
 import { loadSettings, updateSettings } from './settings'
+import { childEnvironment } from './childEnv'
 
 /** A designated requirement includes the bundle ID and signer, but no install path or build version. */
 export function notificationIdentity(output: string): string | null {
@@ -17,7 +18,7 @@ export function createNotificationPermission(settingsPath: string) {
   let pending: Promise<Access> | undefined
   const currentIdentity = () => identity ??= new Promise<string | null>((done) => {
     const bundle = resolve(dirname(process.execPath), '../..')
-    execFile('/usr/bin/codesign', ['-d', '-r-', bundle], { timeout: 3000, maxBuffer: 16_384 }, (error, stdout) => {
+    execFile('/usr/bin/codesign', ['-d', '-r-', bundle], { env: childEnvironment(), timeout: 3000, maxBuffer: 16_384 }, (error, stdout) => {
       const key = error ? null : notificationIdentity(stdout)
       if (!key) console.warn('NOTIFICATIONS could not read app signing identity')
       done(key)

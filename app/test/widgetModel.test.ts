@@ -37,10 +37,23 @@ describe('remote transcription problems', () => {
   it('keeps the actionable problem in the existing note warning and clears it on success', () => {
     const w = new WidgetModel()
     w.start(m)
-    const credits = { code: 'credits' as const, model: 'google/gemini-3.8-flash', at: 100 }
+    const credits = { code: 'credits' as const, meetingId: 'm1', track: 'them' as const, model: 'google/gemini-3.8-flash', at: 100 }
     w.setAiProblem(credits)
     expect(w.view(2000)?.note).toMatchObject({ aiProblem: credits, tone: 'hint' })
-    w.setAiProblem({ code: null, at: 200 })
+    w.setAiProblem({ code: null, meetingId: 'm1', track: 'them', at: 200 })
+    expect(w.view(2000)?.note?.aiProblem).toBeUndefined()
+  })
+
+  it('filters problems by meeting and clears only the failed track', () => {
+    const w = new WidgetModel()
+    w.start(m)
+    w.setAiProblem({ code: 'credits', meetingId: 'other', track: 'them', at: 10 })
+    expect(w.view(2000)?.note?.aiProblem).toBeUndefined()
+    w.setAiProblem({ code: 'credits', meetingId: 'm1', track: 'them', at: 20 })
+    w.setAiProblem({ code: 'auth', meetingId: 'm1', track: 'me', at: 25 })
+    w.setAiProblem({ code: null, meetingId: 'm1', track: 'me', at: 30 })
+    expect(w.view(2000)?.note?.aiProblem).toMatchObject({ code: 'credits', track: 'them' })
+    w.setAiProblem({ code: null, meetingId: 'm1', track: 'them', at: 40 })
     expect(w.view(2000)?.note?.aiProblem).toBeUndefined()
   })
 })

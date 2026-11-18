@@ -161,10 +161,16 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
 
   useEffect(() => {
     let received = false
-    const off = window.yogurt.ai.onProblem(problem => { received = true; setAiProblem(problem) })
-    void window.yogurt.ai.problemState().then(problem => { if (!received) setAiProblem(problem) })
+    const off = window.yogurt.ai.onProblem(problem => {
+      if (problem.meetingId !== id) return
+      received = true
+      if (problem.code) setAiProblem(problem)
+      else void window.yogurt.ai.problemState(id).then(current => setAiProblem(current ?? null))
+    })
+    void window.yogurt.ai.problemState(id).then(problem => { if (!received) setAiProblem(problem ?? null) })
     return off
-  }, [])
+  }, [id])
+  useEffect(() => { setAiProblem(null) }, [id])
 
   useEffect(() => {
     const load = () => void window.yogurt.meetings.get(id).then(setM)

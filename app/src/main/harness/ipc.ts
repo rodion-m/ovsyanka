@@ -20,6 +20,7 @@ export function hookAiPreferences(o: {
   openrouterKey?: string
   openrouter?: Pick<OpenRouterKeyStore, 'status' | 'set' | 'clear' | 'check'>
   usage?: Pick<OpenRouterUsage, 'summary'>
+  onAiConfigChanged?: () => void | Promise<void>
 }) {
   const active = aiSettings(o.active)
   const env = { ...(o.env ?? process.env) }
@@ -30,6 +31,11 @@ export function hookAiPreferences(o: {
     if (value) locked[field] = { variable, value: field === 'openrouterKey' ? keyLast4(String(value)) : String(active[field]) }
   }
   const savedSettings = () => aiSettings(loadSettings(o.file).ai ?? active)
+  const recoverSpool = () => {
+    try {
+      void Promise.resolve(o.onAiConfigChanged?.()).catch(error => console.error('AI spool recovery after settings changed failed', error))
+    } catch (error) { console.error('AI spool recovery after settings changed failed', error) }
+  }
   const preferences = (): AiPreferences => {
     const saved = savedSettings()
     const nextLaunch = configuredAi({ ai: saved }, env)
@@ -52,6 +58,7 @@ export function hookAiPreferences(o: {
     if (locked.agyPath) settings.agyPath = previous.agyPath
     if (locked.porchPath) settings.porchPath = previous.porchPath
     updateSettings(o.file, { ai: settings })
+    recoverSpool()
     return preferences()
   })
   ipcMain.handle('ai:check', async (_e, value: unknown): Promise<AiCheck> => {
@@ -72,8 +79,13 @@ export function hookAiPreferences(o: {
   })
   ipcMain.handle('ai:restart', () => o.restart())
   ipcMain.handle('ai.openrouter.keyStatus', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.status() : { state: 'none' })
-  ipcMain.handle('ai.openrouter.setKey', async (_e, value: unknown): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.set(typeof value === 'string' ? value : '') : { state: 'unavailable' })
+  ipcMain.handle('ai.openrouter.setKey', async (_e, value: unknown): Promise<AiKeyStatus> => {
+    if (!o.openrouter) return { state: 'unavailable' }
+    const status = await o.openrouter.set(typeof value === 'string' ? value : '')
+    if (status.state === 'ok' || status.state === 'unchecked') recoverSpool()
+    return status
+  })
   ipcMain.handle('ai.openrouter.clearKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.clear() : { state: 'none' })
   ipcMain.handle('ai.openrouter.checkKey', async (): Promise<AiKeyStatus> => o.openrouter ? o.openrouter.check() : { state: 'none' })
-  ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, costUnknown: false, missingCostCount: 0 })
+  ipcMain.handle('ai.openrouter.usage', async (): Promise<AiUsage> => o.usage ? o.usage.summary() : { todayUsd: 0, thirtyDayUsd: 0, transcriptionPerHourUsd: {}, transcriptionCostUnknown: false, textCostUnknown: false, missingCostCount: 0 })
 }

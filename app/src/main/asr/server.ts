@@ -5,6 +5,7 @@ import { createServer } from 'node:net'
 import { availableParallelism } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { helperFile } from '../../shared/platform'
+import { childEnvironment } from '../childEnv'
 
 /**
  * whisper-server (whisper.cpp, built by scripts/native.sh) on 127.0.0.1 with a random port.
@@ -44,12 +45,12 @@ const freePort = (): Promise<number> => new Promise((resolve, reject) => {
 
 /** Windows has no ps: tasklist prints "whisper-server.exe","4242",... for a pid that exists, and an INFO line otherwise */
 const windowsName = (pid: number): string | null =>
-  execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true }).match(/^"([^"]+)"/m)?.[1] ?? null
+  execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { env: childEnvironment(), encoding: 'utf8', windowsHide: true }).match(/^"([^"]+)"/m)?.[1] ?? null
 
 /** How a left-over process is looked up and killed; tests stand in for it */
 export type ProcessLookup = { name(pid: number): string | null; kill(pid: number): void }
 const realLookup: ProcessLookup = {
-  name: (pid) => { try { return process.platform === 'win32' ? windowsName(pid) : execFileSync('ps', ['-p', String(pid), '-o', 'comm='], { encoding: 'utf8' }).trim() || null } catch { return null } },
+  name: (pid) => { try { return process.platform === 'win32' ? windowsName(pid) : execFileSync('ps', ['-p', String(pid), '-o', 'comm='], { env: childEnvironment(), encoding: 'utf8' }).trim() || null } catch { return null } },
   kill: (pid) => { try { process.kill(pid, 'SIGKILL') } catch { /* already gone */ } },
 }
 
@@ -121,7 +122,7 @@ export function createWhisperServer(o: Opts) {
     const args = ['-m', o.model, '--host', '127.0.0.1', '--port', String(port), '-t', String(o.threads ?? Math.min(4, availableParallelism())), '-bs', '5']
     if (o.vadModel) args.push('--vad', '-vm', o.vadModel)
     if (cpuOnly) args.push('-ng')
-    const p = spawn(o.binary, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
+    const p = spawn(o.binary, args, { env: childEnvironment(), stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
     launches++
     child = p
     died = false

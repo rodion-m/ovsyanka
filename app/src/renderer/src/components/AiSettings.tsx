@@ -142,8 +142,8 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
       {shown.backend === 'openrouter' && <p className="ai-settings-note">{aiText('openrouterStage6')}</p>}
       {shown.backend === 'agy'
         ? picker('transcriptionModel', 'audioModel', catalog.transcription, ['recommended', 'audio'], undefined, ['medium', 'high'])
-        : shown.backend === 'porch' ? null : input('transcriptionModel', 'audioModel')}
-      {effort('transcriptionEffort', 'audioEffort', shown.backend === 'agy' ? withoutLow(effortsOf(AGY_TRANSCRIPTION, shown.transcriptionModel, ['medium', 'high']), ['medium', 'high']) : ['medium', 'high'])}
+        : shown.backend === 'porch' || shown.backend === 'openrouter' ? null : input('transcriptionModel', 'audioModel')}
+      {shown.backend !== 'openrouter' && effort('transcriptionEffort', 'audioEffort', shown.backend === 'agy' ? withoutLow(effortsOf(AGY_TRANSCRIPTION, shown.transcriptionModel, ['medium', 'high']), ['medium', 'high']) : ['medium', 'high'])}
       {shown.backend === 'agy' && <>
         {picker('textModel', 'textModel', catalog.text, ['recommended', 'text'], 'textHelp', ['low', 'medium', 'high'])}
         {effort('textEffort', 'textEffort', effortsOf(catalog.text, shown.textModel, ['low', 'medium', 'high']))}

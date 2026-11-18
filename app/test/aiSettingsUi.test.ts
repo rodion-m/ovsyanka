@@ -71,6 +71,8 @@ describe('AI settings fields', () => {
     const locked = { backend: { variable: 'YOGURT_AI_BACKEND', value: 'openrouter' } }
     const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend: 'openrouter' }), change() {}, locked }))
     expect(html).toContain('OpenRouter model and key controls are configured in stage 6.')
+    expect(html).not.toContain('id="ai-transcriptionModel"')
+    expect(html).not.toContain('id="ai-transcriptionEffort"')
     expect(status(prefs({ active: aiSettings({ backend: 'openrouter' }) }))).toContain('OpenRouter · google/gemini-3.8-flash')
   })
 
