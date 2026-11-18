@@ -1,4 +1,5 @@
 import { language } from '../../../shared/i18n'
+import type { AiProblemCode } from '../../../shared/ai'
 
 /** Fork-specific UI is available in Russian and English; other interface locales use English here. */
 const en = {
@@ -97,6 +98,20 @@ const en = {
   pricePerHour: '≈ ${x} per hour of speech',
   pricePerMillion: '${in} / ${out} per million tokens',
   addedOn: 'on OpenRouter since {when}',
+  problemNoKey: 'Add your OpenRouter API key in Settings. Recording continues; transcription starts once you add it.',
+  problemAuth: 'OpenRouter rejected the key. Check or replace it in Settings. Your audio is kept.',
+  problemCredits: 'Your OpenRouter credits have run out. Add credits, then press Retry. Your audio is kept.',
+  problemBudget: "This key's spending limit is reached. Raise it in your OpenRouter account or wait for the reset.",
+  problemRateLimit: 'OpenRouter asked to wait. Yogurt will retry by itself.',
+  problemModelGone: 'The model "{model}" is no longer on OpenRouter. Choose another in Settings. Your audio is kept.',
+  problemNoProvider: 'No provider of "{model}" meets the selected data policy. Relax it or choose another model.',
+  problemUnavailable: "Couldn't reach OpenRouter. Yogurt will retry; your audio is kept.",
+  problemNoTimestamps: "This model doesn't return phrase timings, so Yogurt can't use it. Choose another model.",
+  problemModeration: 'The provider declined to process this part. Try another model.',
+  problemKeychain: "Couldn't use the saved key. Enter it again in Settings.",
+  problemBadResponse: "OpenRouter returned a response Yogurt couldn't read. Your audio is kept; try again.",
+  problemTruncated: 'OpenRouter returned a truncated transcript. Your audio is kept; choose another model or try again.',
+  problemTooLarge: 'OpenRouter returned an oversized response. Your audio is kept; try again.',
 } as const
 
 const ru: Record<keyof typeof en, string> = {
@@ -195,6 +210,20 @@ const ru: Record<keyof typeof en, string> = {
   pricePerHour: '≈ ${x} за час речи',
   pricePerMillion: '${in} / ${out} за млн токенов',
   addedOn: 'на OpenRouter с {when}',
+  problemNoKey: 'Добавьте API-ключ OpenRouter в настройках. Запись идёт, расшифровка начнётся после добавления ключа.',
+  problemAuth: 'OpenRouter не принял ключ. Проверьте или замените его в настройках. Аудио сохранено.',
+  problemCredits: 'На счёте OpenRouter закончились кредиты. Пополните счёт и нажмите «Повторить». Аудио сохранено.',
+  problemBudget: 'Достигнут лимит расходов этого ключа. Увеличьте лимит в кабинете OpenRouter или дождитесь сброса.',
+  problemRateLimit: 'OpenRouter просит подождать. Yogurt повторит запрос сам.',
+  problemModelGone: 'Модели «{model}» больше нет в OpenRouter. Выберите другую в настройках. Аудио сохранено.',
+  problemNoProvider: 'Ни один провайдер модели «{model}» не подходит под выбранное правило данных. Смягчите правило или выберите другую модель.',
+  problemUnavailable: 'Не удалось связаться с OpenRouter. Yogurt повторит попытку; аудио сохранено.',
+  problemNoTimestamps: 'Эта модель не возвращает время фраз, Yogurt не может её использовать. Выберите другую модель.',
+  problemModeration: 'Провайдер отказался обрабатывать этот фрагмент. Попробуйте другую модель.',
+  problemKeychain: 'Не удалось использовать сохранённый ключ. Введите его заново в настройках.',
+  problemBadResponse: 'OpenRouter вернул ответ, который Yogurt не смог прочитать. Аудио сохранено; попробуйте ещё раз.',
+  problemTruncated: 'OpenRouter вернул неполную расшифровку. Аудио сохранено; выберите другую модель или попробуйте ещё раз.',
+  problemTooLarge: 'OpenRouter вернул слишком большой ответ. Аудио сохранено; попробуйте ещё раз.',
 }
 
 export type AiCopyKey = keyof typeof en
@@ -202,3 +231,19 @@ export const aiText = (key: AiCopyKey, locale = language()): string => (locale =
 /** The few strings with {placeholders}. */
 export const aiTextF = (key: AiCopyKey, params: Record<string, string>, locale = language()): string =>
   Object.keys(params).reduce((out, name) => out.replaceAll(`{${name}}`, params[name]), aiText(key, locale))
+
+const problemTextKeys: Record<AiProblemCode, AiCopyKey> = {
+  'no-key': 'problemNoKey', auth: 'problemAuth', credits: 'problemCredits', budget: 'problemBudget',
+  'rate-limit': 'problemRateLimit', 'model-gone': 'problemModelGone', 'no-provider': 'problemNoProvider',
+  unavailable: 'problemUnavailable', timeout: 'problemUnavailable', network: 'problemUnavailable',
+  'no-timestamps': 'problemNoTimestamps', moderation: 'problemModeration', keychain: 'problemKeychain',
+  'bad-response': 'problemBadResponse', truncated: 'problemTruncated', 'too-large': 'problemTooLarge',
+}
+
+/** The short, actionable transcription warning shown under the live note. */
+export function aiProblemText(code: AiProblemCode, model?: string, locale = language()): string {
+  const key = problemTextKeys[code]
+  return key === 'problemModelGone' || key === 'problemNoProvider'
+    ? aiTextF(key, { model: model || '…' }, locale)
+    : aiText(key, locale)
+}

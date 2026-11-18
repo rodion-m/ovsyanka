@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { aiSettings, type AiSettings } from '../src/shared/ai'
 import { createOpenRouter, type OpenRouterLogEntry } from '../src/main/harness/openrouter'
+import { HarnessError } from '../src/main/harness/process'
 import { createOpenRouterUsage } from '../src/main/harness/openrouterUsage'
 import type { OpenRouterKeyFetch } from '../src/main/harness/openrouterKey'
 import { checkHarness, createSubscriptionHarness } from '../src/main/harness'
@@ -311,6 +312,18 @@ describe('OpenRouter usage and spooled pipeline', () => {
     retryTimer.mockRestore()
   })
 
+  it('emits a no-key problem once through the real pipeline without making an HTTP request', async () => {
+    const rootPath = await root(), chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000) }
+    const fetch = vi.fn<OpenRouterKeyFetch>()
+    const router = createOpenRouter({ settings: settings(), key: { read: async () => { throw new HarnessError('missing', 'no-key') } }, fetch, lookupModel: async () => model() })
+    const spool = createSpool(spoolDirOf(join(rootPath, 'no-key'))), keyInSpool = spool.add(chunk)!
+    const problems: Array<{ code: string; model?: string } | null> = []
+    const pipeline = createPipeline({ meetingId: 'no-key', batchMs: 1, spool, transcribe: async () => { await router.text('no key', signal()); return [] }, save: () => {}, emit: () => {}, onAiProblem: problem => problems.push(problem) })
+    pipeline.enqueue(chunk, keyInSpool); await pipeline.finish()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(problems).toEqual([{ code: 'no-key', model: 'google/gemini-3.8-flash' }])
+  })
+
   it('stores only daily cost/audio aggregates and reports measured transcription hourly cost', async () => {
     const rootPath = await root(), clock = { at: Date.parse('2026-11-18T12:00:00Z') }
     const usage = createOpenRouterUsage({ userData: rootPath, now: () => clock.at })
@@ -351,7 +364,8 @@ describe('OpenRouter usage and spooled pipeline', () => {
     })
     const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000), clearMs: 1_000 }
     const saved: string[] = []
-    const pipeline = createPipeline({ meetingId: 'm1', batchMs: 60_000, spool, transcribe: async c => { bodies.push(c); return transcriber(c) }, save: lines => saved.push(...lines.map(line => line.text)), emit: () => {} })
+    const problems: Array<{ code: string; model?: string } | null> = []
+    const pipeline = createPipeline({ meetingId: 'm1', batchMs: 60_000, spool, transcribe: async c => { bodies.push(c); return transcriber(c) }, save: lines => saved.push(...lines.map(line => line.text)), emit: () => {}, onAiProblem: problem => problems.push(problem) })
     pipeline.enqueue(chunk, spool.add(chunk))
     const failed = pipeline.finish()
     await failed
@@ -359,6 +373,7 @@ describe('OpenRouter usage and spooled pipeline', () => {
     expect(saved).toEqual([])
     expect(spool.hasEntries()).toBe(true)
     expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true })
+    expect(problems).toEqual([{ code: 'credits', model: 'google/gemini-3.8-flash' }])
 
     const goodFetch: OpenRouterKeyFetch = async () => answer({ choices: [{ message: { content: JSON.stringify({ segments: [{ start: 0, end: 0.5, text: 'После пополнения.' }] }) } }] })
     const goodRouter = createOpenRouter({ settings: settings(), key: key(), fetch: goodFetch, lookupModel: async () => model(), log: () => {} })
@@ -366,12 +381,13 @@ describe('OpenRouter usage and spooled pipeline', () => {
       prompt: () => '', language: () => undefined, onLanguage: vi.fn(),
     })
     const recovered = spool.list()[0]
-    const recoveredPipeline = createPipeline({ meetingId: 'm1', batchMs: 1, spool, transcribe: async c => goodTranscriber(c), save: lines => saved.push(...lines.map(line => line.text)), emit: () => {} })
+    const recoveredPipeline = createPipeline({ meetingId: 'm1', batchMs: 1, spool, transcribe: async c => goodTranscriber(c), save: lines => saved.push(...lines.map(line => line.text)), emit: () => {}, onAiProblem: problem => problems.push(problem) })
     recoveredPipeline.enqueue(recovered, recovered.key)
     await recoveredPipeline.finish()
     expect(saved).toEqual(['После пополнения.'])
     expect(spool.hasEntries()).toBe(false)
     expect(bodies).toHaveLength(1)
+    expect(problems.at(-1)).toBeNull()
   })
 
   it('aborts a long request through harness.stop and leaves the batch spooled', async () => {

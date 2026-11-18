@@ -8,6 +8,7 @@ import { fakeAudioDuration, fakeCaptureProc, joinFakeParts } from './fakeCapture
 import type { RecordingStart } from './meeting'
 import { createCrashPolicy } from './crashPolicy'
 import { helperFile } from '../shared/platform'
+import type { AiProblemEvent } from '../shared/ai'
 
 /**
  * Recording a meeting: yogurt-audio writes me.m4a and them.m4a (Windows and Linux: me.ogg and them.ogg, Ogg Opus) into the meeting's folder and streams
@@ -262,6 +263,7 @@ export type RecordingEvent =
   | { t: 'level'; me: number; them: number; themZero: boolean; ms: number; noBuffers?: boolean; meetingId: string }
   | { t: 'warn'; code: WarnCode | TranscribeWarn }
   | { t: 'system-ready'; meetingId: string }
+  | { t: 'ai-problem'; problem: AiProblemEvent }
   | { t: 'hiccup' }
   | { t: 'gave-up' }
   | { t: 'paused'; meetingId: string; paused: boolean; at: number }

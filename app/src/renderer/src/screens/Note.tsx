@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { useScrollMemory } from '../useScrollMemory'
 import { AudioLines, Lock, RotateCcw, Trash2, TextAlignStart, TriangleAlert } from 'lucide-react'
 import type { MeetingView, NoteSaveResult, NoteSide, NoteView, WidgetView } from '../../../shared/types'
+import type { AiProblemEvent } from '../../../shared/ai'
 import { t } from '../../../shared/i18n'
 import { osWords } from '../keys'
 import { Modal, ModalClose } from '../components/Modal'
@@ -122,7 +123,10 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   const current = useRef<NoteView | undefined>(undefined)
   /** what the recorder has to say right now (a hint, a hiccup), shown under the note too */
   const [recorder, setRecorder] = useState<WidgetView | null>(null)
-  const hint = recorder?.note
+  const [aiProblem, setAiProblem] = useState<AiProblemEvent | null>(null)
+  const hint = aiProblem?.code
+    ? { tone: 'hint' as const, text: "Some of this meeting couldn't be transcribed.", aiProblem }
+    : recorder?.note
   /** stretches where the other side's track was silent during a call, over two minutes in all */
   const themSilentNote = themSilentText(m?.themSilent, m?.state !== 'recording')
   const sourceDone = useRef<number | undefined>(undefined)
@@ -154,6 +158,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
     void window.yogurt.widget.state().then(take)
     return window.yogurt.widget.onState(take)
   }, [id, isRecording])
+
+  useEffect(() => {
+    let received = false
+    const off = window.yogurt.ai.onProblem(problem => { received = true; setAiProblem(problem) })
+    void window.yogurt.ai.problemState().then(problem => { if (!received) setAiProblem(problem) })
+    return off
+  }, [])
 
   useEffect(() => {
     const load = () => void window.yogurt.meetings.get(id).then(setM)
@@ -462,7 +473,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
           {resumeFailed && <p data-testid="note-resume-failed" role="alert" className="pointer-events-auto mx-auto mt-3 w-fit max-w-[calc(100%-32px)] text-[13px] text-danger">{t("Couldn't resume recording. Your existing note and audio are kept. Try again.")}</p>}
           {pauseFailed && recording && <p role="alert" className="pointer-events-auto mx-auto mt-3 w-fit text-[13px] text-danger">{pauseFailed === 'pause' ? t("Couldn't pause the recording. Try again.") : t("Couldn't resume the recording. Try again.")}</p>}
           {recording && recorder && <ThemSilence view={recorder} />}
-          {recording && hint && hint.code !== 'them-silent' && <RecordingHint hint={hint} />}
+          {hint && (recording || aiProblem?.code) && hint.code !== 'them-silent' && <RecordingHint hint={hint} />}
           <div className="note-footer-bar">
           <div className="note-status pointer-events-auto flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
             {(recording || m.state === 'prepared') && <><MicMenu recording={recording} paused={recording && m.paused} /><SpokenMenu /><span aria-hidden="true">·</span></>}

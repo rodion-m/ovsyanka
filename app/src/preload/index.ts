@@ -13,6 +13,12 @@ const api: YogurtApi = {
     save: (settings) => ipcRenderer.invoke('ai:save', settings),
     check: (settings) => ipcRenderer.invoke('ai:check', settings),
     options: (request) => ipcRenderer.invoke('ai:options', request),
+    onProblem: (cb) => {
+      const on = (_e: unknown, problem: Parameters<typeof cb>[0]) => cb(problem)
+      ipcRenderer.on('ai:problem', on)
+      return () => { ipcRenderer.removeListener('ai:problem', on) }
+    },
+    problemState: () => ipcRenderer.invoke('ai:problem-state'),
     restart: () => ipcRenderer.invoke('ai:restart'),
     openrouter: {
       keyStatus: () => ipcRenderer.invoke('ai.openrouter.keyStatus'),

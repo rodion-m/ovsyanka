@@ -180,6 +180,7 @@ export function createWidget(d: { open(meetingId: string): void; stop(meetingId:
     if (e.t === 'level') broadcast('widget:level', { me: e.me, them: e.them })
     else if (e.t === 'paused' && e.meetingId === model.meetingId) { model.pause(e.paused, e.at); push() }
     else if (e.t === 'warn') { model.warn(e.code); push() }
+    else if (e.t === 'ai-problem' && e.problem) { model.setAiProblem(e.problem); push() }
     else if (e.t === 'gave-up') model.gaveUp()
     else if (e.t === 'hiccup') {
       model.hiccup(Date.now()); push()

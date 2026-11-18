@@ -8,7 +8,7 @@ import type { AiProblemCode } from '../../shared/ai'
 
 /** Errors deliberately omit provider diagnostics: they can contain meeting text or credentials. */
 export class HarnessError extends Error {
-  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0) { super(message); this.name = 'HarnessError' }
+  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string) { super(message); this.name = 'HarnessError' }
 }
 
 export function aborted(): Error {

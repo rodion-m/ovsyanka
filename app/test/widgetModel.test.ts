@@ -33,6 +33,18 @@ describe('recording hints on Windows and Linux', () => {
   })
 })
 
+describe('remote transcription problems', () => {
+  it('keeps the actionable problem in the existing note warning and clears it on success', () => {
+    const w = new WidgetModel()
+    w.start(m)
+    const credits = { code: 'credits' as const, model: 'google/gemini-3.8-flash', at: 100 }
+    w.setAiProblem(credits)
+    expect(w.view(2000)?.note).toMatchObject({ aiProblem: credits, tone: 'hint' })
+    w.setAiProblem({ code: null, at: 200 })
+    expect(w.view(2000)?.note?.aiProblem).toBeUndefined()
+  })
+})
+
 describe('widget model', () => {
   it('is hidden until a meeting starts', () => {
     expect(new WidgetModel().view(0)).toBeNull()

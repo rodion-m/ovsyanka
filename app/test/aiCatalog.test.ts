@@ -82,6 +82,8 @@ describe('OpenRouter catalog normalization and selection', () => {
     ['floating alias', rawModel({ id: '~acme/meeting-model' }), false, false],
     ['expired model', rawModel({ expiration_date: '2026-11-17' }), false, false],
     ['audio without text output', rawModel({ architecture: { input_modalities: ['audio'], output_modalities: ['image'] } }), false, false],
+    ['audio completion cap below a full batch', rawModel({ top_provider: { max_completion_tokens: 47_999 } }), false, true],
+    ['audio completion cap for a full batch', rawModel({ top_provider: { max_completion_tokens: 48_000 } }), true, true],
     ['missing endpoints is treated as chat', rawModel({ endpoints: undefined }), true, true],
     ['missing created remains selectable', rawModel({ created: undefined }), true, true],
     ['free suffix and zero price', rawModel({ id: 'acme/meeting-model:free', pricing: { prompt: '0', completion: '0', audio: '0' } }), true, true],
@@ -127,10 +129,10 @@ describe('OpenRouter catalog normalization and selection', () => {
     expect(transcription).not.toHaveLength(0)
     expect(text).not.toHaveLength(0)
 
-    // Independent oracle: these are the plan's hand-classified counts for these saved records.
+    // Selectable audio-chat counts exclude saved records with a known completion cap below 48k.
     const chatAudio = transcription.filter(option => option.kind === 'chat')
-    expect(chatAudio).toHaveLength(32)
-    expect(chatAudio.filter(option => !option.hints.includes('free'))).toHaveLength(31)
+    expect(chatAudio).toHaveLength(28)
+    expect(chatAudio.filter(option => !option.hints.includes('free'))).toHaveLength(27)
     expect(chatAudio.filter(option => option.hints.includes('free'))).toHaveLength(1)
     expect(transcription.filter(option => option.kind === 'stt')).toHaveLength(30)
     expect(transcription.filter(option => option.group === 'free')).toHaveLength(1)

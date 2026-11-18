@@ -10,6 +10,7 @@ import { createWhisperServer, recoverer, vadModelPath, whisperServerPath, type W
 import { createTranscriber, type Line, type Transcribe } from './transcribe'
 import { meetingWords, respell, whisperPrompt } from '../vocab'
 import type { TranscriptPartial } from '../../shared/types'
+import type { AiProblemUpdate } from '../../shared/ai'
 import type { Chunk } from './chunker'
 import { createSpool, spoolDirOf, spoolRounds, SPOOL_MAX_ATTEMPTS, type AudioSpool, type SpooledChunk } from './spool'
 
@@ -171,6 +172,8 @@ export function hookTranscription(p: {
   extraWaitMs?: number
   /** trouble to show the person (once per meeting each) */
   warn: (code: TranscribeWarn) => void
+  /** remote transcription problem; success clears the most recent problem */
+  aiProblem?: (problem: AiProblemUpdate) => void
   /** where whisper-server keeps its pid, so a later start can clean up after a crash */
   pidFile?: string
   /** for tests; heard(language, chars, locked) says what language a chunk was in */
@@ -275,7 +278,7 @@ export function hookTranscription(p: {
         try { p.store.addSegments(segs) } catch (e) { saveFailed = true; throw e }
         // a renderer that went away must not turn a committed save into a failed one (its audio would stay spooled)
         if (segs.some(s => s.hidden)) { try { p.refresh?.(id) } catch (e) { console.error('refreshing the transcript failed', e) } }
-      }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce,
+      }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce, onAiProblem: p.aiProblem,
         batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => s.forceSpoken ?? frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
         // recovery drains everything at finish; the first-batch wait does not apply
         firstBatchMs: o?.recovery ? undefined : p.firstBatchMs,

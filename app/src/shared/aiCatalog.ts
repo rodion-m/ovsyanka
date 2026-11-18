@@ -69,6 +69,8 @@ export const OPENROUTER_RECOMMENDED_MODEL_IDS = ['google/gemini-3.8-flash'] as c
 export const OPENROUTER_CHAT_ENDPOINT = '/api/v1/chat/completions'
 export const OPENROUTER_STT_ENDPOINT = '/api/v1/audio/transcriptions'
 export const OPENROUTER_TEXT_CONTEXT_MINIMUM = 32_000
+/** Audio chat requests reserve 48,000 completion tokens so long transcriptions are not silently capped. */
+export const OPENROUTER_AUDIO_COMPLETION_MINIMUM = 48_000
 /** Stage 0 measured Gemini 3.8 Flash chat-audio input at 25 tokens per second. */
 export const OPENROUTER_AUDIO_TOKENS_PER_SECOND = 25
 /** Completion includes reasoning tokens. Measured fixture rate: 11,986 tokens / 5 audio minutes. */
@@ -203,10 +205,12 @@ function commonEligible(model: OpenRouterModel, now: number): boolean {
 }
 
 function isAudioChatModel(model: OpenRouterModel, now: number): boolean {
+  const completionLimit = model.top_provider?.max_completion_tokens
   return commonEligible(model, now)
     && model.architecture.input_modalities.includes('audio')
     && model.architecture.output_modalities.includes('text')
     && endpoint(model, OPENROUTER_CHAT_ENDPOINT)
+    && (completionLimit == null || completionLimit >= OPENROUTER_AUDIO_COMPLETION_MINIMUM)
 }
 
 function isSttModel(model: OpenRouterModel, now: number): boolean {

@@ -1,5 +1,6 @@
 import type { TranscribeWarn, WarnCode } from './capture'
 import type { ThemSilentPhase, WidgetView } from '../shared/types'
+import type { AiProblemEvent } from '../shared/ai'
 import { t } from '../shared/i18n'
 export { formatElapsed } from '../shared/wave'
 
@@ -20,6 +21,7 @@ export class WidgetModel {
   private missingAudio = new Set<'mic' | 'systemAudio'>()
   /** transcription trouble; the recorder's hints come first */
   private textHint: TranscribeWarn | null = null
+  private aiProblem: AiProblemEvent | null = null
   private hiccupUntil = 0
   private crashed = false
   private savePending = false
@@ -33,7 +35,7 @@ export class WidgetModel {
 
   start(m: { id: string; title: string; startedAt: number }) {
     this.m = m; this.kind = 'recording'
-    this.missingAudio.clear(); this.textHint = null; this.hiccupUntil = 0; this.crashed = false; this.savePending = false
+    this.missingAudio.clear(); this.textHint = null; this.aiProblem = null; this.hiccupUntil = 0; this.crashed = false; this.savePending = false
     this.pausedAt = null; this.pausedMs = 0; this.byCall = false
     this.themPhase = null; this.themMuted = false
   }
@@ -43,6 +45,10 @@ export class WidgetModel {
   warn(code: WarnCode | TranscribeWarn) {
     if (code === 'no-system-audio' || code === 'no-mic') this.missingAudio.add(code === 'no-mic' ? 'mic' : 'systemAudio')
     else if (code === 'transcribe-failed' || code === 'no-speech-model' || code === 'falling-behind') this.textHint = code
+  }
+  setAiProblem(problem: AiProblemEvent) {
+    if (this.aiProblem && problem.at < this.aiProblem.at) return
+    this.aiProblem = problem.code ? problem : null
   }
   /** the helper was restarted: it records again */
   hiccup(now: number) { this.hiccupUntil = now + HICCUP_MS }
@@ -75,6 +81,7 @@ export class WidgetModel {
       else if (this.missingAudio.has('mic')) note = { tone: 'hint', code: 'no-mic', text: this.mac ? t("Yogurt can't hear your mic. Allow it in System Settings.") : this.noMic() }
       else if (this.missingAudio.has('systemAudio')) note = { tone: 'hint', code: 'no-system-audio', text: this.mac ? t("Yogurt can't hear the call audio. Allow it in System Settings.") : t("Yogurt can't hear the call audio on this computer.") }
       else if (this.themPhase && !this.themMuted) note = { tone: 'hint', code: 'them-silent', them: this.themPhase, text: this.themPhase === 'warn' ? t("Can't hear the other side") : this.themPhase === 'restarting' ? t('Restarting sound capture…') : this.themPhase === 'ok' ? t("The other side's sound is being recorded again") : t("That didn't help. Check the sound output in your system settings or the call app.") }
+      else if (this.aiProblem) note = { tone: 'hint', aiProblem: this.aiProblem, text: t("Some of this meeting couldn't be transcribed.") }
       else if (this.textHint === 'transcribe-failed') note = { tone: 'hint', text: t("Some of this meeting couldn't be transcribed.") }
       else if (this.textHint === 'no-speech-model') note = { tone: 'hint', text: t("The speech model isn't ready yet, so only audio is being saved.") }
       else if (this.textHint === 'falling-behind') note = { tone: 'hint', text: t('Yogurt is falling behind. Some lines may be missing.') }

@@ -6,6 +6,7 @@ import type { Meeting, MeetingCard as StoredMeetingCard, Person, Segment, Snippe
 import type { CalEvent, CalendarSource, CalendarStatus } from '../main/calendar'
 import type { Access, PermissionKind, PermissionStatus } from '../main/permissions'
 import type { Capabilities } from './platform'
+import type { AiProblemEvent } from './ai'
 export type { Access, PermissionKind, PermissionStatus }
 /** one first-run question: a permission, or open at login last */
 export type OnboardingStep = { kind: PermissionKind; status: Access }
@@ -36,6 +37,10 @@ export type YogurtApi = {
     /** Availability/version only: no model call or account verification. */
     check(settings: import('./ai').AiSettings): Promise<import('./ai').AiCheck>
     options(request: { backend: 'agy' | 'porch'; refresh?: boolean; agyPath?: string; porchPath?: string }): Promise<import('./aiCatalog').AiOptions>
+    /** Current transcription problem; code null clears it after a later successful request. */
+    onProblem(cb: (problem: AiProblemEvent) => void): () => void
+    /** Current problem for a note opened after the event was first emitted. */
+    problemState(): Promise<AiProblemEvent | null>
     openrouter: {
       keyStatus(): Promise<import('./ai').AiKeyStatus>
       setKey(key: string): Promise<import('./ai').AiKeyStatus>
@@ -421,7 +426,7 @@ export type WidgetView = {
   /** time recorded as of `at` (main's clock); the page counts on from there while recording */
   elapsedMs: number
   at: number
-  note: { tone: 'hint' | 'hiccup'; text: string; /** which warning a hint is for */ code?: 'no-mic' | 'no-system-audio' | 'them-silent'; missingAudio?: ('mic' | 'systemAudio')[]; /** the silent-"them" warning's state */ them?: ThemSilentPhase } | null
+  note: { tone: 'hint' | 'hiccup'; text: string; /** which warning a hint is for */ code?: 'no-mic' | 'no-system-audio' | 'them-silent'; missingAudio?: ('mic' | 'systemAudio')[]; /** the silent-"them" warning's state */ them?: ThemSilentPhase; aiProblem?: AiProblemEvent } | null
   /** "don't warn for this meeting" was picked: the note shows a quiet line instead of the banner */
   themMuted?: true
   /** the recording stopped because the audio helper kept failing */

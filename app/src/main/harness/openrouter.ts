@@ -275,11 +275,11 @@ export class OpenRouterAdapter {
     let lastError: HarnessError | undefined
     for (let attempt = 0; attempt < OPENROUTER_MAX_ATTEMPTS; attempt++) {
       assertRunning(signal)
-      const key = await this.dependencies.key.read()
       const started = this.now()
       let status = 0, bodySize = 0, generationId: string | undefined, errorType: string | undefined, costUsd: number | undefined, response: Response | undefined
       const logAttempt = () => this.log({ model: safeModel(model), status, ...(errorType ? { error_type: errorType } : {}), ...(generationId ? { generationId } : {}), durationMs: Math.max(0, this.now() - started), bodySize, ...(costUsd === undefined ? {} : { costUsd }) })
       try {
+        const key = await this.dependencies.key.read()
         const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }
         const result = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
           method: 'POST', headers, body: JSON.stringify(body),
@@ -342,7 +342,7 @@ export class OpenRouterAdapter {
       } catch (error) {
         if (signal.aborted) throw aborted()
         const harnessError = error instanceof HarnessError
-          ? (error.attempts ? error : new HarnessError(error.message, error.code, attempt + 1))
+          ? new HarnessError(error.message, error.code, error.attempts || attempt + 1, error.model ?? safeModel(model))
           : undefined
         if (harnessError?.code && retryable(harnessError.code) && attempt + 1 < OPENROUTER_MAX_ATTEMPTS) {
           lastError = harnessError

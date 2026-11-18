@@ -58,6 +58,7 @@ import { macFullName } from './user'
 import { setJargon, setOwnerName } from './vocab'
 import { cleanJargon } from '../shared/jargon'
 import { setGenericTitles } from './titles'
+import type { AiProblemEvent } from '../shared/ai'
 import { installAppMenu } from './appMenu'
 import { UtilityEngine } from './engine'
 import { createNotesModel } from './notes/model'
@@ -585,6 +586,8 @@ app.whenReady().then(() => {
   callNamesRef = callNames
   // Windows and Linux: whisper left the graphics card in a meeting, so the speed check (timed with it) runs again next start
   onWhisperGpuOff(() => speedStore(speedFile()).forget())
+  let currentAiProblem: AiProblemEvent | null = null
+  ipcMain.handle('ai:problem-state', () => currentAiProblem)
   hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
     const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
     const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
@@ -598,6 +601,13 @@ app.whenReady().then(() => {
     resuming: (id) => resumingId === id,
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
     warn: (code) => tell({ t: 'warn', code }), pidFile: join(userDataDir(), 'whisper-server.pid'),
+    aiProblem: (problem) => {
+      if (!problem && !currentAiProblem) return
+      const event: AiProblemEvent = problem ? { ...problem, at: Date.now() } : { code: null, at: Date.now() }
+      currentAiProblem = problem ? event : null
+      win?.webContents.send('ai:problem', event)
+      tell({ t: 'ai-problem', problem: event })
+    },
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, firstBatchMs: 60_000, maxQueuedMs: 15 * 60_000 } : {}),
     meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once

@@ -45,6 +45,8 @@ export function createPipeline(p: {
   echoForTests?: EchoCheck
   /** trouble worth telling the person about; each kind is reported once */
   onWarn?: (kind: Exclude<TranscribeWarn, 'no-speech-model'>) => void
+  /** a remote transcription failure; null clears the last problem after any later success */
+  onAiProblem?: (problem: { code: AiProblemCode; model?: string } | null) => void
   /** who said a line of the other side, as the call app showed it (callNames); null: Them */
   nameOf?: (startMs: number, endMs: number) => string | null
   /** the meeting's spellings of names and companies (vocab.ts respell) */
@@ -205,16 +207,23 @@ export function createPipeline(p: {
     let retrying = false
     // the call is deferred to a microtask so a synchronous throw takes the same failure path as a rejection
     Promise.resolve().then(() => p.transcribe(c))
-      .then((lines) => onLines(t, lines, c.startMs, chunkEnd, sources))
+      .then((lines) => {
+        p.onAiProblem?.(null)
+        onLines(t, lines, c.startMs, chunkEnd, sources)
+      })
       // its quick reading goes too: nothing final will replace it
       .catch((e) => {
         console.error(`transcribing a ${t} chunk failed`, e)
         // a closed pipeline or an aborted request (the app is going away) is never retried
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
         const code = typeof e === 'object' && e !== null && 'code' in e ? (e as { code?: AiProblemCode }).code : undefined
+        const model = typeof e === 'object' && e !== null && 'model' in e && typeof (e as { model?: unknown }).model === 'string' ? (e as { model: string }).model : undefined
         const attempts = typeof e === 'object' && e !== null && 'attempts' in e ? Number((e as { attempts?: unknown }).attempts) : 0
         const permanent: AiProblemCode[] = ['auth', 'credits', 'budget', 'model-gone', 'no-provider', 'moderation', 'truncated', 'bad-response', 'no-key', 'keychain', 'no-timestamps']
         if (retries > 0 && !cancelled && !(code && permanent.includes(code)) && !(Number.isSafeInteger(attempts) && attempts >= 3)) { retrying = true; setTimeout(() => run(t, c, retries - 1), RETRY_MS); return }
+        if (!cancelled && code) {
+          try { p.onAiProblem?.({ code, ...(model ? { model } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
+        }
         // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
         // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
         // chunks that never went out count nothing

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { aiSettings, type AiBackend, type AiPreferences } from '../src/shared/ai'
 import { setLanguage } from '../src/shared/i18n'
 import { AiSettingsFields, AiStatus } from '../src/renderer/src/components/AiSettings'
-import { aiText } from '../src/renderer/src/components/aiCopy'
+import { aiProblemText, aiText } from '../src/renderer/src/components/aiCopy'
 import { screenCopy } from '../src/renderer/src/permissionCopy'
 import { setupItems } from '../src/renderer/src/components/SetupStatus'
 
@@ -149,6 +149,13 @@ describe('AI settings fields', () => {
     expect(fields('agy')).toContain('Средний · medium')
     expect(aiText('checkHelp')).toContain('не обращается к модели')
     expect(aiText('title', 'de')).toBe(aiText('title', 'en'))
+  })
+
+  it('shows actionable remote transcription problems in Russian and English across locale fallback', () => {
+    expect(aiProblemText('credits', undefined, 'en')).toContain('Add credits, then press Retry')
+    expect(aiProblemText('no-key', undefined, 'ru')).toContain('Добавьте API-ключ OpenRouter')
+    expect(aiProblemText('model-gone', 'vendor/model', 'ru')).toContain('vendor/model')
+    expect(aiProblemText('auth', undefined, 'de')).toContain('OpenRouter rejected the key')
   })
 })
 
