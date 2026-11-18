@@ -8,7 +8,9 @@ const en = {
   agy: 'agy · Antigravity CLI',
   porch: 'Porch profiles',
   local: 'Local models',
-  active: 'Active now',
+  activeNow: 'Active now',
+  savedPending: 'Saved: {x} — applies after restart.',
+  lockedByEnv: "Set at launch by {VAR}. It can't be changed here.",
   defaultModel: 'Default: Gemini 3.8 Flash · medium thinking.',
   subscription: 'No local AI models are downloaded in agy or Porch mode. Sign in to your provider separately in its CLI.',
   localHelp: 'Local mode downloads speech, notes and search models after restart. It can then process meetings offline.',
@@ -46,10 +48,7 @@ const en = {
   checkFailed: 'Executable check failed',
   restart: 'Restart Yogurt',
   restarting: 'Restarting Yogurt…',
-  restartNeeded: 'Saved changes take effect after restarting Yogurt. The current session keeps the active configuration shown above.',
   restartBlocked: 'Finish recording and wait for transcription and current work to finish, then restart.',
-  saveFirst: 'Save or undo your current edits before restarting.',
-  environmentOverrides: 'These fields are controlled by launch environment variables. Saving keeps your preferences, but the listed overrides still take precedence after restart. Change or remove those variables to apply the saved values.',
   saved: 'Settings saved.',
   loadFailed: 'Could not load AI settings.',
   saveFailed: 'Could not save AI settings. Your changes are still here.',
@@ -71,7 +70,9 @@ const ru: Record<keyof typeof en, string> = {
   agy: 'agy · Antigravity CLI',
   porch: 'Профили Porch',
   local: 'Локальные модели',
-  active: 'Сейчас используется',
+  activeNow: 'Сейчас работает',
+  savedPending: 'Сохранено: {x} — применится после перезапуска.',
+  lockedByEnv: 'Задано при запуске переменной {VAR}. Здесь изменить нельзя.',
   defaultModel: 'По умолчанию: Gemini 3.8 Flash · уровень рассуждения medium.',
   subscription: 'В режимах agy и Porch локальные модели ИИ не скачиваются. Войдите в аккаунт провайдера отдельно через его CLI.',
   localHelp: 'В локальном режиме после перезапуска скачаются модели речи, конспектов и поиска. Затем обработка встреч сможет работать без интернета.',
@@ -109,10 +110,7 @@ const ru: Record<keyof typeof en, string> = {
   checkFailed: 'Проверка CLI не пройдена',
   restart: 'Перезапустить Yogurt',
   restarting: 'Yogurt перезапускается…',
-  restartNeeded: 'Сохранённые изменения применятся после перезапуска Yogurt. Текущий сеанс продолжает использовать настройки, указанные выше.',
   restartBlocked: 'Завершите запись и дождитесь расшифровки и текущих задач, затем повторите перезапуск.',
-  saveFirst: 'Перед перезапуском сохраните или отмените текущие изменения.',
-  environmentOverrides: 'Эти поля управляются переменными окружения при запуске. Настройки сохраняются, но указанные переменные сохраняют приоритет и после перезапуска. Измените или уберите их, чтобы применить сохранённые значения.',
   saved: 'Настройки сохранены.',
   loadFailed: 'Не удалось загрузить настройки ИИ.',
   saveFailed: 'Не удалось сохранить настройки ИИ. Ваши изменения остались в форме.',
@@ -129,3 +127,6 @@ const ru: Record<keyof typeof en, string> = {
 
 export type AiCopyKey = keyof typeof en
 export const aiText = (key: AiCopyKey, locale = language()): string => (locale === 'ru' ? ru : en)[key]
+/** The few strings with {placeholders}. */
+export const aiTextF = (key: AiCopyKey, params: Record<string, string>, locale = language()): string =>
+  Object.keys(params).reduce((out, name) => out.replaceAll(`{${name}}`, params[name]), aiText(key, locale))

@@ -111,10 +111,23 @@ describe('AI preferences IPC', () => {
     active = configuredAi({}, env)
     hookAiPreferences({ file, active, restart, check, env })
     const saved = aiSettings({ ...active, backend: 'porch' })
-    expect(call('ai:save', saved)).toEqual({ saved, active, restartRequired: false, environmentOverrides: ['YOGURT_AI_BACKEND'] })
-    expect(loadSettings(file).ai?.backend).toBe('porch')
+    // nothing was stored yet, so the locked field keeps the shown (effective) value
+    expect(call('ai:save', saved)).toEqual({ saved: active, active, restartRequired: false, locked: { backend: { variable: 'YOGURT_AI_BACKEND', value: 'agy' } } })
+    expect(loadSettings(file).ai?.backend).toBe('agy')
     expect(call<AiPreferences>('ai:get').active.backend).toBe('agy')
     expect(restart).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored backend when the launch mode is locked, while other fields still save', () => {
+    updateSettings(file, { ai: aiSettings({ backend: 'porch' }) })
+    const env = { YOGURT_AI_BACKEND: 'agy' }
+    active = configuredAi({}, env)
+    hookAiPreferences({ file, active, restart, check, env })
+    // the form shows the effective agy mode; saving must not overwrite the stored Porch choice
+    const form = aiSettings({ ...active, textModel: 'gemini-4-argon' })
+    expect(call<AiPreferences>('ai:save', form).saved.backend).toBe('porch')
+    expect(loadSettings(file).ai).toMatchObject({ backend: 'porch', textModel: 'gemini-4-argon' })
+    expect(call<AiPreferences>('ai:get').locked).toEqual({ backend: { variable: 'YOGURT_AI_BACKEND', value: 'agy' } })
   })
 
   it('still requires one restart for independent model changes under an environment-controlled mode', () => {
@@ -123,18 +136,24 @@ describe('AI preferences IPC', () => {
     hookAiPreferences({ file, active, restart, check, env })
     const saved = aiSettings({ ...active, backend: 'porch', textModel: 'gemini-4-argon' })
     expect(call<AiPreferences>('ai:save', saved).restartRequired).toBe(true)
-    const nextActive = configuredAi({ ai: saved }, env)
+    const written = aiSettings({ ...active, textModel: 'gemini-4-argon' })
+    expect(loadSettings(file).ai).toEqual(written)
+    const nextActive = configuredAi({ ai: written }, env)
     hookAiPreferences({ file, active: nextActive, restart, check, env })
-    expect(call('ai:get')).toEqual({ saved, active: nextActive, restartRequired: false, environmentOverrides: ['YOGURT_AI_BACKEND'] })
+    expect(call('ai:get')).toEqual({ saved: written, active: nextActive, restartRequired: false, locked: { backend: { variable: 'YOGURT_AI_BACKEND', value: 'agy' } } })
     expect(nextActive).toMatchObject({ backend: 'agy', textModel: 'gemini-4-argon' })
   })
 
-  it('applies executable-path overrides when determining the next launch and retains the saved paths', () => {
+  it('applies executable-path overrides when determining the next launch and retains the stored paths', () => {
+    updateSettings(file, { ai: aiSettings({ agyPath: '/saved/agy', porchPath: '/saved/porch' }) })
     const env = { YOGURT_AGY_PATH: '/opt/provider/agy', YOGURT_PORCH_PATH: '/opt/provider/porch' }
     active = configuredAi({}, env)
     hookAiPreferences({ file, active, restart, check, env })
-    const saved = aiSettings({ ...active, agyPath: '/saved/agy', porchPath: '/saved/porch' })
-    expect(call('ai:save', saved)).toEqual({ saved, active, restartRequired: false, environmentOverrides: ['YOGURT_AGY_PATH', 'YOGURT_PORCH_PATH'] })
-    expect(loadSettings(file).ai).toMatchObject({ agyPath: '/saved/agy', porchPath: '/saved/porch' })
+    const form = aiSettings({ ...active, textModel: 'gemini-4-argon' })
+    expect(call('ai:save', form)).toEqual({
+      saved: aiSettings({ agyPath: '/saved/agy', porchPath: '/saved/porch', textModel: 'gemini-4-argon' }), active, restartRequired: true,
+      locked: { agyPath: { variable: 'YOGURT_AGY_PATH', value: '/opt/provider/agy' }, porchPath: { variable: 'YOGURT_PORCH_PATH', value: '/opt/provider/porch' } },
+    })
+    expect(loadSettings(file).ai).toMatchObject({ agyPath: '/saved/agy', porchPath: '/saved/porch', textModel: 'gemini-4-argon' })
   })
 })

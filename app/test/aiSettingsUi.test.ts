@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { aiSettings, type AiBackend } from '../src/shared/ai'
+import { aiSettings, type AiBackend, type AiPreferences } from '../src/shared/ai'
 import { setLanguage } from '../src/shared/i18n'
-import { AiActiveSettings, AiEnvironmentNotice, AiSettingsFields } from '../src/renderer/src/components/AiSettings'
+import { AiSettingsFields, AiStatus } from '../src/renderer/src/components/AiSettings'
 import { aiText } from '../src/renderer/src/components/aiCopy'
 import { screenCopy } from '../src/renderer/src/permissionCopy'
 import { setupItems } from '../src/renderer/src/components/SetupStatus'
 
 const fields = (backend: AiBackend) => renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend }), change() {} }))
+const prefs = (partial: Partial<AiPreferences>): AiPreferences => ({ saved: aiSettings({}), active: aiSettings({}), restartRequired: false, ...partial })
+const status = (preferences: AiPreferences, dirty = false) =>
+  renderToStaticMarkup(createElement(AiStatus, { preferences, busy: null, dirty, restart() {} }))
 afterEach(() => setLanguage('en'))
 
 describe('AI settings fields', () => {
@@ -59,25 +62,57 @@ describe('AI settings fields', () => {
     const saved = aiSettings({ backend: 'local', outputLanguage: 'ru' })
     const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: saved, change() {} }))
     expect(html).not.toContain('ai-outputLanguage')
-    expect(renderToStaticMarkup(createElement(AiActiveSettings, { active: saved }))).not.toContain('AI output language')
     expect(saved.outputLanguage).toBe('ru')
     const provider = { ...saved, backend: 'agy' as const }
     expect(renderToStaticMarkup(createElement(AiSettingsFields, { value: provider, change() {} }))).toContain('value="ru" selected=""')
-    expect(renderToStaticMarkup(createElement(AiActiveSettings, { active: provider }))).toContain('AI output language')
   })
 
-  it('names environment-controlled fields and variables in both supported UI languages', () => {
-    const overrides = ['YOGURT_AI_BACKEND', 'YOGURT_AGY_PATH', 'YOGURT_PORCH_PATH'] as const
-    const render = () => renderToStaticMarkup(createElement(AiEnvironmentNotice, { overrides: [...overrides] }))
-    const en = render()
-    expect(en).toContain('still take precedence after restart')
-    expect(en).toContain('Processing mode (YOGURT_AI_BACKEND)')
-    expect(en).toContain('agy executable (YOGURT_AGY_PATH)')
-    expect(en).toContain('Porch executable (YOGURT_PORCH_PATH)')
+  it('shows the status line as one line of what runs now, with the mode and its model', () => {
+    expect(status(prefs({}))).toContain('Active now:</strong> agy · Antigravity CLI · gemini-3.8-flash')
+    expect(status(prefs({ active: aiSettings({ backend: 'local' }) }))).toContain('Local models')
     setLanguage('ru')
-    expect(render()).toContain('приоритет и после перезапуска')
-    expect(render()).toContain('Режим обработки (YOGURT_AI_BACKEND)')
-    expect(renderToStaticMarkup(createElement(AiEnvironmentNotice, { overrides: undefined }))).toBe('')
+    expect(status(prefs({}))).toContain('Сейчас работает')
+  })
+
+  it('locks a launch-variable mode to the effective value, disabled, naming the variable in both UI languages', () => {
+    const saved = aiSettings({ backend: 'porch' })
+    const locked = { backend: { variable: 'YOGURT_AI_BACKEND', value: 'agy' } }
+    const render = () => renderToStaticMarkup(createElement(AiSettingsFields, { value: saved, change() {}, locked }))
+    const html = render()
+    // the effective mode is shown instead of the stored Porch choice, and cannot be edited
+    expect(html).toContain('value="agy" selected=""')
+    expect(html).not.toContain('value="porch" selected=""')
+    expect(html.match(/<select[^>]*id="ai-backend"[^>]*>/)?.[0]).toContain('disabled=""')
+    expect(html).toContain('Set at launch by YOGURT_AI_BACKEND. It can&#x27;t be changed here.')
+    // fields below follow the effective agy mode, not the stored Porch one
+    expect(html).toContain('id="ai-textModel"')
+    expect(html).not.toContain('id="ai-textProfile"')
+    setLanguage('ru')
+    expect(render()).toContain('Задано при запуске переменной YOGURT_AI_BACKEND')
+  })
+
+  it('locks an executable path fixed by a launch variable while other fields stay editable', () => {
+    const locked = { agyPath: { variable: 'YOGURT_AGY_PATH', value: '/opt/provider/agy' } }
+    const html = renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend: 'agy' }), change() {}, locked }))
+    const input = html.match(/<input[^>]*id="ai-agyPath"[^>]*>/)?.[0] ?? ''
+    expect(input).toContain('disabled=""')
+    expect(input).toContain('value="/opt/provider/agy"')
+    expect(html).toContain('Set at launch by YOGURT_AGY_PATH.')
+    expect(html.match(/<input[^>]*id="ai-transcriptionModel"[^>]*>/)?.[0]).not.toContain('disabled')
+  })
+
+  it('adds a saved line with a restart button only while a different saved mode waits for restart', () => {
+    const pending = prefs({ saved: aiSettings({ backend: 'local' }), active: aiSettings({ backend: 'agy' }), restartRequired: true })
+    const html = status(pending)
+    expect(html).toContain('Saved: Local models — applies after restart.')
+    expect(html).toContain('data-testid="ai-saved-pending"')
+    expect(html).toContain('data-testid="ai-restart"')
+    expect(status(pending, true).match(/data-testid="ai-restart"[^>]*/)?.[0]).toContain('disabled=""')
+    // same configuration: one line, no restart offer; a locked field: the variable explains it instead
+    expect(status(prefs({}))).not.toContain('ai-saved-pending')
+    expect(status(prefs({ ...pending, locked: { backend: { variable: 'YOGURT_AI_BACKEND', value: 'agy' } } }))).not.toContain('ai-saved-pending')
+    setLanguage('ru')
+    expect(status(pending)).toContain('Сохранено: Локальные модели — применится после перезапуска.')
   })
 
   it('associates field labels and descriptions and sets bounded whole-number limits', () => {

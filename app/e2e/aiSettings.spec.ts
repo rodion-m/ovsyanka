@@ -22,7 +22,7 @@ test('provider preferences save for the next launch and keep the current process
     await expect(page.getByTestId('ai-transcriptionEffort')).toHaveValue('medium')
     await page.getByTestId('ai-outputLanguage').selectOption('ru')
     await page.getByTestId('ai-save').click()
-    await expect(page.getByTestId('ai-restart-required')).toBeVisible()
+    await expect(page.getByTestId('ai-saved-pending')).toBeVisible()
     await expect(page.getByTestId('ai-active')).toContainText('Local models')
     await expect(page.getByTestId('settings-ai-privacy')).toContainText(/stay on this (Mac|computer)/)
     const saved = JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8')).ai

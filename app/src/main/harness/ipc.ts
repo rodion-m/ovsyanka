@@ -3,6 +3,9 @@ import { aiSettings, validAiSettings, type AiCheck, type AiPreferences, type AiS
 import { configuredAi, loadSettings, updateSettings } from '../settings'
 import { checkHarness } from './index'
 
+/** Environment variables that fix a settings field for the whole launch. */
+const envLocks = { YOGURT_AI_BACKEND: 'backend', YOGURT_AGY_PATH: 'agyPath', YOGURT_PORCH_PATH: 'porchPath' } as const
+
 /** A launch keeps one provider configuration. Saving changes only the next launch. */
 export function hookAiPreferences(o: {
   file: string
@@ -14,13 +17,18 @@ export function hookAiPreferences(o: {
 }) {
   const active = aiSettings(o.active)
   const env = { ...(o.env ?? process.env) }
-  const overrides = (['YOGURT_AI_BACKEND', 'YOGURT_AGY_PATH', 'YOGURT_PORCH_PATH'] as const).filter(key => !!env[key])
+  const locked: NonNullable<AiPreferences['locked']> = {}
+  for (const variable of Object.keys(envLocks) as (keyof typeof envLocks)[]) {
+    const field = envLocks[variable]
+    if (env[variable]) locked[field] = { variable, value: String(active[field]) }
+  }
+  const savedSettings = () => aiSettings(loadSettings(o.file).ai ?? active)
   const preferences = (): AiPreferences => {
-    const saved = aiSettings(loadSettings(o.file).ai ?? active)
+    const saved = savedSettings()
     const nextLaunch = configuredAi({ ai: saved }, env)
     return {
       saved, active: { ...active }, restartRequired: JSON.stringify(nextLaunch) !== JSON.stringify(active),
-      ...(overrides.length ? { environmentOverrides: [...overrides] } : {}),
+      ...(Object.keys(locked).length ? { locked } : {}),
     }
   }
   const checked = (value: unknown): AiSettings => {
@@ -31,6 +39,11 @@ export function hookAiPreferences(o: {
   ipcMain.handle('ai:get', preferences)
   ipcMain.handle('ai:save', (_e, value: unknown) => {
     const settings = checked(value)
+    // a field fixed by a launch variable keeps its stored value: the form shows the effective one instead
+    const previous = savedSettings()
+    if (locked.backend) settings.backend = previous.backend
+    if (locked.agyPath) settings.agyPath = previous.agyPath
+    if (locked.porchPath) settings.porchPath = previous.porchPath
     updateSettings(o.file, { ai: settings })
     return preferences()
   })

@@ -35,13 +35,14 @@ export const DEFAULT_AI_SETTINGS: Readonly<AiSettings> = {
   contextTokens: 32_768,
 }
 
-export type AiEnvironmentOverride = 'YOGURT_AI_BACKEND' | 'YOGURT_AGY_PATH' | 'YOGURT_PORCH_PATH'
+/** Settings fields a launch environment variable can fix for the whole run; openrouterKey arrives with the OpenRouter mode. */
+export type AiLockedField = 'backend' | 'agyPath' | 'porchPath' | 'openrouterKey'
 export type AiPreferences = {
   saved: AiSettings
   active: AiSettings
   restartRequired: boolean
-  /** Launch variables take precedence over these saved fields, including after restart. */
-  environmentOverrides?: AiEnvironmentOverride[]
+  /** Launch variables take precedence over these saved fields, including after restart. The form shows the effective value; saving keeps the stored choice. */
+  locked?: Partial<Record<AiLockedField, { variable: string; value: string }>>
 }
 export type AiCheck = { ok: boolean; message: string }
 
