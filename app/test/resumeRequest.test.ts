@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), yogurt: {
     meetings: { get: async () => meeting, onChange: (cb: typeof meetingChanged) => { meetingChanged = cb; return vi.fn() }, resume, stop: vi.fn() },
     notes: { get: async () => notes, onChange: (cb: typeof notesChanged) => { notesChanged = cb; return vi.fn() } },
+    ai: { problemState: async () => null, onProblem: () => vi.fn() },
     widget: { state: async () => null, onState: () => vi.fn() },
   } })
 })

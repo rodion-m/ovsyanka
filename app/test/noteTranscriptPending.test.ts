@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import { Note } from '../src/renderer/src/screens/Note'
+import { RecordingHint } from '../src/renderer/src/components/RecordingHint'
+import type { AiProblemEvent } from '../src/shared/ai'
 import type { MeetingView, NoteView } from '../src/shared/types'
 
 // Run the note's effects and handlers without mounting editors, a browser, or capture.
@@ -24,6 +26,7 @@ vi.mock('react', async original => ({ ...await original<typeof import('react')>(
 vi.mock('../src/renderer/src/motion', async original => ({ ...await original<typeof import('../src/renderer/src/motion')>(), useReducedMotion: () => true }))
 let meeting: MeetingView, notes: NoteView
 let meetingChanged: () => void, notesChanged: (notes: NoteView) => void
+let aiProblemChanged: (problem: AiProblemEvent) => void
 const retryTranscription = vi.fn()
 const title = vi.fn(), source = vi.fn()
 let tree: ReactNode
@@ -43,6 +46,12 @@ function find(node: ReactNode, id: string): ReactElement<Record<string, unknown>
   if (!isValidElement<Record<string, unknown>>(node)) return
   return node.props['data-testid'] === id || node.props.testId === id ? node : find(node.props.children as ReactNode, id)
 }
+function findComponent<P>(node: ReactNode, component: (props: P) => ReactNode): ReactElement<P> | undefined {
+  if (Array.isArray(node)) return node.map(child => findComponent(child, component)).find(Boolean)
+  if (!isValidElement<P>(node)) return
+  const props = node.props as P & { children?: ReactNode }
+  return node.type === component ? node : findComponent(props.children, component)
+}
 beforeEach(() => {
   vi.clearAllMocks()
   meeting = { id: 'pending-fixture', title: 'Pending fixture', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'stopped', language: null, titleSource: 'user', transcriptionPending: true, transcriptIncomplete: true }
@@ -51,6 +60,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), yogurt: {
     meetings: { get: async () => meeting, onChange: (cb: typeof meetingChanged) => { meetingChanged = cb; return vi.fn() }, retryTranscription },
     notes: { get: async () => notes, onChange: (cb: typeof notesChanged) => { notesChanged = cb; return vi.fn() } },
+    ai: { problemState: async () => null, onProblem: (cb: typeof aiProblemChanged) => { aiProblemChanged = cb; return vi.fn() } },
     widget: { state: async () => null, onState: () => vi.fn() },
   } })
 })
@@ -75,4 +85,15 @@ it('hides the banner once nothing is really waiting, while recording, and in the
   meeting = { ...meeting, state: 'stopped', endedAt: 2, trashedAt: 3 }
   await render(); await render()
   expect(find(tree, 'note-transcript-pending')).toBeUndefined()
+})
+
+it('shows only transcription problems for this meeting', async () => {
+  await render()
+  aiProblemChanged({ code: 'credits', meetingId: 'another-meeting', track: 'them', model: 'vendor/model', at: 10 })
+  await render()
+  expect(findComponent(tree, RecordingHint)).toBeUndefined()
+
+  aiProblemChanged({ code: 'credits', meetingId: meeting.id, track: 'them', model: 'vendor/model', at: 20 })
+  await render()
+  expect(findComponent(tree, RecordingHint)?.props.hint.aiProblem).toMatchObject({ meetingId: meeting.id, track: 'them', code: 'credits' })
 })
