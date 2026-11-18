@@ -30,6 +30,10 @@ async function retry(fn, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), 
 }
 
 async function sign(opts) {
+  // A one-off local build may request ad-hoc signing explicitly. This does not affect the
+  // release path, which still requires the identity supplied by electron-builder.
+  const localAdhoc = process.env.YOGURT_LOCAL_ADHOC === '1'
+  if (localAdhoc) opts = { ...opts, identity: '-' }
   // an unsigned build (no certificate, e.g. CI without secrets): nothing to sign with
   if (!opts.identity) { console.log('  • no signing identity: left unsigned'); return }
   const { signAsync } = require('@electron/osx-sign')
@@ -39,7 +43,7 @@ async function sign(opts) {
     ...opts,
     optionsForFile: (file) => {
       const base = { ...(forFile ? forFile(file) : {}),
-        ...(process.env.YOGURT_SIGN_ID === 'Yogurt Local' && process.env.YOGURT_NOTARIZE === '0' ? { timestamp: 'none' } : {}),
+        ...(localAdhoc || (process.env.YOGURT_SIGN_ID === 'Yogurt Local' && process.env.YOGURT_NOTARIZE === '0') ? { timestamp: 'none' } : {}),
       }
       const own = helperEntitlements(file, buildDir)
       return own ? { ...base, entitlements: own } : base
