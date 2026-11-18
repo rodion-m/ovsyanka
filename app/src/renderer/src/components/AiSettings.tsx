@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { validAiSettings, type AiBackend, type AiCheck, type AiEffort, type AiOutputLanguage, type AiPreferences, type AiSettings as Configuration } from '../../../shared/ai'
+import { agyTextOptions, agyTranscriptionOptions, validCustomId, type AiOption } from '../../../shared/aiCatalog'
 import { useLanguage } from '../i18n'
 import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
+import { ModelPicker, type ModelPickerGroup } from './ModelPicker'
 import './AiSettings.css'
 
 const backendName = (backend: AiBackend) => aiText(backend)
@@ -21,6 +23,20 @@ const effective = (value: Configuration, locked: AiPreferences['locked']): Confi
   ...(locked?.agyPath ? { agyPath: locked.agyPath.value } : {}),
   ...(locked?.porchPath ? { porchPath: locked.porchPath.value } : {}),
 })
+
+const groupCopy: Record<AiOption['group'], AiCopyKey> = {
+  recommended: 'groupRecommended', audio: 'groupAudio', stt: 'groupStt', text: 'groupText',
+  free: 'groupFree', alias: 'groupText', unavailable: 'groupUnavailable',
+}
+const pickerGroups = (ids: readonly AiOption['group'][]): ModelPickerGroup[] => ids.map(id => ({ id, label: aiText(groupCopy[id]) }))
+const effortsOf = (options: readonly AiOption[], modelId: string, fallback: AiEffort[]): AiEffort[] =>
+  options.find(option => option.id === modelId)?.efforts ?? fallback
+const withoutLow = (levels: readonly AiEffort[], fallback: AiEffort[]): AiEffort[] => {
+  const result = levels.filter(level => level !== 'low')
+  return result.length ? result : fallback
+}
+const AGY_TRANSCRIPTION = agyTranscriptionOptions()
+const AGY_TEXT = agyTextOptions()
 
 function Row({ id, label, help, children }: { id: string; label: string; help?: string; children: ReactNode }) {
   return <div className="settings-row">
@@ -52,6 +68,24 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
     </span></Row>
   const effort = (key: 'transcriptionEffort' | 'textEffort', label: AiCopyKey, options: readonly AiEffort[] = ['low', 'medium', 'high']) =>
     select(`ai-${key}`, aiText(label), shown[key], options.map(v => [v, aiText(v)]), v => change({ [key]: v as AiEffort }))
+  // Changing the model narrows the effort select to the new model's levels; an unsupported saved level falls back to medium.
+  const pickModel = (key: 'transcriptionModel' | 'textModel', options: readonly AiOption[], fallback: AiEffort[]) => (id: string) => {
+    let levels = effortsOf(options, id, fallback)
+    if (key === 'transcriptionModel') levels = withoutLow(levels, fallback)
+    const effortKey = key === 'transcriptionModel' ? 'transcriptionEffort' : 'textEffort' as const
+    const patch: Partial<Configuration> = { [key]: id }
+    if (!levels.includes(shown[effortKey])) patch[effortKey] = levels.includes('medium') ? 'medium' : levels[0]
+    change(patch)
+  }
+  const picker = (key: 'transcriptionModel' | 'textModel', label: AiCopyKey, options: readonly AiOption[], groups: readonly AiOption['group'][], help: AiCopyKey | undefined, fallback: AiEffort[]) => {
+    const id = `ai-${key}`
+    const helpText = lockHelp(locked, key) ?? (help && aiText(help))
+    return <Row key={key} id={id} label={aiText(label)} help={helpText}>
+      <ModelPicker id={id} value={shown[key]} options={options} groups={pickerGroups(groups)} locked={!!lock(locked, key)}
+        describedBy={helpText ? `${id}-help` : undefined} allowCustom validateCustom={validCustomId}
+        onChange={pickModel(key, options, fallback)} />
+    </Row>
+  }
   return <>
     {select('ai-backend', aiText('backend'), shown.backend, (['agy', 'porch', 'local'] as const).map(v => [v, backendName(v)]), v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
     <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(shown.backend === 'local' ? 'localHelp' : 'subscription')}</p>
@@ -62,11 +96,13 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
         {input('textProfile', 'textProfile', 'textProfileHelp')}
         <p className="ai-settings-note">{aiText('porchAudio')}</p>
       </>}
-      {input('transcriptionModel', 'audioModel')}
-      {effort('transcriptionEffort', 'audioEffort', ['medium', 'high'])}
+      {shown.backend === 'agy'
+        ? picker('transcriptionModel', 'audioModel', AGY_TRANSCRIPTION, ['recommended', 'audio'], undefined, ['medium', 'high'])
+        : input('transcriptionModel', 'audioModel')}
+      {effort('transcriptionEffort', 'audioEffort', shown.backend === 'agy' ? withoutLow(effortsOf(AGY_TRANSCRIPTION, shown.transcriptionModel, ['medium', 'high']), ['medium', 'high']) : ['medium', 'high'])}
       {shown.backend === 'agy' && <>
-        {input('textModel', 'textModel', 'textHelp')}
-        {effort('textEffort', 'textEffort')}
+        {picker('textModel', 'textModel', AGY_TEXT, ['recommended', 'text'], 'textHelp', ['low', 'medium', 'high'])}
+        {effort('textEffort', 'textEffort', effortsOf(AGY_TEXT, shown.textModel, ['low', 'medium', 'high']))}
       </>}
     </>}
     {shown.backend !== 'local' && select('ai-outputLanguage', aiText('outputLanguage'), shown.outputLanguage, [['auto', aiText('auto')], ['ru', aiText('russian')], ['en', aiText('english')]], v => change({ outputLanguage: v as AiOutputLanguage }), aiText('outputHelp'))}

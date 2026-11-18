@@ -2,16 +2,21 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
+  AGY_BUILTIN_MODELS,
   type AiOption,
+  agyTextOptions,
+  agyTranscriptionOptions,
   estimateOpenRouterPricePerHour,
   isExpiringSoon,
   isModelMissing,
   missingModelIds,
   normalizeOpenRouterModel,
   normalizeOpenRouterResponse,
+  searchAiOptions,
   selectTextOptions,
   selectTranscriptionOptions,
   sortAiOptions,
+  validCustomId,
 } from '../src/shared/aiCatalog'
 
 type JsonBody = { data: unknown[] }
@@ -195,5 +200,61 @@ describe('OpenRouter catalog lifecycle helpers', () => {
     expect(isModelMissing('acme/gone', options)).toBe(true)
     expect(isModelMissing('acme/kept', options)).toBe(false)
     expect(missingModelIds(['acme/kept', 'acme/gone'], options)).toEqual(['acme/gone'])
+  })
+})
+
+describe('agy built-in catalog', () => {
+  it('mirrors the plan 3.3 table: transcription lists only audio-capable models, text lists them all', () => {
+    expect(AGY_BUILTIN_MODELS.map(option => option.id)).toEqual([
+      'gemini-3.8-flash', 'gemini-4-hydrogen', 'gemini-4-argon',
+      'claude-opus-5-5', 'claude-sonnet-5-5', 'gpt-oss-120b',
+    ])
+    const transcription = agyTranscriptionOptions()
+    expect(transcription).not.toHaveLength(0)
+    expect(transcription.every(option => option.hints.includes('audio'))).toBe(true)
+    expect(transcription.map(option => option.id)).toEqual(['gemini-3.8-flash', 'gemini-4-hydrogen', 'gemini-4-argon'])
+    expect(transcription[0]?.group).toBe('recommended')
+    expect(transcription[0]?.hints).toContain('verified')
+
+    const text = agyTextOptions()
+    expect(text).toHaveLength(AGY_BUILTIN_MODELS.length)
+    expect(text[0]?.group).toBe('recommended')
+    expect(text.filter(option => option.group !== 'recommended').every(option => option.group === 'text')).toBe(true)
+    expect(text.find(option => option.id === 'gpt-oss-120b')?.efforts).toEqual(['medium'])
+    expect(text.find(option => option.id === 'claude-opus-5-5')?.efforts).toEqual(['low', 'medium', 'high'])
+  })
+
+  it.each([
+    ['one word of the name', 'opus', ['claude-opus-5-5']],
+    ['several words, all must match', 'gemini flash', ['gemini-3.8-flash']],
+    ['word order does not matter', 'flash gemini', ['gemini-3.8-flash']],
+    ['part of the ID', 'gemini-4', ['gemini-4-hydrogen', 'gemini-4-argon']],
+    ['the vendor', 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5']],
+    ['upper case is ignored', 'GPT-OSS', ['gpt-oss-120b']],
+    ['a word only one model has', 'hydrogen', ['gemini-4-hydrogen']],
+    ['words spanning name and ID', 'sonnet 5-5', ['claude-sonnet-5-5']],
+    ['empty returns everything', '', AGY_BUILTIN_MODELS.map(option => option.id)],
+    ['spaces only returns everything', '   ', AGY_BUILTIN_MODELS.map(option => option.id)],
+    ['no match at all', 'zzz', []],
+    ['one unmatched word drops the hit', 'gemini claude', []],
+  ])('search: %s', (_name, query, expected) => {
+    expect(searchAiOptions(AGY_BUILTIN_MODELS, query).map(option => option.id)).toEqual(expected)
+  })
+
+  it.each([
+    ['a normal model ID', 'gemini-4-hydrogen', true],
+    ['every boundary sign . - _ / :', 'a/b-c.d_e:f', true],
+    ['an OpenRouter-style ID with free suffix', 'google/gemini-3.8-flash:free', true],
+    ['digits and dots only between letters', 'v1.2.3', true],
+    ['Cyrillic is rejected', 'модель', false],
+    ['a space is rejected', 'has space', false],
+    ['an empty ID is rejected', '', false],
+    ['a tilde is rejected', '~alias/model', false],
+    ['an at sign is rejected', 'model@2', false],
+    ['a comma is rejected', 'a,b', false],
+    ['exactly 200 characters pass', 'a'.repeat(200), true],
+    ['201 characters fail', 'a'.repeat(201), false],
+  ])('custom ID validation: %s', (_name, id, expected) => {
+    expect(validCustomId(id)).toBe(expected)
   })
 })

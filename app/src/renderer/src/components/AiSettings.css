@@ -2,7 +2,7 @@
 .ai-settings-form fieldset { min-width:0;margin:0;padding:0;border:0; }
 .ai-settings-form .settings-row { align-items:flex-start; }
 .ai-settings-form .settings-row-copy { padding-block:4px; }
-.ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap { width:240px;max-width:100%; }
+.ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:240px;max-width:100%; }
 .ai-settings-form .settings-select { width:100%;min-width:0; }
 .ai-settings-form .settings-name-field { min-width:0; }
 .ai-settings-note { margin:0;padding:14px 20px;color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
@@ -17,5 +17,5 @@
 .ai-settings-pending { display:flex;align-items:center;justify-content:space-between;gap:12px; }
 @media(max-width:600px) {
   .ai-settings-form .settings-row { display:block; }
-  .ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap { width:100%;margin-top:8px; }
+  .ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:100%;margin-top:8px; }
 }

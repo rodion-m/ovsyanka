@@ -19,7 +19,12 @@ describe('AI settings fields', () => {
     const html = fields('agy')
     expect(html).toContain('id="ai-transcriptionModel"')
     expect(html).toContain('id="ai-textModel"')
-    expect(html.match(/value="gemini-3\.8-flash"/g)).toHaveLength(2)
+    // the picker's closed field shows the model label; the exact ID stays in the fact line below it
+    const input = (id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? ''
+    expect(input('ai-transcriptionModel')).toContain('role="combobox"')
+    expect(input('ai-transcriptionModel')).toContain('value="Gemini 3.8 Flash"')
+    expect(input('ai-textModel')).toContain('value="Gemini 3.8 Flash"')
+    expect(html.match(/gemini-3\.8-flash · audio · verified/g)).toHaveLength(2)
     expect(html.match(/value="medium" selected=""/g)).toHaveLength(2)
     expect(html).not.toContain('id="ai-textProfile"')
     expect(html).toContain('id="ai-agyPath"')

@@ -18,7 +18,8 @@ test('provider preferences save for the next launch and keep the current process
     await page.getByTestId('settings-open').click()
     await expect(page.getByTestId('ai-backend')).toHaveValue('local')
     await page.getByTestId('ai-backend').selectOption('agy')
-    await expect(page.getByTestId('ai-transcriptionModel')).toHaveValue('gemini-3.8-flash')
+    await expect(page.getByTestId('ai-transcriptionModel')).toHaveValue('Gemini 3.8 Flash')
+    await expect(page.getByTestId('ai-transcriptionModel-sub')).toContainText('gemini-3.8-flash')
     await expect(page.getByTestId('ai-transcriptionEffort')).toHaveValue('medium')
     await page.getByTestId('ai-outputLanguage').selectOption('ru')
     await page.getByTestId('ai-save').click()
@@ -29,6 +30,25 @@ test('provider preferences save for the next launch and keep the current process
     expect(saved).toMatchObject({ backend: 'agy', transcriptionModel: 'gemini-3.8-flash', textEffort: 'medium', outputLanguage: 'ru' })
     expect(await page.evaluate(() => window.yogurt.ai.get())).toMatchObject({ active: { backend: 'local' }, restartRequired: true })
     await expect(page.getByTestId('ai-save')).toBeDisabled()
+  } finally { await app.close() }
+})
+
+test('a custom model ID can be picked with the keyboard and saved for the next launch', async () => {
+  const { app, page, userData } = await launch()
+  try {
+    await page.getByTestId('settings-open').click()
+    await page.getByTestId('ai-backend').selectOption('agy')
+    const model = page.getByTestId('ai-transcriptionModel')
+    await model.click()
+    await expect(page.getByRole('listbox')).toBeVisible()
+    await page.keyboard.type('claude-test-9')
+    await page.getByRole('option', { name: /custom ID/ }).click()
+    await expect(model).toHaveValue('claude-test-9')
+    await expect(page.getByTestId('ai-transcriptionModel-sub')).toContainText('custom ID')
+    await page.getByTestId('ai-save').click()
+    const saved = JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8')).ai
+    expect(saved).toMatchObject({ backend: 'agy', transcriptionModel: 'claude-test-9' })
+    expect(await page.evaluate(() => window.yogurt.ai.get())).toMatchObject({ saved: { transcriptionModel: 'claude-test-9' }, restartRequired: true })
   } finally { await app.close() }
 })
 

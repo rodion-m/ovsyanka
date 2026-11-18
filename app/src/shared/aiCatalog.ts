@@ -432,3 +432,65 @@ export function missingModelIds(modelIds: readonly string[], options: readonly P
 }
 
 export const modelIsMissing = isModelMissing
+
+// ---- agy built-in catalog and picker helpers ----
+
+/**
+ * The agy list built into the app, mirroring `agy models` 1.5.11 (plan 3.3). A later stage can
+ * extend it with live `agy models` output; hints come only from this built-in list. Gemini 4
+ * Hydrogen also offers xhigh upstream, but AiSettings cannot store that level yet.
+ */
+export const AGY_BUILTIN_MODELS: readonly AiOption[] = [
+  {
+    id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', vendor: 'Google',
+    group: 'recommended', hints: ['audio', 'verified'], efforts: ['low', 'medium', 'high'],
+  },
+  {
+    id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', vendor: 'Google',
+    group: 'audio', hints: ['audio'], efforts: ['low', 'medium', 'high'],
+  },
+  {
+    id: 'gemini-4-argon', label: 'Gemini 4 Argon', vendor: 'Google',
+    group: 'audio', hints: ['audio'], efforts: ['low', 'medium', 'high'],
+  },
+  {
+    id: 'claude-opus-5-5', label: 'Claude Opus 5.5', vendor: 'Anthropic',
+    group: 'text', hints: [], efforts: ['low', 'medium', 'high'],
+  },
+  {
+    id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', vendor: 'Anthropic',
+    group: 'text', hints: [], efforts: ['low', 'medium', 'high'],
+  },
+  {
+    id: 'gpt-oss-120b', label: 'GPT-OSS 120B', vendor: 'OpenAI',
+    group: 'text', hints: [], efforts: ['medium'],
+  },
+]
+
+/** Transcription needs native audio input, so only audio-flagged models are listed; the rest stay reachable through a custom ID. */
+export function agyTranscriptionOptions(): AiOption[] {
+  return AGY_BUILTIN_MODELS.filter(option => option.hints.includes('audio'))
+}
+
+/** Every built-in model can produce text; non-recommended entries sit in the text group here. */
+export function agyTextOptions(): AiOption[] {
+  return AGY_BUILTIN_MODELS.map(option => option.group === 'recommended' ? option : { ...option, group: 'text' as const })
+}
+
+/** Search the picker's options: every whitespace-separated word must appear in the name, ID or vendor, case-insensitive. */
+export function searchAiOptions(options: readonly AiOption[], query: string): AiOption[] {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return [...options]
+  return options.filter(option => {
+    const text = `${option.label} ${option.id} ${option.vendor ?? ''}`.toLowerCase()
+    return words.every(word => text.includes(word))
+  })
+}
+
+export const CUSTOM_ID_MAX_LENGTH = 200
+const CUSTOM_ID_PATTERN = /^[A-Za-z0-9._\-/:]+$/
+
+/** Custom IDs accept Latin letters, digits and the signs . - _ / : (plan 2.3), up to 200 characters. */
+export function validCustomId(id: string): boolean {
+  return id.length > 0 && id.length <= CUSTOM_ID_MAX_LENGTH && CUSTOM_ID_PATTERN.test(id)
+}
