@@ -695,7 +695,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "A transcrição está incompleta: parte da gravação ainda não foi transcrita.",
   "Retry": "Tentar novamente",
   "Can't hear the other side": "Não dá para ouvir a outra pessoa",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "O som do computador não está sendo gravado há um minuto. Se for um webinar ou você estiver apresentando sozinho, está tudo bem.",
   "Restart sound capture": "Reiniciar captura de som",
   "Don't warn for this meeting": "Não avisar nesta reunião",
   "Restarting sound capture…": "Reiniciando a captura de som…",
@@ -703,8 +702,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Não resolveu. Verifique a saída de som nas configurações do sistema ou no app de chamadas.",
   "Warnings are off for this meeting": "Os avisos estão desativados para esta reunião",
   "Warn when the other side can't be heard": "Avisar quando a outra pessoa não puder ser ouvida",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Mostra um banner e uma notificação quando o som do computador não é gravado durante uma chamada.",
   "from {start} to {end}": "de {start} a {end}",
   "and {n} more": "e mais {n}",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "O som da outra pessoa não foi gravado {ranges}. Se alguém falou nesse período, essas palavras não aparecem na transcrição."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "O som da outra pessoa não foi gravado {ranges}. Se alguém falou nesse período, essas palavras não aparecem na transcrição.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "O áudio do computador não é gravado há um minuto e meio. Se as outras pessoas estiverem em silêncio agora, isso pode ser normal.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Mostra um aviso se o áudio das outras pessoas não for gravado durante uma chamada."
 }

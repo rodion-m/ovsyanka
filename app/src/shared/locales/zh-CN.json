@@ -635,7 +635,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "转写不完整：录音的一部分尚未转写。",
   "Retry": "重试",
   "Can't hear the other side": "听不到对方",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "电脑声音已连续一分钟没有录上。如果这是网络研讨会或您在独自演讲，一切正常。",
   "Restart sound capture": "重新启动声音采集",
   "Don't warn for this meeting": "本次会议不再提醒",
   "Restarting sound capture…": "正在重新启动声音采集…",
@@ -643,8 +642,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "没有奏效。请在系统设置或通话应用中检查声音输出。",
   "Warnings are off for this meeting": "本次会议的提醒已关闭",
   "Warn when the other side can't be heard": "听不到对方时提醒",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "通话期间电脑声音未被录制时显示横幅和通知。",
   "from {start} to {end}": "{start} 至 {end}",
   "and {n} more": "以及另外 {n} 段",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "对方声音在 {ranges} 未被录制. 如果当时有人说话，这些内容不会出现在转写中。"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "对方声音在 {ranges} 未被录制. 如果当时有人说话，这些内容不会出现在转写中。",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "电脑声音已连续一分钟半未被录制。如果对方现在没有说话，这可能是正常的。",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "通话期间未录制对方的声音时显示警告。"
 }

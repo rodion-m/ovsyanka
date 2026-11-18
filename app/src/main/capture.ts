@@ -25,7 +25,7 @@ export type TranscribeWarn = 'transcribe-failed' | 'no-speech-model' | 'falling-
 const WARN_CODES: readonly string[] = ['no-system-audio', 'device-changed', 'no-mic', 'mic-gone'] satisfies WarnCode[]
 /** The mic recording now, after each start or switch: uid null is Auto (the Mac's default input), name the device's */
 export type MicInUse = { uid: string | null; name: string | null }
-export type Level = { me: number; them: number; themZero: boolean; ms: number }
+export type Level = { me: number; them: number; themZero: boolean; ms: number; noBuffers?: boolean }
 /** Apple's on-device speech (macOS 26): words as they are said (final false, they still change) and once settled, on meeting time */
 export type SpeechFrame = { t: 'speech'; track: Track; final: boolean; startMs: number; endMs: number; text: string
   /** each word's time (a volatile reading is one run for all its words) */
@@ -34,6 +34,7 @@ export type Frame =
   | { t: 'pcm'; track: Track; ms: number; samples: Float32Array }
   | ({ t: 'level' } & Level)
   | { t: 'warn'; code: WarnCode }
+  | { t: 'system-ready' }
   | SpeechFrame
   /** Apple's speech could not run for this recording (not installed, failed to start): whisper's own readings take over */
   | { t: 'speech-off' }
@@ -87,8 +88,9 @@ function readLine(line: string): Header | null {
   try { m = JSON.parse(line) } catch { console.error('capture: unreadable line', line.slice(0, 200)); return null }
   if (m.t === 'pcm' && (m.track === 'me' || m.track === 'them') && Number.isInteger(m.n) && (m.n as number) >= 0)
     return { t: 'pcm', track: m.track, ms: Number(m.ms), n: m.n as number }
-  if (m.t === 'level' && Number.isFinite(Number(m.ms)) && typeof m.themZero === 'boolean') return { t: 'level', me: Number(m.me) || 0, them: Number(m.them) || 0, themZero: m.themZero, ms: Number(m.ms) }
+  if (m.t === 'level' && Number.isFinite(Number(m.me)) && Number.isFinite(Number(m.them))) return { t: 'level', me: Number(m.me), them: Number(m.them), themZero: m.themZero === true, ms: Number.isFinite(Number(m.ms)) ? Number(m.ms) : 0, ...(m.noBuffers === true ? { noBuffers: true } : {}) }
   if (m.t === 'warn' && typeof m.code === 'string' && WARN_CODES.includes(m.code)) return { t: 'warn', code: m.code as WarnCode }
+  if (m.t === 'system-ready') return { t: 'system-ready' }
   if (m.t === 'speech-off') return { t: 'speech-off' }
   const orNull = (x: unknown) => (typeof x === 'string' ? x : x === null ? null : undefined)
   if (m.t === 'mic' && orNull(m.uid) !== undefined && orNull(m.name) !== undefined) return { t: 'mic', uid: orNull(m.uid)!, name: orNull(m.name)! }
@@ -114,6 +116,7 @@ export interface Capture {
   on(e: 'speech-off', fn: () => void): this
   on(e: 'speech-ready', fn: (tracks: Track[]) => void): this
   on(e: 'mic', fn: (m: MicInUse) => void): this
+  on(e: 'system-ready', fn: () => void): this
   on(e: 'ended', fn: (e: { crashed: boolean }) => void): this
 }
 
@@ -122,21 +125,29 @@ export class Capture extends EventEmitter {
   private exited = false
   private done: Promise<void>
   private end: number
+  private supportsRebuildSystem: boolean
   get currentMs() { return this.end }
 
   /** startMs: where meeting time stands when this run starts (a restart picks up after the one before) */
-  constructor(private proc: CaptureProc, opts: { startMs?: number } = {}) {
+  constructor(private proc: CaptureProc, opts: { startMs?: number; supportsRebuildSystem?: boolean } = {}) {
     super()
     this.end = opts.startMs ?? 0
+    this.supportsRebuildSystem = opts.supportsRebuildSystem ?? process.platform === 'darwin'
     const parser = new FrameParser()
     proc.stdout.on('data', (d: Buffer) => {
       for (const f of parser.push(d)) {
         if (f.t === 'pcm') { this.end = Math.max(this.end, f.ms + f.samples.length / 16); this.emit('pcm', f.track, f.ms, f.samples) }
-        else if (f.t === 'level') this.emit('level', { me: f.me, them: f.them, themZero: f.themZero, ms: f.ms })
+        else if (f.t === 'level') {
+          const base = Number.isFinite(f.ms) && f.ms > 0 ? f.ms : this.end
+          const ms = f.noBuffers ? Math.max(base, this.end + 100) : Math.max(base, this.end)
+          this.end = Math.max(this.end, ms)
+          this.emit('level', { me: f.me, them: f.them, themZero: f.themZero === true || f.noBuffers === true, ms, ...(f.noBuffers ? { noBuffers: true } : {}) })
+        }
         else if (f.t === 'speech') this.emit('speech', f)
         else if (f.t === 'speech-off') this.emit('speech-off')
         else if (f.t === 'speech-ready') this.emit('speech-ready', f.tracks)
         else if (f.t === 'mic') this.emit('mic', { uid: f.uid, name: f.name })
+        else if (f.t === 'system-ready') this.emit('system-ready')
         else this.emit('warn', f.code)
       }
     })
@@ -164,7 +175,7 @@ export class Capture extends EventEmitter {
   /** records from this mic from now on (null: Auto), without stopping */
   setMic(uid: string | null) { return !this.stopping && this.send(uid ? `mic ${uid}` : 'mic auto') }
   /** asks the helper to rebuild the system-sound tap now (the same debounce as a device change) */
-  rebuildSystem() { return !this.stopping && this.send('rebuild-system') }
+  rebuildSystem() { return this.supportsRebuildSystem && !this.stopping && this.send('rebuild-system') }
 
   /** Finishes both files; a helper that hangs is killed after 10 s (the files stay playable up to the last 5 s flush) */
   async stop(): Promise<void> {
@@ -248,8 +259,9 @@ export function rebuildSystemCapture(id: string): boolean {
 
 /** What the recording widget hears about: levels, warnings, and the helper's restarts */
 export type RecordingEvent =
-  | { t: 'level'; me: number; them: number; themZero: boolean; ms: number; meetingId: string }
+  | { t: 'level'; me: number; them: number; themZero: boolean; ms: number; noBuffers?: boolean; meetingId: string }
   | { t: 'warn'; code: WarnCode | TranscribeWarn }
+  | { t: 'system-ready'; meetingId: string }
   | { t: 'hiccup' }
   | { t: 'gave-up' }
   | { t: 'paused'; meetingId: string; paused: boolean; at: number }
@@ -385,7 +397,8 @@ export function hookCapture(p: {
     const attach = (c: Capture) => {
       active = c
       c.on('warn', (code) => { console.warn('capture warning', code); tell({ t: 'warn', code }) })
-      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them, themZero: !s.paused && lv.themZero, ms: lv.ms, meetingId: s.id }))
+      c.on('system-ready', () => tell({ t: 'system-ready', meetingId: s.id }))
+      c.on('level', (lv) => tell({ t: 'level', me: s.paused ? 0 : lv.me, them: s.paused ? 0 : lv.them, themZero: !s.paused && lv.themZero, ms: lv.ms, noBuffers: lv.noBuffers, meetingId: s.id }))
       c.on('ended', (e) => {
         // a capture that was stopped on purpose or replaced is not ours to judge
         if (active !== c) return

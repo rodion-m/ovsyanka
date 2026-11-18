@@ -692,7 +692,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "התמליל אינו שלם: חלק מההקלטה עדיין לא תומלל.",
   "Retry": "נסה שוב",
   "Can't hear the other side": "לא שומעים את הצד השני",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "הצליל של המחשב לא מוקלט כבר דקה. אם זה וובינר או שאתה מציג לבד, הכל בסדר.",
   "Restart sound capture": "הפעל מחדש לכידת שמע",
   "Don't warn for this meeting": "אל תתריע בפגישה הזו",
   "Restarting sound capture…": "מפעיל מחדש לכידת שמע…",
@@ -700,8 +699,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "זה לא עזר. בדוק את פלט השמע בהגדרות המערכת או באפליקציית השיחות.",
   "Warnings are off for this meeting": "האזהרות כבויות לפגישה הזו",
   "Warn when the other side can't be heard": "להתריע כשלא שומעים את הצד השני",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "מציג באנר והתראה כשצליל המחשב לא מוקלט במהלך שיחה.",
   "from {start} to {end}": "מ-{start} עד {end}",
   "and {n} more": "ועוד {n}",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "צליל הצד השני לא הוקלט {ranges}. אם מישהו דיבר בזמן הזה, דבריו לא יופיעו בתמלול."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "צליל הצד השני לא הוקלט {ranges}. אם מישהו דיבר בזמן הזה, דבריו לא יופיעו בתמלול.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "צליל המחשב לא הוקלט במשך דקה וחצי. אם הצד השני שקט כרגע, ייתכן שזה תקין.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "מציג אזהרה אם הצליל של הצד השני לא מוקלט במהלך שיחה."
 }

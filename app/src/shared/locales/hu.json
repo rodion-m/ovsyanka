@@ -671,7 +671,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Az átirat hiányos: a felvétel egy része még nincs leírva.",
   "Retry": "Újra",
   "Can't hear the other side": "A másik fél nem hallatszik",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "A számítógép hangja már egy perce nem rögzül. Ha ez egy webinar, vagy egyedül tart prezentációt, minden rendben van.",
   "Restart sound capture": "Hangrögzítés újraindítása",
   "Don't warn for this meeting": "Ne figyelmeztessen ezen az értekezleten",
   "Restarting sound capture…": "Hangrögzítés újraindítása…",
@@ -679,8 +678,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Nem segített. Ellenőrizze a hangkimenetet a rendszeren belüli beállításokban vagy a hívásalkalmazásban.",
   "Warnings are off for this meeting": "Az értekezleten a figyelmeztetések ki vannak kapcsolva",
   "Warn when the other side can't be heard": "Figyelmeztetés, ha a másik fél nem hallatszik",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Sávot és értesítést jelenít meg, ha a számítógép hangja hívás közben nem rögzül.",
   "from {start} to {end}": "{start}–{end} között",
   "and {n} more": "és még {n}",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "A másik fél hangja nem rögzült {ranges}. Ha valaki akkor beszélt, a szavai nem szerepelnek az átiratban."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "A másik fél hangja nem rögzült {ranges}. Ha valaki akkor beszélt, a szavai nem szerepelnek az átiratban.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "A számítógép hangja másfél perce nem kerül rögzítésre. Ha a többiek most csendben vannak, ez normális lehet.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Figyelmeztetést jelenít meg, ha hívás közben nem rögzül a többiek hangja."
 }

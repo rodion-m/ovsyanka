@@ -40,9 +40,7 @@ const APP_LAG_MS = 750
 const LOGGED_CHANGES = 30
 
 type Sample = Omit<CallSample, 'ms'> & { t: number }
-type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number; lastCallSample?: CallSample
-  /** for the silent-"them" watchdog: the last headcount, whether it ever read speakers, when someone else last talked */
-  lastParticipants: number | null; sawSpeakers: boolean; otherTalkedAt: number | null }
+type Session = { samples: Sample[]; priorLines: Set<number>; watch?: { stop(): void }; offset?: number; startedAt: number; pictured: boolean; errors: Set<string>; last: string; logged: number; meetingApp: string | null; lastCallSample?: CallSample & { readerApp?: string } }
 
 export function hookCallNames(p: {
   store: Pick<Store, 'meeting' | 'segments' | 'setSegmentSpeakers' | 'updateMeeting'>
@@ -63,6 +61,12 @@ export function hookCallNames(p: {
   const now = p.now ?? Date.now
   const sessions = new Map<string, Session>()
   const finals = new Map<string, Promise<void>>()
+  let cachedNames = { at: 0, names: [] as string[] }
+  const myNames = () => {
+    const at = now()
+    if (at - cachedNames.at >= 2_000) cachedNames = { at, names: p.myNames() }
+    return cachedNames.names
+  }
 
   /** the readings in meeting time: the wall clock less when meeting time 0 was heard, less the app's lag */
   const timeline = (s: Session): CallSample[] => {
@@ -83,14 +87,8 @@ export function hookCallNames(p: {
     // the first reading of each meeting goes to the log in short, so a real call shows what its app gives
     if (!s.pictured) { s.pictured = true; log(`call names: reading ${l.app} (${kind}), its window in short:\n${summarize(l.windows)}`) }
     const r = readCall(kind, l.windows)
-    s.lastCallSample = { ms: l.t - (s.offset ?? s.startedAt) - APP_LAG_MS, ...r }
+    s.lastCallSample = { ms: l.t - (s.offset ?? s.startedAt) - APP_LAG_MS, readerApp: l.app, ...r }
     s.samples.push({ t: l.t, ...r })
-    s.lastParticipants = r.participants.length || null
-    if (r.speaking.length) {
-      s.sawSpeakers = true
-      const sample: CallSample = { ms: 0, ...r }
-      if (r.speaking.some((n) => !isMe(n, sample, { myNames: p.myNames() }))) s.otherTalkedAt = l.t
-    }
     const said = `${r.speaking.join(', ') || '-'} of ${r.participants.length}${r.me ? ', me known' : ''}`
     if (said !== s.last && s.logged < LOGGED_CHANGES) { s.logged++; log(`call names: ${kind} talking ${said}`) }
     s.last = said
@@ -99,9 +97,8 @@ export function hookCallNames(p: {
   p.onStart((m) => {
     const ids = watchIds(m.app)
     // a resumed meeting keeps what the reader already knew about this call
-    const prev = sessions.get(m.id)
     const s: Session = { samples: [], priorLines: new Set(p.store.segments(m.id, { hidden: true }).map((line) => line.id)), startedAt: m.resume ? m.resume.startedAt - m.resume.startMs : m.startedAt, pictured: false, errors: new Set(), last: '', logged: 0,
-      lastParticipants: prev?.lastParticipants ?? null, sawSpeakers: prev?.sawSpeakers ?? false, otherTalkedAt: prev?.otherTalkedAt ?? null }
+      meetingApp: m.app }
     sessions.set(m.id, s)
     if (!ids.length) { log(`call names: ${m.app} can't be read, the other side is Them`); return }
     try { s.watch = p.watch(ids, (l) => onLine(m.id, s, l)) } catch (e) { console.error('call names: the watch did not start', e) }
@@ -124,7 +121,7 @@ export function hookCallNames(p: {
     const final = (async () => {
       await p.transcribed(m.id)
       const tl = timeline(s)
-      const o = { myNames: p.myNames() }
+      const o = { myNames: myNames() }
       // every line of the other side again, now that the whole call is known
       const lines = p.store.segments(m.id, { hidden: true }).filter((x) => x.track === 'them' && !s.priorLines.has(x.id))
       const names = lines.map((x) => ({ id: x.id, speaker: nameFor(x, tl, o) }))
@@ -145,7 +142,7 @@ export function hookCallNames(p: {
     /** the name for a line of the other side just heard, or null for Them */
     nameFor(meetingId: string, startMs: number, endMs: number): string | null {
       const s = sessions.get(meetingId)
-      return s?.samples.length ? nameFor({ startMs, endMs }, timeline(s), { myNames: p.myNames() }) : null
+      return s?.samples.length ? nameFor({ startMs, endMs }, timeline(s), { myNames: myNames() }) : null
     },
     /** resolves when the names after the meeting are in */
     finished: (id: string): Promise<void> => finals.get(id) ?? Promise.resolve(),
@@ -154,9 +151,11 @@ export function hookCallNames(p: {
       const s = sessions.get(meetingId)
       const r = s?.lastCallSample
       if (!r) return null
-      const names = { myNames: p.myNames() }
-      return { callApp: true, participants: r.participants, me: r.participants.some(n => isMe(n, r, names)), other: r.participants.some(n => !isMe(n, r, names)), speakingMe: r.speaking.some(n => isMe(n, r, names)), speakingOther: r.speaking.some(n => !isMe(n, r, names)) }
+      const names = { myNames: myNames() }
+      const readerApp = r.readerApp ? Object.entries(APPS).find(([, config]) => config.ids.includes(r.readerApp!))?.[0] : null
+      return { callApp: !!s?.meetingApp && readerApp === s.meetingApp, participants: r.participants, me: r.participants.some(n => isMe(n, r, names)), other: r.participants.some(n => !isMe(n, r, names)), speakingMe: r.speaking.some(n => isMe(n, r, names)), speakingOther: r.speaking.some(n => !isMe(n, r, names)) }
     },
+    bindApp(meetingId: string, app: string | null) { const s = sessions.get(meetingId); if (s) s.meetingApp = app },
   }
 }
 export type CallNames = ReturnType<typeof hookCallNames>

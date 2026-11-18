@@ -671,7 +671,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkript eksik: kaydın bir bölümü henüz metne dökülmedi.",
   "Retry": "Yeniden dene",
   "Can't hear the other side": "Karşı taraf duyulmuyor",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Bilgisayarın sesi bir dakikadır kaydedilmiyor. Bu bir webinar ise veya tek başınıza sunum yapıyorsanız sorun yok.",
   "Restart sound capture": "Ses kaydını yeniden başlat",
   "Don't warn for this meeting": "Bu toplantıda uyarma",
   "Restarting sound capture…": "Ses kaydı yeniden başlatılıyor…",
@@ -679,8 +678,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Yaramadı. Sistem ayarlarındaki veya arama uygulamasındaki ses çıkışını kontrol edin.",
   "Warnings are off for this meeting": "Uyarılar bu toplantı için kapalı",
   "Warn when the other side can't be heard": "Karşı taraf duyulamadığında uyar",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Arama sırasında bilgisayarın sesi kaydedilmediğinde bir şerit ve bildirim gösterir.",
   "from {start} to {end}": "{start}–{end}",
   "and {n} more": "ve {n} tane daha",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Karşı tarafın sesi {ranges} kaydedilmedi. O sırada biri konuştuysa, söyledikleri konuşma dökümünde yer almaz."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Karşı tarafın sesi {ranges} kaydedilmedi. O sırada biri konuştuysa, söyledikleri konuşma dökümünde yer almaz.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Bilgisayarın sesi bir buçuk dakikadır kaydedilmiyor. Diğer taraf şu anda sessizse bu normal olabilir.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Görüşme sırasında diğer tarafın sesi kaydedilmediğinde uyarı gösterir."
 }

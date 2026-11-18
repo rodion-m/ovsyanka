@@ -671,7 +671,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "ট্রান্সক্রিপ্ট অসম্পূর্ণ: রেকর্ডিংয়ের 일부 এখনও ট্রান্সক্রাইব হয়নি।",
   "Retry": "পুনরায় চেষ্টা করুন",
   "Can't hear the other side": "অন্য পক্ষের শব্দ শোনা যাচ্ছে না",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "কম্পিউটারের শব্দ এক মিনিট ধরে রেকর্ড হচ্ছে না। এটি ওয়েবিনার হলে বা আপনি একা উপস্থাপনা দিলে সমস্যা নেই।",
   "Restart sound capture": "শব্দ ক্যাপচার আবার শুরু করুন",
   "Don't warn for this meeting": "এই মিটিংয়ে সতর্ক করবেন না",
   "Restarting sound capture…": "শব্দ ক্যাপচার আবার শুরু হচ্ছে…",
@@ -679,8 +678,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "এতে কাজ হয়নি। সিস্টেম সেটিংস বা কল অ্যাপে সাউন্ড আউটপুট পরীক্ষা করুন।",
   "Warnings are off for this meeting": "এই মিটিংয়ের জন্য সতর্কতা বন্ধ আছে",
   "Warn when the other side can't be heard": "অন্য পক্ষের শব্দ না শোনা গেলে সতর্ক করুন",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "কলের সময় কম্পিউটারের শব্দ রেকর্ড না হলে ব্যানার ও নোটিফিকেশন দেখায়।",
   "from {start} to {end}": "{start} থেকে {end} পর্যন্ত",
   "and {n} more": "এবং আরও {n}টি",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "অন্য পক্ষের শব্দ {ranges} রেকর্ড হয়নি. ওই সময় কেউ কথা বলে থাকলে, তাদের কথা প্রতিলিপিতে থাকবে না।"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "অন্য পক্ষের শব্দ {ranges} রেকর্ড হয়নি. ওই সময় কেউ কথা বলে থাকলে, তাদের কথা প্রতিলিপিতে থাকবে না।",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "কম্পিউটারের শব্দ দেড় মিনিট ধরে রেকর্ড করা হয়নি। অন্য পক্ষ এখন চুপ থাকলে, তা স্বাভাবিক হতে পারে।",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "কলের সময় অন্য পক্ষের শব্দ রেকর্ড না হলে সতর্কবার্তা দেখায়।"
 }

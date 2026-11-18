@@ -741,7 +741,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "النسخة غير مكتملة: لم يتم تفريغ جزء من التسجيل بعد.",
   "Retry": "إعادة المحاولة",
   "Can't hear the other side": "لا يمكن سماع الطرف الآخر",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "لم يتم تسجيل صوت الكمبيوتر منذ دقيقة. إذا كان هذا webinar أو كنت تقدم بمفردك، فلا بأس.",
   "Restart sound capture": "إعادة تشغيل التقاط الصوت",
   "Don't warn for this meeting": "لا تحذير في هذا الاجتماع",
   "Restarting sound capture…": "جارٍ إعادة تشغيل التقاط الصوت…",
@@ -749,8 +748,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "لم ينفع ذلك. تحقق من مخرج الصوت في إعدادات النظام أو في تطبيق المكالمات.",
   "Warnings are off for this meeting": "التحذيرات متوقفة لهذا الاجتماع",
   "Warn when the other side can't be heard": "التحذير عندما لا يمكن سماع الطرف الآخر",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "يعرض لافتة وإشعارًا عندما لا يتم تسجيل صوت الكمبيوتر أثناء مكالمة.",
   "from {start} to {end}": "من {start} إلى {end}",
   "and {n} more": "و{n} أخرى",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "لم يتم تسجيل صوت الطرف الآخر {ranges}. إذا كان أحد يتحدث آنذاك، فلن تجد كلامه في النص."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "لم يتم تسجيل صوت الطرف الآخر {ranges}. إذا كان أحد يتحدث آنذاك، فلن تجد كلامه في النص.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "لم يُسجَّل صوت الكمبيوتر منذ دقيقة ونصف. إذا كان الطرف الآخر صامتًا الآن، فقد يكون ذلك طبيعيًا.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "يعرض تحذيرًا إذا لم يُسجَّل صوت الطرف الآخر أثناء المكالمة."
 }

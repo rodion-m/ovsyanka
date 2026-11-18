@@ -635,7 +635,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "文字起こしが不完全です。録音の一部がまだ文字起こしされていません。",
   "Retry": "再試行",
   "Can't hear the other side": "相手の声が聞こえません",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "コンピューターの音声が1分間録音されていません。ウェビナーや一人での発表であれば問題ありません。",
   "Restart sound capture": "音声キャプチャを再起動",
   "Don't warn for this meeting": "このミーティングでは通知しない",
   "Restarting sound capture…": "音声キャプチャを再起動しています…",
@@ -643,8 +642,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "解決しませんでした。システム設定または通話アプリで音声出力を確認してください。",
   "Warnings are off for this meeting": "このミーティングでは通知がオフです",
   "Warn when the other side can't be heard": "相手の声が聞こえないときに通知する",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "通話中にコンピューターの音声が録音されないとき、バナーと通知を表示します。",
   "from {start} to {end}": "{start}〜{end}",
   "and {n} more": "ほか{n}件",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "相手の音声は{ranges}録音されていませんでした. その間に誰かが話していた場合、その発言は文字起こしに含まれていません。"
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "相手の音声は{ranges}録音されていませんでした. その間に誰かが話していた場合、その発言は文字起こしに含まれていません。",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "パソコンの音声が1分半録音されていません。相手が今静かにしているなら、これは正常な場合があります。",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "通話中に相手の音声が録音されていない場合に警告を表示します。"
 }

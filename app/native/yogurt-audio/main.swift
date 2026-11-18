@@ -11,7 +11,7 @@
 // File time is meeting time on both: gaps (startup, pause, device switches) are written as silence.
 // stdout: JSON lines; a pcm line is followed by n float32 little-endian samples (16 kHz mono).
 //   {"t":"pcm","track":"me"|"them","ms":<startMs>,"n":<samples>}
-//   {"t":"level","me":0..1,"them":0..1}        10 times a second
+//   {"t":"level","me":0..1,"them":0..1,"themZero":bool,"noBuffers":bool,"ms":<file time>} 10 times a second
 //   {"t":"warn","code":"no-system-audio"|"device-changed"|"no-mic"|"mic-gone"}   mic-gone: the chosen mic went away, back to the Mac's own
 //   {"t":"mic","uid":string|null,"name":string|null}   the mic recording now, after each start: uid null is Auto (the Mac's default input)
 //   {"t":"speech","track":"me"|"them","final":bool,"startMs","endMs","text","words":[{"text","startMs","endMs"}]}  Apple's on-device speech (record --speech LOCALE, macOS 26)
@@ -226,11 +226,11 @@ final class Track {
   }
 
   /// 0..1 from -60 dB to 0 dB over what came in since the last call
-  func levelFrame() -> (Double, Bool) {
+  func levelFrame() -> (Double, Bool, Bool) {
     defer { sumSq = 0; count = 0; zeroCount = 0 }
-    guard count > 0 else { return (0, false) }
+    guard count > 0 else { return (0, true, true) }
     let db = 20 * log10(sqrt(sumSq / Double(count)) + 1e-9)
-    return (min(1, max(0, (db + 60) / 60)).rounded(toPlaces: 3), zeroCount == count)
+    return (min(1, max(0, (db + 60) / 60)).rounded(toPlaces: 3), zeroCount == count, false)
   }
 
   var audioMs: Double { startOffsetMs + (baseMs ?? 0) + Double(sentSince) / 16 }
@@ -809,7 +809,7 @@ final class Recorder {
       if self.finishing { return }
       let me = self.me.levelFrame(), them = self.them.levelFrame()
       send(["t": "level", "me": self.paused ? 0 : me.0, "them": self.paused ? 0 : them.0,
-            "themZero": !self.paused && them.1, "ms": Int(self.them.audioMs.rounded())])
+            "themZero": !self.paused && them.1, "noBuffers": !self.paused && them.2, "ms": Int(self.them.audioMs.rounded())])
     }
     t.resume(); timer = t
 
@@ -843,11 +843,15 @@ final class Recorder {
       // first time: the system asks; the mic keeps recording meanwhile
       requestAudioCapture { ok in work.async {
         if !ok { self.sysAllowed = false; send(["t": "warn", "code": "no-system-audio"]); return }
-        if !self.finishing && !self.sys.start() { send(["t": "warn", "code": "no-system-audio"]) }
+        if !self.finishing {
+          if self.sys.start() { send(["t": "system-ready"]) }
+          else { send(["t": "warn", "code": "no-system-audio"]) }
+        }
       } }
       return
     }
     if !sysAllowed || !sys.start() { send(["t": "warn", "code": "no-system-audio"]) }
+    else { send(["t": "system-ready"]) }
   }
 
   func listen(_ sel: AudioObjectPropertySelector, _ fn: @escaping () -> Void) {
@@ -856,8 +860,8 @@ final class Recorder {
   }
 
   /// Every "them" buffer, on the work queue (never the IO thread): the per-minute stats, the exact-zero stretch
-  /// logs, and the tap's own self-heal — a full rebuild after 20 s of zeros while other audio plays, backing off
-  /// 40 s, 80 s, ... up to 5 minutes, reset by the first non-zero buffer.
+  /// logs, and the tap's own self-heal — a full rebuild after 60 s of zeros while other audio plays, backing off
+  /// 60 s, 120 s, 240 s, then 300 s, capped at five rebuilds and reset after 10 s of sustained non-zero sound.
   func noteThemBuffer(_ b: AVAudioPCMBuffer, heardMs: Double?) {
     themCallbacks += 1
     var peak: Float = 0, silent = true
@@ -910,7 +914,8 @@ final class Recorder {
     let item = DispatchWorkItem { [unowned self] in
       guard !self.finishing, self.sysAllowed else { return }
       self.sys.stop(); self.them.resync()
-      if !self.sys.start() { send(["t": "warn", "code": "no-system-audio"]) }
+      if self.sys.start() { send(["t": "system-ready"]) }
+      else { send(["t": "warn", "code": "no-system-audio"]) }
       if announceDeviceChange { send(["t": "warn", "code": "device-changed"]) }
     }
     sysRebuild = item

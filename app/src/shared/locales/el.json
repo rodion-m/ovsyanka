@@ -683,7 +683,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Η απομαγνητοφώνηση είναι ελλιπής: μέρος της ηχογράφησης δεν έχει απομαγνητοφωνηθεί ακόμη.",
   "Retry": "Επανάληψη",
   "Can't hear the other side": "Δεν ακούγεται ο συνομιλητής",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Ο ήχος του υπολογιστή δεν ηχογραφείται εδώ και ένα λεπτό. Αν πρόκειται για διαδικτυακό σεμινάριο ή παρουσιάζετε μόνοι σας, όλα είναι εντάξει.",
   "Restart sound capture": "Επανεκκίνηση λήψης ήχου",
   "Don't warn for this meeting": "Να μην ειδοποιούμαι σε αυτή τη συνάντηση",
   "Restarting sound capture…": "Επανεκκίνηση λήψης ήχου…",
@@ -691,8 +690,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Δεν βοήθησε. Ελέγξτε την έξοδο ήχου στις ρυθμίσεις συστήματος ή στην εφαρμογή κλήσεων.",
   "Warnings are off for this meeting": "Οι ειδοποιήσεις είναι απενεργοποιημένες για αυτή τη συνάντηση",
   "Warn when the other side can't be heard": "Ειδοποίηση όταν δεν ακούγεται ο συνομιλητής",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Εμφανίζει banner και ειδοποίηση όταν ο ήχος του υπολογιστή δεν ηχογραφείται κατά τη διάρκεια κλήσης.",
   "from {start} to {end}": "από {start} έως {end}",
   "and {n} more": "και άλλα {n}",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges}. Αν μιλούσε κάποιος τότε, τα λόγια του δεν υπάρχουν στην απομαγνητοφώνηση."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges}. Αν μιλούσε κάποιος τότε, τα λόγια του δεν υπάρχουν στην απομαγνητοφώνηση.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Ο ήχος του υπολογιστή δεν καταγράφεται εδώ και ενάμιση λεπτό. Αν οι άλλοι συμμετέχοντες είναι τώρα σιωπηλοί, αυτό μπορεί να είναι φυσιολογικό.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Εμφανίζει προειδοποίηση αν δεν καταγράφεται ο ήχος των άλλων συμμετεχόντων κατά τη διάρκεια μιας κλήσης."
 }

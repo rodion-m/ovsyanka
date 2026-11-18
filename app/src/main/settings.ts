@@ -83,7 +83,7 @@ export function loadSettings(path: string): Settings {
   } catch { return {} }
   if (parsed && typeof parsed === 'object' && !('spoken' in parsed) && !('spokenMigrated' in parsed) && Object.keys(parsed).some(k => k !== 'spokenMigrated')) {
     const upgraded = { ...parsed, spoken: 'en' as const, spokenMigrated: 2 }
-    saveSettings(path, upgraded)
+    try { saveSettings(path, upgraded) } catch { /* startup still uses the migrated value if settings cannot be written */ }
     return upgraded
   }
   return parsed

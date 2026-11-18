@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -49,6 +49,13 @@ describe('the spoken language setting', () => {
     expect(loadSettings(fresh)).toMatchObject({ spoken: 'multi', spokenMigrated: 2 })
     updateSettings(fresh, { spoken: 'ru', spokenMigrated: 2 })
     expect(loadSettings(fresh).spoken).toBe('ru')
+  })
+  it('returns the migrated value when its one-time settings write fails', () => {
+    const file = settingsFile()
+    writeFileSync(file, JSON.stringify({ myName: 'Ari' }))
+    mkdirSync(`${file}.tmp`)
+    expect(loadSettings(file)).toMatchObject({ myName: 'Ari', spoken: 'en', spokenMigrated: 2 })
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toEqual({ myName: 'Ari' })
   })
   it('passes English and Russian directly to Whisper, and lets Multi-language detect', () => {
     expect(whisperLanguage('en')).toBe('en')

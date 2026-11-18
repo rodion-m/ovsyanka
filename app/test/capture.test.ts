@@ -23,6 +23,20 @@ describe('frame parser', () => {
     expect(out[1]).toEqual({ t: 'level', me: 0.2, them: 0.4, themZero: false, ms: 140 })
   })
 
+  it('accepts the Linux and Windows level shape without watchdog-only fields', () => {
+    const p = new FrameParser()
+    expect(p.push(Buffer.from('{"t":"level","me":0.3,"them":0.7}\n'))).toEqual([
+      { t: 'level', me: 0.3, them: 0.7, themZero: false, ms: 0 },
+    ])
+  })
+
+  it('keeps no-buffer levels zero-equivalent for the watchdog and logs their source flag', () => {
+    const p = new FrameParser()
+    expect(p.push(Buffer.from('{"t":"level","me":0,"them":0,"themZero":false,"noBuffers":true,"ms":100}\n'))).toEqual([
+      { t: 'level', me: 0, them: 0, themZero: false, noBuffers: true, ms: 100 },
+    ])
+  })
+
   it('keeps two interleaved tracks apart', () => {
     const p = new FrameParser()
     const bytes = Buffer.concat([encodeFrame(pcm('me', 0, [0.1])), encodeFrame(pcm('them', 0, [0.2, 0.3])), encodeFrame(pcm('me', 100, [0.4]))])
@@ -83,6 +97,19 @@ describe('Capture', () => {
     expect(got).toEqual([{ me: 0.3, them: 0, themZero: true, ms: 100 }])
   })
 
+  it('advances the watchdog clock when the them tap delivers no buffers', async () => {
+    const f = fakeProc(); const c = new Capture(f.proc, { startMs: 1_000 })
+    const got: unknown[] = []
+    c.on('level', (lv) => got.push(lv))
+    f.out.write(Buffer.from('{"t":"level","me":0,"them":0,"noBuffers":true,"ms":1000}\n{"t":"level","me":0,"them":0,"noBuffers":true,"ms":1000}\n{"t":"level","me":0.5,"them":0.5,"themZero":false,"ms":1000}\n'))
+    await tick()
+    expect(got).toEqual([
+      { me: 0, them: 0, themZero: true, ms: 1_100, noBuffers: true },
+      { me: 0, them: 0, themZero: true, ms: 1_200, noBuffers: true },
+      { me: 0.5, them: 0.5, themZero: false, ms: 1_200 },
+    ])
+  })
+
   it('a warn message emits warn', async () => {
     const f = fakeProc(); const c = new Capture(f.proc)
     const got: string[] = []
@@ -90,6 +117,14 @@ describe('Capture', () => {
     f.out.write(encodeFrame({ t: 'warn', code: 'no-system-audio' }))
     await tick()
     expect(got).toEqual(['no-system-audio'])
+  })
+
+  it('reports when the helper successfully starts or rebuilds system capture', async () => {
+    const f = fakeProc(); const c = new Capture(f.proc)
+    const ready = vi.fn(); c.on('system-ready', ready)
+    f.out.write(Buffer.from('{"t":"system-ready"}\n')); await tick()
+    expect(ready).toHaveBeenCalledOnce()
+    const stopped = c.stop(); f.exit(0); await stopped
   })
 
   it('pause, resume and stop go to the helper as lines', async () => {
@@ -278,6 +313,13 @@ describe('choosing the mic while recording', () => {
     f.exit(0)
     await stopped
     expect(c.rebuildSystem()).toBe(false)
+  })
+
+  it('rebuildSystem returns false when the selected Rust helper has no command', async () => {
+    const f = fakeProc(); const c = new Capture(f.proc, { supportsRebuildSystem: false })
+    expect(c.rebuildSystem()).toBe(false)
+    expect(f.commands).toEqual([])
+    const stopped = c.stop(); f.exit(0); await stopped
   })
 })
 

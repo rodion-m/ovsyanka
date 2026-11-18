@@ -334,7 +334,7 @@ function startDetection() {
     notify: (id) => {
       if (!themWarnOn || isFake() || !Notification.isSupported()) return
       themWarningNotification?.close()
-      const n = new Notification({ title: t("Can't hear the other side"), body: t("The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine."), silent: true })
+      const n = new Notification({ title: t("Can't hear the other side"), body: t("The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal."), silent: true })
       themWarningNotification = n
       n.on('click', () => { if (themWarningNotification === n) themWarningNotification = undefined; goTo(`/note/${id}`) })
       n.on('close', () => { if (themWarningNotification === n) themWarningNotification = undefined })
@@ -347,11 +347,13 @@ function startDetection() {
   })
   themSilence = them
   onRecordingEvent((e) => {
-    if (e.t === 'level') them.level(e.meetingId, e)
+    if (e.t === 'level') { them.level(e.meetingId, e); if (!e.themZero) them.permission(e.meetingId, true) }
     else if (e.t === 'paused') them.paused(e.meetingId, e.paused)
+    else if (e.t === 'system-ready') them.permission(e.meetingId, true)
     else if (e.t === 'warn' && e.code === 'no-system-audio') them.permission(activeMeeting()?.id ?? '', false)
   })
-  onMeetingStart((m) => them.started(m))
+  onMeetingStart((m) => { them.started(m); them.permission(m.id, true) })
+  onMeetingChange((m) => { them.bindApp(m.id, m.app); callNamesRef?.bindApp(m.id, m.app) })
   onMeetingStop((m) => them.stopped(m.id))
   onMeetingStart(() => { prompts.hide(); watcher.cleared(); updateOfferChanged() })
   // Recording needs the mic and the call audio: one never asked is asked now (the Mac's own prompt, as any app does
@@ -529,7 +531,7 @@ app.whenReady().then(() => {
     },
     slowStartMs: isFake() ? Number(process.env.YOGURT_FAKE_BOOT_MS ?? 0) : 0,
     onSpoken: () => spokenChanged(),
-    onThemSilenceWarn: (on) => { themWarnOn = on },
+    onThemSilenceWarn: (on) => { themWarnOn = on; themSilence?.setting(on) },
   })
   // Music and Spotify pause while a meeting records, and play again after
   const media = createMedia({ helper: runHelper })

@@ -683,7 +683,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Litterointi on epätäydellinen: osa tallenteesta on vielä transkriboimatta.",
   "Retry": "Yritä uudelleen",
   "Can't hear the other side": "Toista osapuolta ei kuulosta",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Tietokoneen ääntä ei ole tallennettu minuuttiin. Jos kyseessä on webinaari tai esittelet yksin, kaikki on kunnossa.",
   "Restart sound capture": "Käynnistä äänen kaappaus uudelleen",
   "Don't warn for this meeting": "Älä varoita tässä kokouksessa",
   "Restarting sound capture…": "Käynnistän äänen kaappausta uudelleen…",
@@ -691,8 +690,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Eipä auttanut. Tarkista äänen ulostulo järjestelmäasetuksista tai puhelusovelluksesta.",
   "Warnings are off for this meeting": "Varoitukset on pois päältä tässä kokouksessa",
   "Warn when the other side can't be heard": "Varoita, kun toista osapuolta ei kuulu",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Näyttää bannerin ja ilmoituksen, kun tietokoneen ääntä ei tallenneta puhelun aikana.",
   "from {start} to {end}": "{start}–{end}",
   "and {n} more": "ja vielä {n}",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Toisen osapuolen ääntä ei tallennettu {ranges}. Jos joku puhui silloin, hänen sanansa eivät ole litteraatissa."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Toisen osapuolen ääntä ei tallennettu {ranges}. Jos joku puhui silloin, hänen sanansa eivät ole litteraatissa.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Tietokoneen ääntä ei ole tallennettu puoleentoista minuuttiin. Jos toinen osapuoli on nyt hiljaa, se voi olla normaalia.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Näyttää varoituksen, jos toisen osapuolen ääntä ei tallenneta puhelun aikana."
 }

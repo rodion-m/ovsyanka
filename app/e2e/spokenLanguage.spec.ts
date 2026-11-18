@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -16,16 +16,16 @@ const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T
 const languages = async (app: ElectronApplication) => (await fake<{ languages: string[] }>(app, 'prompts')).languages
 const saved = (userData: string) => JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8')).spoken
 
-test('the spoken language picker: English by default, Russian and automatic detection, remembered and shown in Settings', async () => {
+test('the spoken language picker: Multi-language by default, explicit choices are remembered and shown in Settings', async () => {
   const a = await launch()
   const { app, page } = a
   try {
     await page.getByRole('button', { name: 'Start recording', exact: true }).click()
     await expect(page.getByTestId('note-state')).toHaveAttribute('data-state', 'recording')
-    await expect(page.getByTestId('spoken-name')).toHaveText('English')
-    // whisper is told English, nothing is detected
+    await expect(page.getByTestId('spoken-name')).toHaveText('Multi-language')
+    // whisper detects the language automatically
     await expect.poll(async () => (await languages(app)).length, { timeout: 30_000 }).toBeGreaterThan(0)
-    expect(new Set(await languages(app))).toEqual(new Set(['en']))
+    expect(new Set(await languages(app))).toEqual(new Set(['auto']))
 
     await page.getByTestId('spoken-chip').click()
     const menu = page.getByTestId('spoken-menu')
@@ -71,8 +71,8 @@ test('the spoken language picker: English by default, Russian and automatic dete
     await expect(page.getByTestId('settings-spoken-multi')).toHaveAttribute('aria-checked', 'true')
     await page.getByTestId('settings-spoken-en').click()
     await expect(page.getByTestId('settings-spoken-en')).toHaveAttribute('aria-checked', 'true')
-    // English only is the default, so it is not written down
-    await expect.poll(() => saved(a.userData)).toBeUndefined()
+    // An explicit English choice is written down even though older profiles defaulted to English.
+    await expect.poll(() => saved(a.userData)).toBe('en')
     await page.getByTestId('settings-spoken-en').press('ArrowRight')
     await expect(page.getByTestId('settings-spoken-ru')).toHaveAttribute('aria-checked', 'true')
     await expect.poll(focused).toBe('settings-spoken-ru')
@@ -94,4 +94,16 @@ test('the spoken language picker: English by default, Russian and automatic dete
     await expect.poll(async () => (await languages(b.app)).length, { timeout: 30_000 }).toBeGreaterThan(0)
     expect(new Set(await languages(b.app))).toEqual(new Set(['ru']))
   } finally { await b.app.close() }
+})
+
+test('a legacy profile without spoken language upgrades to explicit English once', async () => {
+  const userData = mkdtempSync(join(tmpdir(), 'yogurt-spoken-legacy-'))
+  mkdirSync(userData, { recursive: true })
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ myName: 'Ari' }))
+  const { app } = await launch(userData)
+  try {
+    await expect.poll(() => saved(userData)).toBe('en')
+    const profile = JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8'))
+    expect(profile).toMatchObject({ myName: 'Ari', spoken: 'en', spokenMigrated: 2 })
+  } finally { await app.close() }
 })

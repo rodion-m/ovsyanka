@@ -695,7 +695,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "La transcription est incomplète : une partie de l'enregistrement n'est pas encore transcrite.",
   "Retry": "Réessayer",
   "Can't hear the other side": "Impossible d'entendre l'autre participant",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Le son de l'ordinateur n'est pas enregistré depuis une minute. S'il s'agit d'un webinaire ou si vous présentez seul, tout est normal.",
   "Restart sound capture": "Redémarrer la capture du son",
   "Don't warn for this meeting": "Ne pas avertir pour cette réunion",
   "Restarting sound capture…": "Redémarrage de la capture du son…",
@@ -703,8 +702,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Cela n'a pas suffi. Vérifiez la sortie audio dans les réglages système ou dans l'application d'appel.",
   "Warnings are off for this meeting": "Les avertissements sont désactivés pour cette réunion",
   "Warn when the other side can't be heard": "Avertir quand l'autre participant n'est pas audible",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Affiche une bannière et une notification quand le son de l'ordinateur n'est pas enregistré pendant un appel.",
   "from {start} to {end}": "de {start} à {end}",
   "and {n} more": "et {n} autres",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Le son de l'autre participant n'a pas été enregistré {ranges}. Si quelqu'un a parlé à ce moment-là, ses paroles ne figurent pas dans la transcription."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Le son de l'autre participant n'a pas été enregistré {ranges}. Si quelqu'un a parlé à ce moment-là, ses paroles ne figurent pas dans la transcription.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Le son de l’ordinateur n’est plus enregistré depuis une minute et demie. Si les autres participants sont silencieux en ce moment, cela peut être normal.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Affiche un avertissement si le son des autres participants n’est pas enregistré pendant un appel."
 }

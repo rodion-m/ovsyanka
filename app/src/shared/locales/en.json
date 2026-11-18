@@ -133,5 +133,7 @@
   "Russian": "Russian",
   "Transcribes Russian in Cyrillic": "Transcribes Russian in Cyrillic",
   "Choose English or Russian, or let Yogurt detect the language.": "Choose English or Russian, or let Yogurt detect the language.",
-  "Yogurt detects the spoken language automatically.": "Yogurt detects the spoken language automatically."
+  "Yogurt detects the spoken language automatically.": "Yogurt detects the spoken language automatically.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Shows a warning if the other side's sound isn't recorded during a call."
 }

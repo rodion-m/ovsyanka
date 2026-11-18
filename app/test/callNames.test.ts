@@ -38,7 +38,7 @@ function setup(o: { app?: string | null; attendees?: Meeting['attendees'] } = {}
   const root = mkdtempSync(join(tmpdir(), 'yogurt-callnames-')); dirs.push(root)
   const store = openStore(join(root, 'yogurt.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Sync', startedAt: 1_000_000, endedAt: null, eventId: null, app: o.app === undefined ? 'Zoom' : o.app, attendees: o.attendees ?? [], state: 'recording' })
-  let clock = 1_000_000
+  let clock = 1_000_000, nameReads = 0
   const watched: string[][] = []
   let emit!: (l: WatchLine) => void
   let stopped = 0
@@ -48,13 +48,13 @@ function setup(o: { app?: string | null; attendees?: Meeting['attendees'] } = {}
   let transcribed!: () => void
   const done = new Promise<void>((r) => { transcribed = r })
   const hook = hookCallNames({
-    store, myNames: () => ['Alex Morgan'], transcribed: () => done, changed: (id) => changed.push(id), log: (s) => logs.push(s), now: () => clock,
+    store, myNames: () => { nameReads++; return ['Alex Morgan'] }, transcribed: () => done, changed: (id) => changed.push(id), log: (s) => logs.push(s), now: () => clock,
     watch: (ids, onLine) => { watched.push(ids); emit = onLine; return { stop: () => { stopped++ } } },
     onStart: (fn) => starts.push(fn), onStop: (fn) => stops.push(fn), onCapture: (fn) => captures.push(fn),
   })
   const capture = new EventEmitter()
   return {
-    store, m, hook, watched, changed, logs, transcribed, stopped: () => stopped,
+    store, m, hook, watched, changed, logs, transcribed, stopped: () => stopped, nameReads: () => nameReads, advance: (ms: number) => { clock += ms },
     start() { starts.forEach((f) => f(m)); captures.forEach((f) => f(capture, m.id)) },
     /** audio heard: meeting time `ms`, arriving at wall clock `at` */
     audio(ms: number, at: number) { clock = at; capture.emit('pcm', 'them', ms, new Float32Array(1600)) },
@@ -112,6 +112,28 @@ describe('hookCallNames', () => {
     expect(s.hook.nameFor(s.m.id, 1500, 4000)).toBe('Dana Smith')
     expect(s.hook.nameFor(s.m.id, 6000, 8000)).toBe('Ann Lee')
     expect(s.hook.nameFor('other', 1500, 4000)).toBeNull()
+  })
+
+  it('qualifies the watchdog only when the reader app matches the meeting binding', () => {
+    const bound = setup(); bound.start(); bound.emit(zoomLine(1_001_000, ['Alex Morgan', 'Dana Smith']))
+    expect(bound.hook.themWatch(bound.m.id)).toMatchObject({ callApp: true, participants: ['Alex Morgan', 'Dana Smith'], me: true, other: true })
+
+    const manual = setup({ app: null }); manual.start(); manual.emit(zoomLine(1_001_000, ['Alex Morgan', 'Dana Smith']))
+    expect(manual.hook.themWatch(manual.m.id)).toMatchObject({ callApp: false, me: true, other: true })
+    manual.hook.bindApp(manual.m.id, 'Teams')
+    expect(manual.hook.themWatch(manual.m.id)?.callApp).toBe(false)
+    manual.hook.bindApp(manual.m.id, 'Zoom')
+    expect(manual.hook.themWatch(manual.m.id)?.callApp).toBe(true)
+  })
+
+  it('caches watchdog name settings for two seconds instead of rereading on every level frame', () => {
+    const s = setup(); s.start(); s.emit(zoomLine(1_001_000, ['Alex Morgan', 'Dana Smith']))
+    s.hook.themWatch(s.m.id)
+    const afterRead = s.nameReads()
+    for (let i = 0; i < 100; i++) s.hook.themWatch(s.m.id)
+    expect(s.nameReads()).toBe(afterRead)
+    s.advance(2_001); s.hook.themWatch(s.m.id)
+    expect(s.nameReads()).toBe(afterRead + 1)
   })
 
   it('reads Webex roster names during a call', () => {

@@ -680,7 +680,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transskriptionen er ufuldstændig: en del af optagelsen er ikke transskriberet endnu.",
   "Retry": "Prøv igen",
   "Can't hear the other side": "Den anden deltager kan ikke høres",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Computeren lyder ikke er blevet optaget i et minut. Hvis dette er et webinar, eller du holder præsentation alene, er det helt i orden.",
   "Restart sound capture": "Genstart lydoptagelse",
   "Don't warn for this meeting": "Advar ikke på dette møde",
   "Restarting sound capture…": "Genstarter lydoptagelse…",
@@ -688,8 +687,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Det hjalp ikke. Tjek lydudgangen i systemindstillingerne eller i opkaldsappen.",
   "Warnings are off for this meeting": "Advarsler er slået fra for dette møde",
   "Warn when the other side can't be heard": "Advar, når den anden deltager ikke kan høres",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Viser et banner og en notifikation, når computerens lyd ikke optages under et opkald.",
   "from {start} to {end}": "fra {start} til {end}",
   "and {n} more": "og {n} mere",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Den anden deltagers lyd blev ikke optaget {ranges}. Hvis nogen talte på det tidspunkt, er deres ord ikke med i udskriften."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Den anden deltagers lyd blev ikke optaget {ranges}. Hvis nogen talte på det tidspunkt, er deres ord ikke med i udskriften.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Computerens lyd er ikke blevet optaget i halvandet minut. Hvis den anden part er stille lige nu, kan det være helt normalt.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Viser en advarsel, hvis den anden parts lyd ikke optages under et opkald."
 }

@@ -62,7 +62,9 @@ function themSilentOf(raw: unknown): Meeting['themSilent'] | undefined {
   } catch { return undefined }
 }
 
-const toMeeting = (r: Row): Meeting => ({
+const toMeeting = (r: Row): Meeting => {
+  const themSilent = themSilentOf(r.them_silent)
+  return ({
   ...(r.transcription_pending ? { transcriptionPending: true } : {}),
   id: String(r.id), title: String(r.title), startedAt: Number(r.started_at), endedAt: r.ended_at == null ? null : Number(r.ended_at),
   eventId: r.event_id == null ? null : String(r.event_id), app: r.app == null ? null : String(r.app),
@@ -77,8 +79,9 @@ const toMeeting = (r: Row): Meeting => ({
   ...(r.event_calendar_source == null ? {} : { eventCalendarSource: String(r.event_calendar_source) }),
   ...(r.duration_ms == null ? {} : { durationMs: Number(r.duration_ms) }),
   ...(r.trashed_at == null ? {} : { trashedAt: Number(r.trashed_at) }),
-  ...(themSilentOf(r.them_silent) ? { themSilent: themSilentOf(r.them_silent)! } : {}),
+  ...(themSilent ? { themSilent } : {}),
 })
+}
 const toSegment = (r: Row): Segment => ({
   id: Number(r.id), meetingId: String(r.meeting_id), track: r.track as Segment['track'], startMs: Number(r.start_ms), endMs: Number(r.end_ms),
   text: String(r.text), speaker: r.speaker == null ? null : String(r.speaker), hidden: Number(r.hidden ?? 0) === 1,

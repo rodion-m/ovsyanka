@@ -635,7 +635,6 @@
   "The transcript is incomplete: part of the recording is not transcribed yet.": "Transkripsi tidak lengkap: sebahagian rakaman belum ditranskripsikan.",
   "Retry": "Cuba lagi",
   "Can't hear the other side": "Pihak sebelah tidak dapat didengar",
-  "The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.": "Bunyi komputer tidak dirakam selama seminit. Jika ini webinar atau anda membentangkan sendiri, tidak mengapa.",
   "Restart sound capture": "Mula semula rakaman bunyi",
   "Don't warn for this meeting": "Jangan beri amaran dalam mesyuarat ini",
   "Restarting sound capture…": "Memulakan semula rakaman bunyi…",
@@ -643,8 +642,9 @@
   "That didn't help. Check the sound output in your system settings or the call app.": "Tidak berhasil. Semak output bunyi dalam tetapan sistem atau apl panggilan.",
   "Warnings are off for this meeting": "Amaran dimatikan untuk mesyuarat ini",
   "Warn when the other side can't be heard": "Beri amaran apabila pihak sebelah tidak dapat didengar",
-  "Shows a banner and a notification when the computer's sound isn't recorded during a call.": "Menunjukkan sepanduk dan pemberitahuan apabila bunyi komputer tidak dirakam semasa panggilan.",
   "from {start} to {end}": "dari {start} hingga {end}",
   "and {n} more": "dan {n} lagi",
-  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Bunyi pihak sebelah tidak dirakam {ranges}. Jika seseorang bercakap pada waktu itu, kata-katanya tiada dalam transkrip."
+  "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Bunyi pihak sebelah tidak dirakam {ranges}. Jika seseorang bercakap pada waktu itu, kata-katanya tiada dalam transkrip.",
+  "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Bunyi komputer tidak dirakam selama satu setengah minit. Jika pihak satu lagi sedang senyap, hal ini mungkin normal.",
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Memaparkan amaran jika bunyi pihak satu lagi tidak dirakam semasa panggilan."
 }

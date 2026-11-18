@@ -123,7 +123,7 @@ function ThemSilentNote({ note, meetingId }: { note: NonNullable<WidgetView['not
   const warn = phase === 'warn' || phase === 'failed'
   return <>
     <p data-testid="widget-note" data-tone={note.tone} data-them={phase}>{warn ? t("Can't hear the other side") : note.text}</p>
-    {phase === 'warn' && <p className="widget-them-body">{t("The computer's sound hasn't been recorded for a minute. If this is a webinar or you're presenting alone, that's fine.")}</p>}
+    {phase === 'warn' && <p className="widget-them-body">{t("The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.")}</p>}
     {phase === 'failed' && <p className="widget-them-body">{t("That didn't help. Check the sound output in your system settings or the call app.")}</p>}
     {(warn || phase === 'restarting') && <div className="widget-them-actions">
       <button data-testid="widget-them-restart" className="widget-settings" disabled={phase === 'restarting' || busy} onClick={restart}>
