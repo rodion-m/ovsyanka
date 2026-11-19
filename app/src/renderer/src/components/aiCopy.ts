@@ -288,14 +288,20 @@ const problemTextKeys: Record<AiProblemCode, AiCopyKey> = {
 }
 
 /** The short, actionable transcription warning shown under the live note. */
-export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli): string {
-  if (code === 'cli-missing') return aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
-  if (code === 'cli-failed') return aiTextF('problemCliFailed', { cli: cli || 'agy' }, locale)
-  if (code === 'cli-config') return aiText('problemCliConfig', locale)
-  if (code === 'timeout' && cli) return aiTextF('problemCliTimeout', { cli }, locale)
-  if (code === 'bad-response' && cli) return aiTextF('problemCliBadResponse', { cli }, locale)
-  const key = problemTextKeys[code]
-  return key === 'problemModelGone' || key === 'problemNoProvider'
-    ? aiTextF(key, { model: model || '…' }, locale)
-    : aiText(key, locale)
+export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli, afterMeeting = false): string {
+  let text: string
+  if (code === 'cli-missing') text = aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
+  else if (code === 'cli-failed') text = aiTextF('problemCliFailed', { cli: cli || 'agy' }, locale)
+  else if (code === 'cli-config') text = aiText('problemCliConfig', locale)
+  else if (code === 'timeout' && cli) text = aiTextF('problemCliTimeout', { cli }, locale)
+  else if (code === 'bad-response' && cli) text = aiTextF('problemCliBadResponse', { cli }, locale)
+  else {
+    const key = problemTextKeys[code]
+    text = key === 'problemModelGone' || key === 'problemNoProvider'
+      ? aiTextF(key, { model: model || '…' }, locale)
+      : aiText(key, locale)
+  }
+  if (!afterMeeting) return text
+  const retrySentence = locale === 'ru' ? ' После встречи нажмите Повторить в заметке.' : ' After the meeting, press Retry in the note.'
+  return text.endsWith(retrySentence) ? text.slice(0, -retrySentence.length) : text
 }

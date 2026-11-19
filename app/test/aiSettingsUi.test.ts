@@ -204,6 +204,10 @@ it('shows actionable CLI transcription problems in Russian and English', () => {
     expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain(retryRu)
     expect(aiProblemText(code, undefined, 'en', 'agy')).toContain('Your audio is kept.')
     expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain('Аудио сохранено.')
+    expect(aiProblemText(code, undefined, 'en', 'agy', true)).not.toContain(retryEn)
+    expect(aiProblemText(code, undefined, 'ru', 'agy', true)).not.toContain(retryRu)
+    expect(aiProblemText(code, undefined, 'en', 'agy', true)).toMatch(/Your audio is kept\.$/)
+    expect(aiProblemText(code, undefined, 'ru', 'agy', true)).toMatch(/Аудио сохранено\.$/)
   }
   expect(aiProblemText('cli-missing', undefined, 'en', 'agy')).toContain('couldn’t start agy')
   expect(aiProblemText('cli-missing', undefined, 'ru', 'agy')).toContain('не смог запустить agy')

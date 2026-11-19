@@ -481,7 +481,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
           {resumeFailed && <p data-testid="note-resume-failed" role="alert" className="pointer-events-auto mx-auto mt-3 w-fit max-w-[calc(100%-32px)] text-[13px] text-danger">{t("Couldn't resume recording. Your existing note and audio are kept. Try again.")}</p>}
           {pauseFailed && recording && <p role="alert" className="pointer-events-auto mx-auto mt-3 w-fit text-[13px] text-danger">{pauseFailed === 'pause' ? t("Couldn't pause the recording. Try again.") : t("Couldn't resume the recording. Try again.")}</p>}
           {recording && recorder && <ThemSilence view={recorder} />}
-          {hint && (recording || aiProblem?.code) && hint.code !== 'them-silent' && <RecordingHint hint={hint} />}
+          {hint && (recording || aiProblem?.code) && hint.code !== 'them-silent' && <RecordingHint hint={hint} recording={recording} />}
           <div className="note-footer-bar">
           <div className="note-status pointer-events-auto flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
             {(recording || m.state === 'prepared') && <><MicMenu recording={recording} paused={recording && m.paused} /><SpokenMenu backend={activeAiBackend} /><span aria-hidden="true">·</span></>}

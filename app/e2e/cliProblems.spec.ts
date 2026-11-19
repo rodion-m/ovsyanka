@@ -50,6 +50,8 @@ for (const locale of ['en', 'ru'] as const) test(`${locale}: CLI failures explai
 
     await page.getByTestId('note-stop').click()
     await expect(page.getByTestId('note-transcript-pending')).toBeVisible({ timeout: 30_000 })
+    await expect(noteNotice).not.toContainText(locale === 'en' ? 'After the meeting' : 'После встречи')
+    await expect(noteNotice).toContainText(locale === 'en' ? 'Your audio is kept.' : 'Аудио сохранено.')
     await capture(page, `${locale}-d-after-stop-retry-banner.png`)
 
     await fake(app, 'cliFailure')
