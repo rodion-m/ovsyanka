@@ -691,5 +691,7 @@
   "and {n} more": "og {n} mere",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Den anden deltagers lyd blev ikke optaget {ranges}. Hvis nogen talte på det tidspunkt, er deres ord ikke med i udskriften.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Computerens lyd er ikke blevet optaget i halvandet minut. Hvis den anden part er stille lige nu, kan det være helt normalt.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Viser en advarsel, hvis den anden parts lyd ikke optages under et opkald."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Viser en advarsel, hvis den anden parts lyd ikke optages under et opkald.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

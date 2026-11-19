@@ -4,13 +4,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
-async function launch() {
+async function launch(extra: Record<string, string> = {}) {
   const userData = mkdtempSync(join(tmpdir(), 'yogurt-ai-settings-'))
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_AI_BACKEND: '', YOGURT_USER_DATA: userData } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_AI_BACKEND: '', YOGURT_USER_DATA: userData, ...extra } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
   return { app, page, userData }
 }
+
+test('provider recording explains the batched transcript before lines arrive', async () => {
+  const { app, page } = await launch({ YOGURT_AI_BACKEND: 'agy', YOGURT_SYSTEM_LANGUAGES: 'ru-RU' })
+  try {
+    await page.getByRole('button', { name: 'Начать запись', exact: true }).click()
+    await page.getByRole('tab', { name: 'Расшифровка' }).click()
+    await expect(page.getByTestId('transcript-empty')).toContainText('Идёт запись. При работе через провайдера ИИ расшифровка появляется частями')
+    await page.getByTestId('spoken-chip').click()
+    await expect(page.getByTestId('spoken-multi')).toContainText('Язык определяется автоматически')
+  } finally { await app.close() }
+})
 
 test('provider preferences save for the next launch and keep the current processing/privacy mode', async () => {
   const { app, page, userData } = await launch()

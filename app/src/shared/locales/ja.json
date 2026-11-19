@@ -646,5 +646,7 @@
   "and {n} more": "ほか{n}件",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "相手の音声は{ranges}録音されていませんでした. その間に誰かが話していた場合、その発言は文字起こしに含まれていません。",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "パソコンの音声が1分半録音されていません。相手が今静かにしているなら、これは正常な場合があります。",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "通話中に相手の音声が録音されていない場合に警告を表示します。"
+  "Shows a warning if the other side's sound isn't recorded during a call.": "通話中に相手の音声が録音されていない場合に警告を表示します。",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

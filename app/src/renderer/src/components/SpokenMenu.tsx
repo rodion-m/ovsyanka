@@ -2,6 +2,7 @@ import { usePopoverPresence } from '../motion'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Check, ChevronDown, Info, Languages } from 'lucide-react'
 import { WHISPER_LANGUAGES, type Spoken } from '../../../shared/spoken'
+import type { AiBackend } from '../../../shared/ai'
 import { t } from '../../../shared/i18n'
 
 /** the names shown on the chip and in Settings */
@@ -11,7 +12,11 @@ export const spokenName = (s: Spoken): string => (s === 'en' ? t('English') : s 
  * The spoken language under the note's bar, beside the mic: English, Russian, or automatic detection.
  * Choosing applies to the recording's next words and is remembered for the next meetings.
  */
-export function SpokenMenu() {
+export const spokenSupportText = (backend: AiBackend) => backend === 'local'
+  ? t('{count} languages supported', { count: WHISPER_LANGUAGES })
+  : t('Language is detected automatically')
+
+export function SpokenMenu({ backend = 'local' }: { backend?: AiBackend }) {
   const [spoken, setSpoken] = useState<Spoken>()
   const [open, setOpen] = useState<false | 'pointer' | 'keyboard'>(false)
   const presence = usePopoverPresence(open, open === 'pointer')
@@ -85,7 +90,7 @@ export function SpokenMenu() {
             <span className="flex min-w-0 flex-col">
               <span>{t('Multi-language')}</span>
               <span className="flex items-center gap-1.5 text-xs text-muted">
-                {t('{count} languages supported', { count: WHISPER_LANGUAGES })}
+                {spokenSupportText(backend)}
                 <span data-testid="spoken-multi-info" title={about} aria-label={about}><Info size={12} aria-hidden="true" /></span>
               </span>
             </span>

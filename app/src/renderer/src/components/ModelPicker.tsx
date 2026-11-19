@@ -34,6 +34,8 @@ export type ModelPickerProps = {
   /** Optional controls above the list, such as a refresh button. */
   toolbar?: ReactNode
   describedBy?: string
+  /** Hide the audio capability tag when a transcription-capable model is used for text tasks. */
+  hideAudioHint?: boolean
 }
 
 const hintKey: Record<Exclude<AiHint, 'unavailable'>, AiCopyKey> = {
@@ -58,17 +60,26 @@ function price(option: AiOption): string | undefined {
 function facts(option: AiOption): string {
   return [
     option.id,
-    ...option.hints.filter(h => h !== 'unavailable').map(h => aiText(hintKey[h])),
-    ...(option.hints.includes('experimental') ? [aiText('sttExperimentalHint')] : []),
     option.detail,
     price(option),
     option.addedAt === undefined ? undefined : aiTextF('addedOn', { when: monthYear(option.addedAt) }),
   ].filter(Boolean).join(' · ')
 }
 
+function SelectedFacts({ option, hideAudioHint = false }: { option: AiOption; hideAudioHint?: boolean }) {
+  const hints = option.hints.filter((h): h is Exclude<AiHint, 'unavailable'> => h !== 'unavailable' && !(hideAudioHint && h === 'audio'))
+  return <div className="model-picker-summary">
+    <span className="model-picker-summary-id">{option.id}</span>
+    {hints.length > 0 && <span className="model-picker-summary-tags">{hints.map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>}
+    {option.hints.includes('experimental') && <span className="model-picker-summary-warning">{aiText('sttExperimentalHint')}.</span>}
+    {option.detail && <span className="model-picker-summary-warning">{option.detail.endsWith('.') ? option.detail : `${option.detail}.`}</span>}
+    {price(option) && <span className="model-picker-summary-price">{price(option)}</span>}
+  </div>
+}
+
 type Row = { key: string; domId: string; option?: AiOption; custom?: string }
 
-export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, showErrorWhenClosed, validateCustom, state, locked, hint, toolbar, describedBy }: ModelPickerProps) {
+export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, showErrorWhenClosed, validateCustom, state, locked, hint, toolbar, describedBy, hideAudioHint = false }: ModelPickerProps) {
   const status = state?.status ?? 'ready'
   const selected = options.find(option => option.id === value)
   const [open, setOpen] = useState(false)
@@ -147,9 +158,7 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
   const retry = (onRetry?: () => void) => onRetry && <button type="button" className="model-picker-retry" onMouseDown={e => e.preventDefault()} onClick={onRetry}>{aiText('retry')}</button>
   const notice = (text: string, onRetry?: () => void) => <p className="model-picker-note">{text}{retry(onRetry)}</p>
 
-  const sub = selected
-    ? facts(selected)
-    : [value, aiText(allowCustom ? 'hintCustom' : 'hintMissing')].filter(Boolean).join(' · ')
+  const sub = selected ? <SelectedFacts option={selected} /> : [value, aiText(allowCustom ? 'hintCustom' : 'hintMissing')].filter(Boolean).join(' · ')
 
   return <div className="model-picker" ref={root} data-open={open || undefined}
     onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) closeList() }}>
@@ -168,7 +177,7 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
             onMouseDown={e => e.preventDefault()} onClick={() => retype('')}><X size={13} aria-hidden="true" /></button>
         : <ChevronDown size={14} aria-hidden="true" className="model-picker-chevron" />}
     </span>
-    {!open && <p className="model-picker-sub" data-testid={`${id}-sub`}>{sub}</p>}
+    {!open && <div className="model-picker-sub" data-testid={`${id}-sub`}>{selected && hideAudioHint ? <SelectedFacts option={selected} hideAudioHint /> : sub}</div>}
     {!open && hint && <p className="model-picker-sub">{hint}</p>}
     {!open && showErrorWhenClosed && status === 'error' && state && 'message' in state && notice(state.message, 'onRetry' in state ? state.onRetry : undefined)}
     {open && <div className="model-picker-pop">
@@ -185,12 +194,12 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
           const groupDomId = `${id}-group-${group.id}${group.vendor ? `-${group.vendor}` : ''}`
           return inside.length > 0 && <div key={`${group.id}:${group.vendor ?? ''}`} role="group" aria-labelledby={groupDomId}>
             <div id={groupDomId} className="model-picker-group">{group.label}</div>
-            {inside.map(option => <OptionRow key={option.id} id={domIdOf(option)} option={option} current={value}
+            {inside.map(option => <OptionRow key={option.id} id={domIdOf(option)} option={option} current={value} hideAudioHint={hideAudioHint}
               highlighted={activeDomId === domIdOf(option)} select={() => commit(rows.find(row => row.option === option)!)} />)}
           </div>
         })}
         {filtered.filter(option => !(groups ?? []).some(group => group.id === option.group))
-          .map(option => <OptionRow key={option.id} id={domIdOf(option)} option={option} current={value}
+          .map(option => <OptionRow key={option.id} id={domIdOf(option)} option={option} current={value} hideAudioHint={hideAudioHint}
             highlighted={activeDomId === domIdOf(option)} select={() => commit(rows.find(row => row.option === option)!)} />)}
         {customValid && <div role="option" id={`${id}-custom`} aria-selected={trimmed === value} data-active={activeDomId === `${id}-custom` || undefined}
           className="model-picker-option" onMouseDown={e => e.preventDefault()}
@@ -210,14 +219,14 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
   </div>
 }
 
-function OptionRow({ id, option, current, highlighted, select }: { id: string; option: AiOption; current: string; highlighted: boolean; select(): void }) {
+function OptionRow({ id, option, current, highlighted, select, hideAudioHint }: { id: string; option: AiOption; current: string; highlighted: boolean; select(): void; hideAudioHint?: boolean }) {
   return <div role="option" id={id} aria-selected={option.id === current} aria-disabled={!!option.disabledReason || undefined}
     data-active={highlighted || undefined} className="model-picker-option" onMouseDown={e => e.preventDefault()}
     onClick={() => { if (!option.disabledReason) select() }}>
     <span className="model-picker-check" aria-hidden="true">{option.id === current && <Check size={13} />}</span>
     <span className="model-picker-name">{option.label}</span>
-    <span className="model-picker-hints">{option.hints.filter(h => h !== 'unavailable').map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>
+    <span className="model-picker-hints">{option.hints.filter((h): h is Exclude<AiHint, 'unavailable'> => h !== 'unavailable' && !(hideAudioHint && h === 'audio')).map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>
     <span className="model-picker-sub">{option.disabledReason === 'backend-unavailable' ? aiText('profileUnavailable') : option.disabledReason === 'soon' ? aiText('sttSoon') : option.disabledReason ?? facts(option)}</span>
-    {option.hints.includes('experimental') && <span className="model-picker-sub">{aiText('sttExperimentalHint')}</span>}
+    {option.hints.includes('experimental') && <span className="model-picker-extra-sub">{aiText('sttExperimentalHint')}</span>}
   </div>
 }

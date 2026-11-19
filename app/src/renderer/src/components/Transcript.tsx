@@ -18,6 +18,12 @@ import { followTarget, inView } from '../../../shared/follow'
 import { afterFinal, joinWords } from '../../../shared/liveWords'
 
 type Line = Omit<Segment, 'id'> & { id?: number }
+export function TranscriptEmpty({ recording, providerMode }: { recording: boolean; providerMode: boolean }) {
+  const text = recording && providerMode
+    ? t('Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.')
+    : t('Nothing heard yet.')
+  return <li data-testid="transcript-empty" className="note-empty empty-state"><div className="empty-state-content"><div className="empty-tile"><AudioLines size={28} strokeWidth={1.5} aria-hidden="true" /></div>{text}</div></li>
+}
 const key = (l: { track: string; startMs: number }) => `${l.track}:${l.startMs}`
 /** this close to the bottom still counts as reading the latest lines */
 const STICK_PX = 24
@@ -145,8 +151,8 @@ const Row = memo(function Row({ line: l, focused, name, query, playing, playable
  * The meeting's transcript: each turn carries who said it, following new lines
  * while it records; after the meeting a line plays from that moment, and the player sits at the bottom. The header searches it.
  */
-export function Transcript({ id, recording, inline = false, active = true, onClose, focus, toolbar }: {
-  id: string; recording: boolean; inline?: boolean; active?: boolean; toolbar?: HTMLElement | null; onClose?: () => void
+export function Transcript({ id, recording, providerMode = false, inline = false, active = true, onClose, focus, toolbar }: {
+  id: string; recording: boolean; providerMode?: boolean; inline?: boolean; active?: boolean; toolbar?: HTMLElement | null; onClose?: () => void
   /** a line to show and mark (an answer's source): ms into the meeting; seq: each time it is asked for */
   focus?: { ms: number; match?: string; seq: number }
 }) {
@@ -353,7 +359,7 @@ export function Transcript({ id, recording, inline = false, active = true, onClo
       <div className="transcript-scroll-wrap relative flex min-h-0 flex-1 flex-col">
         <ScrollFade enabled={active && loaded}><ol data-loaded={loaded} data-loading-phase={loadingPhase} data-testid="transcript" ref={list} onScroll={onScroll} onWheel={theirs} onTouchStart={theirs} onPointerDown={theirs} onKeyDownCapture={theirs} onKeyDown={onKeyDown} className="loading-content transcript-loading-content flex flex-1 flex-col gap-2 overflow-y-auto px-4 pb-4 pt-2 text-sm leading-[1.55]">
           {loadingPhase !== 'ready' && <li className="loading-placeholder"><Loading layout="transcript" /></li>}
-          {loaded && allLines.length === 0 && liveSaid.length === 0 && <li data-testid="transcript-empty" className="note-empty empty-state"><div className="empty-state-content"><div className="empty-tile"><AudioLines size={28} strokeWidth={1.5} aria-hidden="true" /></div>{t('Nothing heard yet.')}</div></li>}
+          {loaded && allLines.length === 0 && liveSaid.length === 0 && <TranscriptEmpty recording={recording} providerMode={providerMode} />}
           {allLines.length > 0 && grouped.length === 0 && <li data-testid="transcript-none" className="note-empty">{t('Nothing found for “{query}”.', { query: typed })}</li>}
           {grouped.map(run => <Fragment key={key(run.lines[0])}>
             {turns(run.lines).map((turn) => {

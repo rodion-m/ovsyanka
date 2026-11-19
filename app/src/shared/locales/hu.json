@@ -682,5 +682,7 @@
   "and {n} more": "és még {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "A másik fél hangja nem rögzült {ranges}. Ha valaki akkor beszélt, a szavai nem szerepelnek az átiratban.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "A számítógép hangja másfél perce nem kerül rögzítésre. Ha a többiek most csendben vannak, ez normális lehet.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Figyelmeztetést jelenít meg, ha hívás közben nem rögzül a többiek hangja."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Figyelmeztetést jelenít meg, ha hívás közben nem rögzül a többiek hangja.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

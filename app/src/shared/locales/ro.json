@@ -709,5 +709,7 @@
   "and {n} more": "și încă {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Sunetul celeilalte părți nu a fost înregistrat {ranges}. Dacă cineva a vorbit atunci, cuvintele sale nu apar în transcriere.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Sunetul computerului nu a fost înregistrat de un minut și jumătate. Dacă ceilalți participanți sunt tăcuți acum, poate fi normal.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Afișează un avertisment dacă sunetul celorlalți participanți nu este înregistrat în timpul unui apel."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Afișează un avertisment dacă sunetul celorlalți participanți nu este înregistrat în timpul unui apel.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

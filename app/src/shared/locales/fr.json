@@ -706,5 +706,7 @@
   "and {n} more": "et {n} autres",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Le son de l'autre participant n'a pas été enregistré {ranges}. Si quelqu'un a parlé à ce moment-là, ses paroles ne figurent pas dans la transcription.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Le son de l’ordinateur n’est plus enregistré depuis une minute et demie. Si les autres participants sont silencieux en ce moment, cela peut être normal.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Affiche un avertissement si le son des autres participants n’est pas enregistré pendant un appel."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Affiche un avertissement si le son des autres participants n’est pas enregistré pendant un appel.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

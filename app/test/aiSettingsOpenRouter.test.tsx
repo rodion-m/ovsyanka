@@ -76,7 +76,9 @@ describe('OpenRouter AI settings', () => {
     await waitFor(() => expect(openrouter.setKey).toHaveBeenCalledWith(key))
     expect(container.innerHTML).not.toContain(key)
     expect((screen.getByLabelText('API key') as HTMLInputElement).value).not.toBe(key)
-    expect(screen.getByText(/Key works/)).not.toBeNull()
+    expect(screen.getByText(/Key saved in the Keychain and working/)).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save and check key' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Check key' })).toBeTruthy()
   })
 
   it('offers replace and remove for a saved key, and shows the configured key check', async () => {

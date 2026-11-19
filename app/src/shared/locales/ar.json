@@ -752,5 +752,7 @@
   "and {n} more": "و{n} أخرى",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "لم يتم تسجيل صوت الطرف الآخر {ranges}. إذا كان أحد يتحدث آنذاك، فلن تجد كلامه في النص.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "لم يُسجَّل صوت الكمبيوتر منذ دقيقة ونصف. إذا كان الطرف الآخر صامتًا الآن، فقد يكون ذلك طبيعيًا.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "يعرض تحذيرًا إذا لم يُسجَّل صوت الطرف الآخر أثناء المكالمة."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "يعرض تحذيرًا إذا لم يُسجَّل صوت الطرف الآخر أثناء المكالمة.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

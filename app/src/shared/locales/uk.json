@@ -721,5 +721,7 @@
   "and {n} more": "і ще {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Звук співрозмовника не записувався {ranges}. Якщо в цей час хтось говорив, цих реплік немає в розшифровці.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Звук комп’ютера не записується вже півтори хвилини. Якщо співрозмовники зараз мовчать, це може бути нормально.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Показує попередження, якщо під час дзвінка звук співрозмовників не записується."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Показує попередження, якщо під час дзвінка звук співрозмовників не записується.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

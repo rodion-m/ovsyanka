@@ -694,5 +694,7 @@
   "and {n} more": "ja vielä {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Toisen osapuolen ääntä ei tallennettu {ranges}. Jos joku puhui silloin, hänen sanansa eivät ole litteraatissa.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Tietokoneen ääntä ei ole tallennettu puoleentoista minuuttiin. Jos toinen osapuoli on nyt hiljaa, se voi olla normaalia.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Näyttää varoituksen, jos toisen osapuolen ääntä ei tallenneta puhelun aikana."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Näyttää varoituksen, jos toisen osapuolen ääntä ei tallenneta puhelun aikana.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

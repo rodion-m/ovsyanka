@@ -682,5 +682,7 @@
   "and {n} more": "এবং আরও {n}টি",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "অন্য পক্ষের শব্দ {ranges} রেকর্ড হয়নি. ওই সময় কেউ কথা বলে থাকলে, তাদের কথা প্রতিলিপিতে থাকবে না।",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "কম্পিউটারের শব্দ দেড় মিনিট ধরে রেকর্ড করা হয়নি। অন্য পক্ষ এখন চুপ থাকলে, তা স্বাভাবিক হতে পারে।",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "কলের সময় অন্য পক্ষের শব্দ রেকর্ড না হলে সতর্কবার্তা দেখায়।"
+  "Shows a warning if the other side's sound isn't recorded during a call.": "কলের সময় অন্য পক্ষের শব্দ রেকর্ড না হলে সতর্কবার্তা দেখায়।",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

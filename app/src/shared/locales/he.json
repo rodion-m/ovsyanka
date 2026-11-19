@@ -703,5 +703,7 @@
   "and {n} more": "ועוד {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "צליל הצד השני לא הוקלט {ranges}. אם מישהו דיבר בזמן הזה, דבריו לא יופיעו בתמלול.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "צליל המחשב לא הוקלט במשך דקה וחצי. אם הצד השני שקט כרגע, ייתכן שזה תקין.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "מציג אזהרה אם הצליל של הצד השני לא מוקלט במהלך שיחה."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "מציג אזהרה אם הצליל של הצד השני לא מוקלט במהלך שיחה.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

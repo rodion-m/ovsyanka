@@ -1,8 +1,9 @@
 .ai-settings-intro { margin:0 0 12px;color:var(--muted);font-size:13px;line-height:1.6; }
 .ai-settings-form fieldset { min-width:0;margin:0;padding:0;border:0; }
-.ai-settings-form .settings-row { align-items:flex-start; }
+.ai-settings-form .settings-row { display:grid;grid-template-columns:minmax(120px, 1fr) minmax(0, 2fr);align-items:start;gap:18px; }
 .ai-settings-form .settings-row-copy { padding-block:4px; }
-.ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:240px;max-width:100%; }
+.ai-settings-form .settings-row > :last-child { min-width:0;width:100%; }
+.ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:100%;max-width:100%; }
 .ai-settings-form .settings-select { width:100%;min-width:0; }
 .ai-settings-form .settings-name-field { min-width:0; }
 .ai-settings-note { margin:0;padding:14px 20px;color:var(--muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
@@ -11,26 +12,27 @@
 .ai-settings-advanced summary { padding:15px 20px;cursor:pointer;color:var(--ink);font-size:13px; }
 .ai-settings-advanced summary:focus-visible { outline:2px solid var(--focus);outline-offset:-4px;border-radius:6px; }
 .ai-settings-actions { display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px;border-top:1px solid var(--line); }
+.ai-settings-mode-pending { flex:1 0 100%;margin:0;color:var(--muted);font-size:12px;line-height:1.5; }
 .ai-settings-status { margin:0;padding:0 20px 16px;font-size:12px;line-height:1.6;overflow-wrap:anywhere; }
 .ai-settings-status[data-error=true] { color:var(--ink); }
 .ai-settings-result { display:block;margin-top:4px;color:var(--muted);white-space:pre-wrap; }
 .ai-settings-pending { display:flex;align-items:center;justify-content:space-between;gap:12px; }
 .openrouter-fields { display:contents; }
 .openrouter-key-controls,.openrouter-model-controls { display:flex;align-items:flex-start;gap:7px;flex-wrap:wrap;max-width:100%; }
-.openrouter-key-row .settings-row-copy { flex:0 0 32%; }
-.openrouter-key-controls { flex:1 1 0;min-width:0; }
+.openrouter-probe-help { flex-basis:100%;font-size:11px;line-height:1.5;color:var(--muted); }
+.openrouter-key-controls { min-width:0; }
 .openrouter-key-controls .settings-name-field { flex:1 1 100%;width:100%; }
 .openrouter-key-buttons { display:flex;gap:6px; }
 .openrouter-key-link { flex-basis:100%;font-size:11px;color:var(--muted); }
-.openrouter-fields .settings-select-wrap:has(#ai-openrouter-dataPolicy) { width:390px;max-width:100%; }
-.openrouter-same { display:flex;gap:8px;align-items:center;padding:10px 20px 10px 36%;font-size:12px; }
-.openrouter-same input { accent-color:var(--accent); }
-.openrouter-picker-toolbar { display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--line);font-size:11px; }
+.openrouter-fields .settings-select-wrap:has(#ai-openrouter-dataPolicy) { width:100%;max-width:100%; }
+.openrouter-same { display:grid;grid-template-columns:minmax(120px, 1fr) minmax(0, 2fr);gap:18px;align-items:center;padding:10px 20px;font-size:12px; }
+.openrouter-same > span { grid-column:1; }
+.openrouter-same input { grid-column:2;justify-self:start;margin:0;accent-color:var(--accent); }
+.openrouter-picker-toolbar { display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:1px solid var(--line);font-size:11px;flex-wrap:wrap; }
 .openrouter-picker-toolbar button { border:0;background:transparent;color:var(--ink);cursor:pointer;padding:4px 6px;border-radius:4px; }
 .openrouter-picker-toolbar button[aria-pressed=true] { background:var(--surface-2);font-weight:600; }
 .openrouter-picker-toolbar span { color:var(--muted);margin-left:auto; }
+.openrouter-picker-toolbar button:last-child { min-width:28px;min-height:28px;font-size:17px; }
 @media(max-width:600px) {
-  .ai-settings-form .settings-row { display:block; }
-  .ai-settings-form .settings-name-field,.ai-settings-form .settings-select-wrap,.ai-settings-form .model-picker { width:100%;margin-top:8px; }
-  .openrouter-same { padding-left:20px; }
+  .ai-settings-form .settings-row,.openrouter-same { grid-template-columns:minmax(120px, 1fr) minmax(0, 2fr);gap:10px; }
 }

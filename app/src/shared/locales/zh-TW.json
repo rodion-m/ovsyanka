@@ -646,5 +646,7 @@
   "and {n} more": "以及另外 {n} 段",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "對方聲音在 {ranges} 未被錄製. 如果當時有人說話，這些內容不會出現在逐字稿中。",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "電腦聲音已經一分半鐘沒有錄下來。如果對方現在沒有說話，這可能是正常的。",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "通話期間未錄下對方聲音時顯示警告。"
+  "Shows a warning if the other side's sound isn't recorded during a call.": "通話期間未錄下對方聲音時顯示警告。",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

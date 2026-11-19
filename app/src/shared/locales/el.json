@@ -694,5 +694,7 @@
   "and {n} more": "και άλλα {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Ο ήχος του συνομιλητή δεν ηχογραφήθηκε {ranges}. Αν μιλούσε κάποιος τότε, τα λόγια του δεν υπάρχουν στην απομαγνητοφώνηση.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Ο ήχος του υπολογιστή δεν καταγράφεται εδώ και ενάμιση λεπτό. Αν οι άλλοι συμμετέχοντες είναι τώρα σιωπηλοί, αυτό μπορεί να είναι φυσιολογικό.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Εμφανίζει προειδοποίηση αν δεν καταγράφεται ο ήχος των άλλων συμμετεχόντων κατά τη διάρκεια μιας κλήσης."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Εμφανίζει προειδοποίηση αν δεν καταγράφεται ο ήχος των άλλων συμμετεχόντων κατά τη διάρκεια μιας κλήσης.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

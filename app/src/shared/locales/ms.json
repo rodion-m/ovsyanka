@@ -646,5 +646,7 @@
   "and {n} more": "dan {n} lagi",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Bunyi pihak sebelah tidak dirakam {ranges}. Jika seseorang bercakap pada waktu itu, kata-katanya tiada dalam transkrip.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Bunyi komputer tidak dirakam selama satu setengah minit. Jika pihak satu lagi sedang senyap, hal ini mungkin normal.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Memaparkan amaran jika bunyi pihak satu lagi tidak dirakam semasa panggilan."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Memaparkan amaran jika bunyi pihak satu lagi tidak dirakam semasa panggilan.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

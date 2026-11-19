@@ -4,9 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { aiSettings, type AiBackend, type AiPreferences } from '../src/shared/ai'
 import { setLanguage } from '../src/shared/i18n'
 import { AiSettingsFields, AiStatus } from '../src/renderer/src/components/AiSettings'
-import { aiProblemText, aiText } from '../src/renderer/src/components/aiCopy'
+import { aiProblemText, aiText, aiRussianCopy } from '../src/renderer/src/components/aiCopy'
 import { screenCopy } from '../src/renderer/src/permissionCopy'
 import { setupItems } from '../src/renderer/src/components/SetupStatus'
+import { spokenSupportText } from '../src/renderer/src/components/SpokenMenu'
 
 const fields = (backend: AiBackend) => renderToStaticMarkup(createElement(AiSettingsFields, { value: aiSettings({ backend }), change() {} }))
 const prefs = (partial: Partial<AiPreferences>): AiPreferences => ({ saved: aiSettings({}), active: aiSettings({}), restartRequired: false, ...partial })
@@ -24,7 +25,10 @@ describe('AI settings fields', () => {
     expect(input('ai-transcriptionModel')).toContain('role="combobox"')
     expect(input('ai-transcriptionModel')).toContain('value="Gemini 3.8 Flash"')
     expect(input('ai-textModel')).toContain('value="Gemini 3.8 Flash"')
-    expect(html.match(/gemini-3\.8-flash · audio · verified/g)).toHaveLength(2)
+    expect(html.match(/model-picker-summary-id[^>]*>gemini-3\.8-flash/g)).toHaveLength(2)
+    expect(html).not.toContain('gemini-3.8-flash · audio · verified')
+    const textFacts = html.match(/<div class="model-picker-sub" data-testid="ai-textModel-sub">([\s\S]*?)<\/div>/)?.[1] ?? ''
+    expect(textFacts).not.toContain('аудио')
     expect(html.match(/value="medium" selected=""/g)).toHaveLength(2)
     expect(html).not.toContain('id="ai-textProfile"')
     expect(html).toContain('id="ai-agyPath"')
@@ -159,9 +163,17 @@ describe('AI settings fields', () => {
   it('shows Russian provider controls and documents English fallback for other locales', () => {
     setLanguage('ru')
     expect(fields('agy')).toContain('Модель расшифровки')
-    expect(fields('agy')).toContain('Средний · medium')
+    expect(fields('agy')).toContain('Средний')
     expect(aiText('checkHelp')).toContain('не обращается к модели')
     expect(aiText('title', 'de')).toBe(aiText('title', 'en'))
+  })
+
+  it('uses provider-specific help text for automatic spoken-language detection', () => {
+    expect(spokenSupportText('local')).toContain('99 languages supported')
+    expect(spokenSupportText('agy')).toBe('Language is detected automatically')
+    setLanguage('ru')
+    expect(spokenSupportText('local')).toContain('99 языков')
+    expect(spokenSupportText('porch')).toBe('Язык определяется автоматически')
   })
 
   it('shows actionable remote transcription problems in Russian and English across locale fallback', () => {
@@ -171,6 +183,17 @@ describe('AI settings fields', () => {
     expect(aiProblemText('model-gone', 'vendor/model', 'ru')).toContain('vendor/model')
     expect(aiProblemText('auth', undefined, 'de')).toContain('OpenRouter rejected the key')
   })
+
+  it('explains that unreadable saved audio was not deleted and offers Retry', () => {
+    expect(aiProblemText('local-audio', undefined, 'en')).toBe("Yogurt couldn't read the saved audio for this part. The file was not deleted. Press Retry to try again.")
+    expect(aiProblemText('local-audio', undefined, 'ru')).toBe('Yogurt не смог прочитать сохранённое аудио этой части. Файл не удалён. Нажмите кнопку Повторить.')
+  })
+})
+
+it('keeps Russian AI copy free of unapproved Latin words', () => {
+  const allowed = new Set(['Yogurt', 'OpenRouter', 'agy', 'Antigravity', 'Porch', 'Gemini', 'Flash', 'macOS', 'Mac', 'API', 'ID', 'CLI', 'ZDR', 'STT', 'PATH'].map(word => word.toLocaleLowerCase()))
+  const words = Object.values(aiRussianCopy).flatMap(value => value.replace(/\{[^}]*\}/g, '').replace(/openrouter\.ai/gi, '').match(/[A-Za-z]+(?:[-'][A-Za-z]+)*/g) ?? [])
+  expect([...new Set(words.filter(word => !allowed.has(word.toLocaleLowerCase())))]).toEqual([])
 })
 
 describe('provider-aware onboarding privacy', () => {

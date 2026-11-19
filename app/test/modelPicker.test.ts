@@ -4,9 +4,9 @@ import { createElement, useState } from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { aiSettings } from '../src/shared/ai'
-import { agyTextOptions, validCustomId } from '../src/shared/aiCatalog'
+import { agyTextOptions, validCustomId, type AiOption } from '../src/shared/aiCatalog'
 import { setLanguage } from '../src/shared/i18n'
-import { AiSettingsFields } from '../src/renderer/src/components/AiSettings'
+import { AiSettingsFields, formatCatalogTime } from '../src/renderer/src/components/AiSettings'
 import { ModelPicker, type ModelPickerGroup, type ModelPickerProps, type ModelPickerState } from '../src/renderer/src/components/ModelPicker'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -46,6 +46,37 @@ const openWithState = async (state: ModelPickerState) => {
 afterEach(() => { cleanup(); setLanguage('en') })
 
 describe('ModelPicker', () => {
+  it('renders selected model facts in separate lines with a standalone warning', () => {
+    const option: AiOption = { id: 'vendor/model', label: 'Vendor Model', group: 'recommended', hints: ['audio', 'verified', 'experimental'], price: { inPerMillionUsd: 0.83, outPerMillionUsd: 4.13 }, efforts: ['medium'] }
+    render(createElement(ModelPicker, { id: 'ai-facts', value: option.id, options: [option], onChange() {} }))
+    const summary = screen.getByTestId('ai-facts-sub')
+    expect(summary.querySelector('.model-picker-summary-warning')?.textContent).toMatch(/May invent text.*\.$/)
+    expect([...summary.querySelectorAll('.model-picker-summary > *')].every(line => !line.textContent?.startsWith('·'))).toBe(true)
+    expect(summary.querySelector('.model-picker-summary-price')?.textContent).toBe('$0.83 per million input tokens, $4.13 per million output tokens')
+  })
+
+  it('keeps dropdown metadata on separate rows and shows each capability tag once', async () => {
+    setLanguage('en')
+    const option: AiOption = {
+      id: 'vendor/model', label: 'Vendor Model', group: 'recommended',
+      hints: ['audio', 'verified', 'experimental'], detail: 'May invent text on noise',
+    }
+    render(createElement(ModelPicker, { id: 'ai-list', value: option.id, options: [option], onChange() {} }))
+    await userEvent.setup().click(screen.getByRole('combobox'))
+    const row = screen.getByRole('option', { name: /Vendor Model/ })
+    expect(row.querySelector('.model-picker-sub')?.textContent).toContain('vendor/model')
+    expect(row.querySelector('.model-picker-extra-sub')?.textContent).toBe('May invent text on noise without speech')
+    expect(row.querySelector('.model-picker-sub')?.className).not.toBe(row.querySelector('.model-picker-extra-sub')?.className)
+    expect((row.textContent?.match(/audio/g) ?? [])).toHaveLength(1)
+    expect((row.textContent?.match(/verified/g) ?? [])).toHaveLength(1)
+  })
+
+  it('formats catalog update time with the interface locale and 24-hour Russian time', () => {
+    const timestamp = new Date(2026, 0, 1, 13, 7).getTime()
+    expect(formatCatalogTime(timestamp, 'ru')).toMatch(/^\d{2}:\d{2}$/)
+    expect(formatCatalogTime(timestamp, 'ru')).not.toMatch(/AM|PM/i)
+  })
+
   it('opens with ArrowDown, moves the highlight with arrows, and Enter commits it', async () => {
     const { input, onChange, user } = setup()
     expect(input.getAttribute('aria-expanded')).toBe('false')

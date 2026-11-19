@@ -682,5 +682,7 @@
   "and {n} more": "ve {n} tane daha",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Karşı tarafın sesi {ranges} kaydedilmedi. O sırada biri konuştuysa, söyledikleri konuşma dökümünde yer almaz.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Bilgisayarın sesi bir buçuk dakikadır kaydedilmiyor. Diğer taraf şu anda sessizse bu normal olabilir.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Görüşme sırasında diğer tarafın sesi kaydedilmediğinde uyarı gösterir."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Görüşme sırasında diğer tarafın sesi kaydedilmediğinde uyarı gösterir.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

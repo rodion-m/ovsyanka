@@ -135,5 +135,7 @@
   "Choose English or Russian, or let Yogurt detect the language.": "Choose English or Russian, or let Yogurt detect the language.",
   "Yogurt detects the spoken language automatically.": "Yogurt detects the spoken language automatically.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Shows a warning if the other side's sound isn't recorded during a call."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Shows a warning if the other side's sound isn't recorded during a call.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

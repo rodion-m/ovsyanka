@@ -694,5 +694,7 @@
   "and {n} more": "och {n} till",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Den andra personens ljud spelades inte in {ranges}. Om någon talade då finns orden inte med i transkriptionen.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Datorns ljud har inte spelats in på en och en halv minut. Om de andra är tysta just nu kan det vara normalt.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Visar en varning om ljudet från de andra deltagarna inte spelas in under ett samtal."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Visar en varning om ljudet från de andra deltagarna inte spelas in under ett samtal.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

@@ -646,5 +646,7 @@
   "and {n} more": "và {n} khoảng nữa",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "Âm thanh của người đối diện không được ghi {ranges}. Nếu có ai nói trong khoảng thời gian đó, lời nói của họ sẽ không có trong bản chép lời.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "Âm thanh máy tính đã không được ghi trong một phút rưỡi. Nếu những người khác đang im lặng, điều này có thể bình thường.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Hiển thị cảnh báo nếu âm thanh của những người khác không được ghi trong cuộc gọi."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Hiển thị cảnh báo nếu âm thanh của những người khác không được ghi trong cuộc gọi.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

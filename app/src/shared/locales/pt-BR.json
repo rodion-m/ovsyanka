@@ -706,5 +706,7 @@
   "and {n} more": "e mais {n}",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "O som da outra pessoa não foi gravado {ranges}. Se alguém falou nesse período, essas palavras não aparecem na transcrição.",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "O áudio do computador não é gravado há um minuto e meio. Se as outras pessoas estiverem em silêncio agora, isso pode ser normal.",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "Mostra um aviso se o áudio das outras pessoas não for gravado durante uma chamada."
+  "Shows a warning if the other side's sound isn't recorded during a call.": "Mostra um aviso se o áudio das outras pessoas não for gravado durante uma chamada.",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

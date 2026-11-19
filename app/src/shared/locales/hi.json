@@ -682,5 +682,7 @@
   "and {n} more": "और {n} और",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "दूसरी तरफ़ की आवाज़ {ranges} रिकॉर्ड नहीं हुई. अगर उस समय किसी ने बात की, तो उसकी बातें प्रतिलेख में नहीं होंगी।",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "कंप्यूटर की आवाज़ डेढ़ मिनट से रिकॉर्ड नहीं हुई है। अगर दूसरे प्रतिभागी अभी शांत हैं, तो यह सामान्य हो सकता है।",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "कॉल के दौरान दूसरे प्रतिभागियों की आवाज़ रिकॉर्ड न होने पर चेतावनी दिखाता है।"
+  "Shows a warning if the other side's sound isn't recorded during a call.": "कॉल के दौरान दूसरे प्रतिभागियों की आवाज़ रिकॉर्ड न होने पर चेतावनी दिखाता है।",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

@@ -646,5 +646,7 @@
   "and {n} more": "และอีก {n} ช่วง",
   "The other side's sound wasn't recorded {ranges}. If someone spoke then, their words are not in the transcript.": "เสียงของอีกฝ่ายไม่ได้ถูกบันทึก {ranges}. หากมีใครพูดในช่วงนั้น คำพูดของคนนั้นจะไม่มีในบทถอดเสียง",
   "The computer's sound hasn't been recorded for a minute and a half. If the other side is quiet right now, that may be normal.": "ไม่มีการบันทึกเสียงคอมพิวเตอร์มาเป็นเวลาหนึ่งนาทีครึ่ง หากอีกฝ่ายกำลังเงียบอยู่ นี่อาจเป็นเรื่องปกติ",
-  "Shows a warning if the other side's sound isn't recorded during a call.": "แสดงคำเตือนเมื่อไม่มีการบันทึกเสียงของอีกฝ่ายระหว่างการโทร"
+  "Shows a warning if the other side's sound isn't recorded during a call.": "แสดงคำเตือนเมื่อไม่มีการบันทึกเสียงของอีกฝ่ายระหว่างการโทร",
+  "Language is detected automatically": "Language is detected automatically",
+  "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes.": "Recording. With an AI provider, the transcript appears in parts: the first lines in about a minute, then every few minutes."
 }

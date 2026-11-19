@@ -3,6 +3,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 import { validAiSettings, type AiBackend, type AiCheck, type AiEffort, type AiOutputLanguage, type AiPreferences, type AiSettings as Configuration } from '../../../shared/ai'
 import { agyTextOptions, agyTranscriptionOptions, sortAiOptions, validCustomId, type AiOption, type AiOptions, type AiSortMode } from '../../../shared/aiCatalog'
 import { useLanguage } from '../i18n'
+import { language } from '../../../shared/i18n'
 import { aiText, aiTextF, type AiCopyKey } from './aiCopy'
 import { aiProblemText } from './aiCopy'
 import { ModelPicker, type ModelPickerGroup } from './ModelPicker'
@@ -12,6 +13,7 @@ const backendName = (backend: AiBackend) => aiText(backend as AiCopyKey)
 const same = (a: Configuration, b: Configuration) => JSON.stringify(a) === JSON.stringify(b)
 /** The status line's one-line summary of a configuration: mode plus what transcribes. */
 const summary = (s: Configuration) => backendName(s.backend) + (s.backend === 'local' ? '' : ` · ${s.backend === 'porch' ? s.transcriptionProfile : s.backend === 'openrouter' ? s.openrouterTranscriptionModel : s.transcriptionModel}`)
+export const formatCatalogTime = (timestamp: number, locale = language()) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(timestamp)
 const lock = (locked: AiPreferences['locked'], key: string) => (locked as Record<string, { variable: string; value: string }> | undefined)?.[key]
 const lockHelp = (locked: AiPreferences['locked'], key: string) => {
   const field = lock(locked, key)
@@ -116,6 +118,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
     const helpText = lockHelp(locked, key) ?? (help && aiText(help))
     return <Row key={key} id={id} label={aiText(label)} help={helpText}>
       <ModelPicker id={id} value={shown[key]} options={options} groups={pickerGroups(groups)} locked={!!lock(locked, key)}
+        hideAudioHint={key === 'textModel'}
         state={catalogBusy ? { status: 'loading' } : catalog.problem ? { status: 'error', message: aiText('agyListFailed'), onRetry: () => void refreshCatalog(), keepOptions: true } : { status: 'ready' }}
         toolbar={<button type="button" className="model-picker-retry" aria-label={aiText('refreshList')} title={aiText('refreshList')} disabled={catalogBusy} onMouseDown={e => e.preventDefault()} onClick={() => void refreshCatalog()}><RefreshCw size={14} aria-hidden="true" /></button>}
         describedBy={helpText ? `${id}-help` : undefined} allowCustom validateCustom={validCustomId}
@@ -242,7 +245,7 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
   const sttOnly = value.openrouterTranscriptionKind === 'stt' || audioOption?.group === 'stt' || (audioOption && audioOption.kind === 'stt')
   const sameModel = !sttOnly && value.openrouterTranscriptionKind === 'chat' && value.openrouterTranscriptionModel === value.openrouterTextModel
   const groups = pickerGroups(['recommended', 'audio', 'stt', 'free'])
-  const updated = catalog.fetchedAt ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(catalog.fetchedAt) : undefined
+  const updated = catalog.fetchedAt ? formatCatalogTime(catalog.fetchedAt) : undefined
   return <div className="openrouter-fields" data-testid="openrouter-fields">
     <Row id="ai-openrouter-key" label={aiText('keyLabel')} help={locked ? aiTextF('lockedByEnv', { VAR: locked.variable }) : aiText('keyStored')} className="openrouter-key-row">
       <div className="openrouter-key-controls">
@@ -253,7 +256,7 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
         <div className="openrouter-key-buttons">
           {locked ? <button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void checkKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button>
             : !keyStatus || keyStatus.state === 'none' || keyStatus.state === 'unreadable' || keyStatus.state === 'unavailable' || editingKey
-              ? <button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void saveKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button>
+              ? <button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void saveKey()}>{aiText(keyBusy ? 'testing' : 'keySaveCheck')}</button>
               : <><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void checkKey()}>{aiText(keyBusy ? 'testing' : 'keyCheck')}</button><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => { setEditingKey(true); setTimeout(() => keyInput.current?.focus(), 0) }}>{aiText('keyReplace')}</button><button type="button" className="workspace-button" disabled={keyBusy} onClick={() => void removeKey()}>{aiText('keyRemove')}</button></>}
         </div>
         {!locked && <a className="openrouter-key-link" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">{aiText('keyGet')}</a>}
@@ -261,17 +264,17 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
     </Row>
     <p className="ai-settings-note">{keyStatus?.state === 'ok' ? `${typeof keyStatus.remainingUsd === 'number' ? aiTextF('keyOk', { label: keyStatus.label || 'OpenRouter', x: keyStatus.remainingUsd.toFixed(2) }) : `${aiText('keyWorks')}${keyStatus.label ? ` · “${keyStatus.label}”` : ''}${keyStatus.remainingUsd === null ? ` · ${aiText('keyNoLimit')}` : ''}`}` : keyError || keyStatus?.state === 'rejected' ? aiText('keyInvalid') : keyStatus?.state === 'unavailable' ? aiText('keychainUnavailable') : keyStatus?.state === 'unreadable' ? aiText('keyUnreadable') : aiText('keyAdvice')}</p>
     {keyStatus?.state === 'ok' && <p className="ai-settings-note">{aiText('keyAdvice')}</p>}
-    <Row id="ai-openrouter-transcriptionModel" label={aiText('audioModel')} help={aiText('testQuota')}>
+    <Row id="ai-openrouter-transcriptionModel" label={aiText('audioModel')}>
       <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-transcriptionModel" value={value.openrouterTranscriptionModel} options={audioOptions} groups={groups} allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={audioMissing ? aiTextF('modelMissing', { model: value.openrouterTranscriptionModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => { const picked = audioAll.find(option => option.id === id); const kind = picked?.group === 'stt' || picked?.kind === 'stt' ? 'stt' : 'chat'; change({ openrouterTranscriptionModel: id, openrouterTranscriptionKind: kind, ...(kind === 'chat' && sameModel ? { openrouterTextModel: id } : {}) }) }} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
-        {probeButton('transcription')}
+        <>{probeButton('transcription')}<span className="openrouter-probe-help">{aiText('testQuota')}</span></>
       </div>
     </Row>
     {probeResult('transcription')}
     <Row id="ai-openrouter-transcriptionEffort" label={aiText('audioEffort')}><span className="settings-select-wrap"><select id="ai-openrouter-transcriptionEffort" data-testid="ai-openrouter-transcriptionEffort" className="settings-select" value={value.transcriptionEffort} onChange={event => change({ transcriptionEffort: event.target.value as AiEffort })}><option value="medium">{aiText('medium')}</option><option value="high">{aiText('high')}</option></select><ChevronDown size={14} aria-hidden="true" /></span></Row>
-    <label className="openrouter-same"><input type="checkbox" checked={sameModel} disabled={!!sttOnly} aria-describedby={sttOnly ? 'ai-openrouter-stt-only' : undefined} onChange={event => change({ openrouterTextModel: event.target.checked ? value.openrouterTranscriptionModel : (textOptions.find(option => option.id !== value.openrouterTranscriptionModel)?.id ?? 'openai/gpt-4o-mini') })} />{aiText('sameModel')}</label>
+    <label className="openrouter-same"><span>{aiText('sameModel')}</span><input type="checkbox" checked={sameModel} disabled={!!sttOnly} aria-describedby={sttOnly ? 'ai-openrouter-stt-only' : undefined} onChange={event => change({ openrouterTextModel: event.target.checked ? value.openrouterTranscriptionModel : (textOptions.find(option => option.id !== value.openrouterTranscriptionModel)?.id ?? 'openai/gpt-4o-mini') })} /></label>
     {sttOnly && <p id="ai-openrouter-stt-only" className="ai-settings-note">{aiText('sttOnly')}</p>}
-    <Row id="ai-openrouter-textModel" label={aiText('textModel')} help={aiText('testQuota')}>
-      <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-textModel" value={value.openrouterTextModel} options={textOptions} groups={pickerGroups(['recommended', 'text', 'free'])} allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={textMissing ? aiTextF('modelMissing', { model: value.openrouterTextModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => change({ openrouterTextModel: id })} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
+    <Row id="ai-openrouter-textModel" label={aiText('textModel')}>
+      <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-textModel" value={value.openrouterTextModel} options={textOptions} groups={pickerGroups(['recommended', 'text', 'free'])} hideAudioHint allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={textMissing ? aiTextF('modelMissing', { model: value.openrouterTextModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => change({ openrouterTextModel: id })} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
         {probeButton('text')}
       </div>
     </Row>
@@ -364,6 +367,7 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
         <AiSettingsFields value={draft} change={change} locked={preferences.locked} />
         {!valid && <p className="ai-settings-status" role="alert" data-error="true">{aiText('invalid')}</p>}
         <div className="ai-settings-actions">
+          {effective(draft, preferences.locked).backend !== preferences.active.backend && <p className="ai-settings-mode-pending" data-testid="ai-mode-pending">{aiText('modeChangePending')}</p>}
           <button type="submit" data-testid="ai-save" className="workspace-button primary" disabled={!valid || !dirty}>{aiText(busy === 'save' ? 'saving' : 'save')}</button>
           {(shownBackend === 'agy' || shownBackend === 'porch') && <button type="button" data-testid="ai-check" className="workspace-button" disabled={!valid} onClick={() => void checkExecutable()}>{aiText(busy === 'check' ? 'checking' : 'check')}</button>}
         </div>

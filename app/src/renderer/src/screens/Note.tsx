@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { useScrollMemory } from '../useScrollMemory'
 import { AudioLines, Lock, RotateCcw, Trash2, TextAlignStart, TriangleAlert } from 'lucide-react'
 import type { MeetingView, NoteSaveResult, NoteSide, NoteView, WidgetView } from '../../../shared/types'
-import type { AiProblemEvent } from '../../../shared/ai'
+import type { AiBackend, AiProblemEvent } from '../../../shared/ai'
 import { t } from '../../../shared/i18n'
 import { osWords } from '../keys'
 import { Modal, ModalClose } from '../components/Modal'
@@ -64,6 +64,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
   onResumeRequested?: () => void
 }) {
   const [m, setM] = useState<MeetingView>()
+  const [activeAiBackend, setActiveAiBackend] = useState<AiBackend>('local')
   const [footer, setFooter] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
     if (!footer) return
@@ -75,6 +76,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
     return () => { observer.disconnect(); window.removeEventListener('resize', position); document.body.style.removeProperty('--note-footer-height') }
   }, [footer])
   useEffect(() => { if (m) onTitleChange({ id: m.id, title: m.title }) }, [m?.id, m?.title, onTitleChange])
+  useEffect(() => { let active = true; void window.yogurt.ai.get().then(preferences => { if (active) setActiveAiBackend(preferences.active.backend) }).catch(() => {}); return () => { active = false } }, [])
   const [retryingStop, setRetryingStop] = useState(false)
   const [retryingTranscript, setRetryingTranscript] = useState(false)
   const [starting, setStarting] = useState(false)
@@ -437,7 +439,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
                 /> : <Enhanced focus={primary === 'notes' && at?.ms === null ? at : undefined} notes={notes} disabled={starting} onChange={(md) => { setEditedHere(true); const next = { ...current.current!, enhanced: md }; current.current = next; setNotes(next); enhancedSave.change(md) }} onBlur={enhancedSave.flush} onRetry={writeAgain} />}
           </NoteReadingPane>
           {(primary === 'transcript' || transcriptVisited) && <section hidden={primary !== 'transcript'} id="note-transcript-panel" role="tabpanel" aria-labelledby="note-transcript-tab" className="note-content note-transcript-pane">
-            <Transcript id={id} recording={recording} active={primary === 'transcript'} inline toolbar={transcriptToolbar} focus={at?.ms != null ? { ...at, ms: at.ms } : undefined} />
+            <Transcript id={id} recording={recording} providerMode={activeAiBackend !== 'local'} active={primary === 'transcript'} inline toolbar={transcriptToolbar} focus={at?.ms != null ? { ...at, ms: at.ms } : undefined} />
           </section>}
           </div>
         </div>
@@ -482,7 +484,7 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
           {hint && (recording || aiProblem?.code) && hint.code !== 'them-silent' && <RecordingHint hint={hint} />}
           <div className="note-footer-bar">
           <div className="note-status pointer-events-auto flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-            {(recording || m.state === 'prepared') && <><MicMenu recording={recording} paused={recording && m.paused} /><SpokenMenu /><span aria-hidden="true">·</span></>}
+            {(recording || m.state === 'prepared') && <><MicMenu recording={recording} paused={recording && m.paused} /><SpokenMenu backend={activeAiBackend} /><span aria-hidden="true">·</span></>}
             {saveStatus !== 'failed' && <>
               <p data-testid="note-save-status" data-state={saveStatus} role="status" className="flex items-center gap-1.5">
                 <Lock size={10} aria-hidden="true" />

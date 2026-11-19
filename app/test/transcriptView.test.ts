@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { setLanguage } from '../src/shared/i18n'
+import { TranscriptEmpty } from '../src/renderer/src/components/Transcript'
 import { bubbles, clock, filterLines, lineAt, stableKeys, turns, withLive } from '../src/shared/transcript'
 
 const l = (track: 'me' | 'them', startMs: number, speaker: string | null = null, endMs = startMs + 2000) => ({ track, startMs, endMs, speaker, text: '' })
@@ -15,6 +19,19 @@ describe('clock', () => {
     expect(clock(3_723_000)).toBe('1:02:03')
   })
   it('never shows a negative time', () => expect(clock(-300)).toBe('0:00'))
+})
+
+describe('empty transcript copy', () => {
+  it('explains delayed provider batches while recording, in English and Russian', () => {
+    expect(renderToStaticMarkup(createElement(TranscriptEmpty, { recording: true, providerMode: true }))).toContain('the first lines in about a minute')
+    setLanguage('ru')
+    expect(renderToStaticMarkup(createElement(TranscriptEmpty, { recording: true, providerMode: true }))).toContain('первые строки примерно через минуту')
+    setLanguage('en')
+  })
+  it('keeps the original empty state for local recording and finished meetings', () => {
+    expect(renderToStaticMarkup(createElement(TranscriptEmpty, { recording: true, providerMode: false }))).toContain('Nothing heard yet.')
+    expect(renderToStaticMarkup(createElement(TranscriptEmpty, { recording: false, providerMode: true }))).toContain('Nothing heard yet.')
+  })
 })
 
 describe('turns', () => {
