@@ -10,14 +10,14 @@ export const PORCH_CONTRACT = 'b0c5cf4d5d236677595a508ee3491d56ae1e0e8a'
 
 export function exactProfile(value: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(value)) {
-    throw new HarnessError('Choose one exact Porch profile ID using letters, numbers, dots, underscores, or hyphens. Lists and wildcards are not supported.')
+    throw new HarnessError('Choose one exact Porch profile ID using letters, numbers, dots, underscores, or hyphens. Lists and wildcards are not supported.', 'cli-config', 0, undefined, true, 'Porch')
   }
   return value
 }
 
 export async function porchInstallation(path: string): Promise<{ porch: string; runner: string; bash: string }> {
   if (process.platform === 'win32') {
-    throw new HarnessError('Porch integration currently requires macOS or Linux with Bash and Python 3. On Windows, choose the native agy executable instead.')
+    throw new HarnessError('Porch integration currently requires macOS or Linux with Bash and Python 3. On Windows, choose the native agy executable instead.', 'cli-config', 0, undefined, true, 'Porch')
   }
   const porch = await executablePath(path, 'Porch')
   const runner = join(dirname(porch), 'lib', 'backend_run.sh')
@@ -30,7 +30,7 @@ export async function porchInstallation(path: string): Promise<{ porch: string; 
       || !source.includes('build_cmd_agy') || !source.includes('PORCH_OUTPUT_SCHEMA')
       || !source.includes('PORCH_BIN_AGY')) throw new Error('unsupported interface')
   } catch {
-    throw new HarnessError(`Porch's internal raw adapter was not found beside its real executable. Install the complete pragmatic-orchestration package compatible with ${PORCH_CONTRACT.slice(0, 7)}, then select scripts/porch.`)
+    throw new HarnessError(`Porch's internal raw adapter was not found beside its real executable. Install the complete pragmatic-orchestration package compatible with ${PORCH_CONTRACT.slice(0, 7)}, then select scripts/porch.`, 'cli-missing', 0, undefined, true, 'Porch')
   }
   return { porch, runner, bash: await executablePath('bash', 'Bash') }
 }
@@ -74,10 +74,10 @@ export async function readPorchCapabilities(o: {
     env: prependPath(porchEnvironment(o.directory), o.pathDirs), signal: o.signal,
     timeoutMs: 5000, stdoutLimit: 128 * 1024 })
   let capabilities: unknown
-  try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.') }
+  try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.', 'bad-response', 0, undefined, true, 'Porch') }
   if (!capabilities || typeof capabilities !== 'object' || !('transcribe' in capabilities)
     || !Array.isArray(capabilities.transcribe) || !capabilities.transcribe.every(value => typeof value === 'string')) {
-    throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.')
+    throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.', 'bad-response', 0, undefined, true, 'Porch')
   }
   return capabilities.transcribe
 }
@@ -96,7 +96,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
     const transcribe = await readPorchCapabilities({ porch, bash, directory, processes,
       pathDirs: await porchChildPathDirs(settings.agyPath), signal })
     if (!transcribe.includes(profile)) {
-      throw new HarnessError('The selected Porch transcription profile does not support native audio. Choose one exact antigravity-cli profile listed by porch media capabilities --json.')
+      throw new HarnessError('The selected Porch transcription profile does not support native audio. Choose one exact antigravity-cli profile listed by porch media capabilities --json.', 'cli-config', 0, undefined, true, 'Porch')
     }
   }
   return {
@@ -119,11 +119,11 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
         stdoutLimit: 2 * 1024 * 1024 })
         .catch(error => {
           if (agy === undefined && error instanceof HarnessError) {
-            throw new HarnessError(`The Antigravity CLI (agy) was not found at the configured path: ${settings.agyPath}. An agy-backed text profile needs an absolute path to it when Yogurt is started from Finder. The original failure was reported by Porch.`)
+            throw new HarnessError(`The Antigravity CLI (agy) was not found at the configured path: ${settings.agyPath}. An agy-backed text profile needs an absolute path to it when Yogurt is started from Finder. The original failure was reported by Porch.`, 'cli-missing', 0, undefined, true, 'agy')
           }
           throw error
         })
-      if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.')
+      if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.', 'bad-response', 0, undefined, true, 'Porch')
       return result.stdout
     },
     async transcribe(prompt: string, directory: string, signal?: AbortSignal): Promise<string> {
@@ -142,7 +142,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
         env: prependPath({ ...porchEnvironment(directory), PORCH_BIN_AGY: agy, AGY_MODEL: settings.transcriptionModel,
           AGY_EFFORT: clampTranscriptionEffort(settings.transcriptionEffort), PORCH_OUTPUT_SCHEMA: schema }, await porchChildPathDirs(settings.agyPath)),
         signal, timeoutMs: Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) * 1000, stdoutLimit: 2 * 1024 * 1024 })
-      if (!result.stdout.trim()) throw new HarnessError('Porch transcription returned an empty response.')
+      if (!result.stdout.trim()) throw new HarnessError('Porch transcription returned an empty response.', 'bad-response', 0, undefined, true, 'Porch')
       return result.stdout
     },
   }

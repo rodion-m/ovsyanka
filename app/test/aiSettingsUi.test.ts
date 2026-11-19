@@ -196,6 +196,24 @@ it('keeps Russian AI copy free of unapproved Latin words', () => {
   expect([...new Set(words.filter(word => !allowed.has(word.toLocaleLowerCase())))]).toEqual([])
 })
 
+it('shows actionable CLI transcription problems in Russian and English', () => {
+  const retryEn = 'After the meeting, press Retry in the note.'
+  const retryRu = 'После встречи нажмите Повторить в заметке.'
+  for (const code of ['cli-missing', 'cli-failed', 'cli-config', 'timeout', 'bad-response'] as const) {
+    expect(aiProblemText(code, undefined, 'en', 'agy')).toContain(retryEn)
+    expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain(retryRu)
+    expect(aiProblemText(code, undefined, 'en', 'agy')).toContain('Your audio is kept.')
+    expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain('Аудио сохранено.')
+  }
+  expect(aiProblemText('cli-missing', undefined, 'en', 'agy')).toContain('couldn’t start agy')
+  expect(aiProblemText('cli-missing', undefined, 'ru', 'agy')).toContain('не смог запустить agy')
+  expect(aiProblemText('cli-failed', undefined, 'ru', 'Porch')).toContain('Porch не смог обработать эту часть')
+  expect(aiProblemText('timeout', undefined, 'en', 'agy')).toContain('increase the timeout')
+  expect(aiProblemText('bad-response', undefined, 'ru', 'Porch')).toContain('вернул ответ')
+  expect(aiProblemText('cli-config', undefined, 'ru', 'Porch')).toContain('профиль Porch')
+  expect(aiProblemText('cli-failed', undefined, 'ru', 'Porch')).not.toContain('«')
+})
+
 describe('provider-aware onboarding privacy', () => {
   it('keeps the original local promise only in local mode', () => {
     expect(screenCopy('welcome', false).text).toContain('nothing leaves your Mac')

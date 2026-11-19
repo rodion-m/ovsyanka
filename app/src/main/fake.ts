@@ -142,6 +142,7 @@ export const fakeNow = () => Date.now() + skew
  *   go(route)                     show a page, as the card or widget would (e.g. /note/<id>)
  *   main()                        whether the main window was brought forward, is visible, and its route
  *   warn(code)                    the audio helper warns (no-mic, no-system-audio)
+ *   cliFailure(code?)             fake CLI transcription failure; clear it to let Retry return fixture text
  *   crashCapture()                kill the audio helper as if it crashed
  *   manyMeetings(n)               n finished meetings over the past months, with notes (home and search)
  *   calendarEvents(list | null)   the calendar has these events (null: the usual two)
@@ -156,7 +157,7 @@ export const fakeNow = () => Date.now() + skew
  *   chatMeetings()                two finished meetings with transcripts and notes, indexed for chat across meetings (their ids)
  *   prompts()                     what whisper and the notes model were given so far
  */
-export function installFakeHooks(h: { signals(r: Reading): Promise<void>; advance(ms: number): Promise<void>; widget(): unknown; main(): unknown; go(route: string): void; crashCapture(): void; warn(code: string): void; bigMeeting(n: number): string; manyMeetings(o: number | { n: number; clean?: boolean }): void; calendarChanged(): void; tray(): string[]; trayClick(id: string): void; trayAccelerators(): Record<string, string | undefined>; permissions(): Promise<unknown>; notice(): unknown; noticeClick(): void; chatMeetings(): Promise<string[]> }) {
+export function installFakeHooks(h: { signals(r: Reading): Promise<void>; advance(ms: number): Promise<void>; widget(): unknown; main(): unknown; go(route: string): void; crashCapture(): void; warn(code: string): void; setCliFailure(code?: string): void; bigMeeting(n: number): string; manyMeetings(o: number | { n: number; clean?: boolean }): void; calendarChanged(): void; tray(): string[]; trayClick(id: string): void; trayAccelerators(): Record<string, string | undefined>; permissions(): Promise<unknown>; notice(): unknown; noticeClick(): void; chatMeetings(): Promise<string[]> }) {
   ;(globalThis as Record<string, unknown>).__fake__ = {
     audioMetadataRelease: () => { audioMetadataReleased = true; releaseAudioMetadata?.() },
     signals: h.signals,
@@ -166,6 +167,7 @@ export function installFakeHooks(h: { signals(r: Reading): Promise<void>; advanc
     go: h.go,
     crashCapture: h.crashCapture,
     warn: h.warn,
+    cliFailure: h.setCliFailure,
     bigMeeting: h.bigMeeting,
     manyMeetings: h.manyMeetings,
     tray: h.tray,

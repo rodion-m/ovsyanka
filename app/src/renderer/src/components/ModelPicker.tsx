@@ -24,6 +24,8 @@ export type ModelPickerProps = {
   groups?: readonly ModelPickerGroup[]
   onChange(id: string): void
   allowCustom?: boolean
+  /** A built-in value to identify when its catalog is unavailable. */
+  defaultValue?: string
   showErrorWhenClosed?: boolean
   validateCustom?(id: string): boolean
   state?: ModelPickerState
@@ -43,7 +45,6 @@ const hintKey: Record<Exclude<AiHint, 'unavailable'>, AiCopyKey> = {
   free: 'hintFree', tokens: 'hintTokens', expiring: 'hintExpiring', experimental: 'sttExperimental',
 }
 const money = (usd: number) => usd < 0.01 ? usd.toPrecision(1) : usd.toFixed(2)
-const monthYear = (seconds: number) => new Intl.DateTimeFormat(language(), { month: 'short', year: 'numeric' }).format(new Date(seconds * 1000))
 const longDate = (ms: number) => new Intl.DateTimeFormat(language(), { day: 'numeric', month: 'long' }).format(new Date(ms))
 
 function price(option: AiOption): string | undefined {
@@ -58,12 +59,8 @@ function price(option: AiOption): string | undefined {
 
 /** ID plus the key facts as plain text, so meaning never rides on colour alone. */
 function facts(option: AiOption): string {
-  return [
-    option.id,
-    option.detail,
-    price(option),
-    option.addedAt === undefined ? undefined : aiTextF('addedOn', { when: monthYear(option.addedAt) }),
-  ].filter(Boolean).join(' · ')
+  const detail = option.detail && (option.detail.endsWith('.') ? option.detail : `${option.detail}.`)
+  return [option.id, detail, price(option)].filter(Boolean).join('\n')
 }
 
 function SelectedFacts({ option, hideAudioHint = false }: { option: AiOption; hideAudioHint?: boolean }) {
@@ -79,7 +76,7 @@ function SelectedFacts({ option, hideAudioHint = false }: { option: AiOption; hi
 
 type Row = { key: string; domId: string; option?: AiOption; custom?: string }
 
-export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, showErrorWhenClosed, validateCustom, state, locked, hint, toolbar, describedBy, hideAudioHint = false }: ModelPickerProps) {
+export function ModelPicker({ id, label, value, options, groups, onChange, allowCustom, defaultValue, showErrorWhenClosed, validateCustom, state, locked, hint, toolbar, describedBy, hideAudioHint = false }: ModelPickerProps) {
   const status = state?.status ?? 'ready'
   const selected = options.find(option => option.id === value)
   const [open, setOpen] = useState(false)
@@ -158,7 +155,7 @@ export function ModelPicker({ id, label, value, options, groups, onChange, allow
   const retry = (onRetry?: () => void) => onRetry && <button type="button" className="model-picker-retry" onMouseDown={e => e.preventDefault()} onClick={onRetry}>{aiText('retry')}</button>
   const notice = (text: string, onRetry?: () => void) => <p className="model-picker-note">{text}{retry(onRetry)}</p>
 
-  const sub = selected ? <SelectedFacts option={selected} /> : [value, aiText(allowCustom ? 'hintCustom' : 'hintMissing')].filter(Boolean).join(' · ')
+  const sub = selected ? <SelectedFacts option={selected} /> : [value, aiText(defaultValue === value ? 'hintDefault' : allowCustom ? 'hintCustom' : 'hintMissing')].filter(Boolean).join(' · ')
 
   return <div className="model-picker" ref={root} data-open={open || undefined}
     onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) closeList() }}>
@@ -227,6 +224,6 @@ function OptionRow({ id, option, current, highlighted, select, hideAudioHint }: 
     <span className="model-picker-name">{option.label}</span>
     <span className="model-picker-hints">{option.hints.filter((h): h is Exclude<AiHint, 'unavailable'> => h !== 'unavailable' && !(hideAudioHint && h === 'audio')).map(h => <span key={h} className="model-picker-hint">{aiText(hintKey[h])}</span>)}</span>
     <span className="model-picker-sub">{option.disabledReason === 'backend-unavailable' ? aiText('profileUnavailable') : option.disabledReason === 'soon' ? aiText('sttSoon') : option.disabledReason ?? facts(option)}</span>
-    {option.hints.includes('experimental') && <span className="model-picker-extra-sub">{aiText('sttExperimentalHint')}</span>}
+    {option.hints.includes('experimental') && <span className="model-picker-extra-sub">{aiText('sttExperimentalHint')}.</span>}
   </div>
 }

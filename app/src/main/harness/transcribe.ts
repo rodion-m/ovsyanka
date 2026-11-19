@@ -160,6 +160,10 @@ export function createHarnessTranscriber(o: { settings: AiSettings; tempDir: str
     catch (error) {
       const reason = error instanceof Error ? error.message : 'invalid transcript'
       console.warn(`harness transcript rejected: ${response.length} characters; ${reason}`)
+      if (error instanceof HarnessError && error.code === 'bad-response') {
+        const cli = o.settings.backend === 'porch' ? 'Porch' : 'agy'
+        throw new HarnessError(error.message, error.code, error.attempts, error.model, error.permanent, cli)
+      }
       throw error
     }
     const reported = language ?? transcript.language

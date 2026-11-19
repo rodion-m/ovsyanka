@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createPipeline } from '../src/main/asr/pipeline'
 import type { Chunk } from '../src/main/asr/chunker'
 import { createTranscriber, type Line } from '../src/main/asr/transcribe'
+import { HarnessError } from '../src/main/harness/process'
 
 const RATE = 16000
 const tone = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE) }, (_, i) => 0.3 * Math.sin(i / 10))
@@ -32,6 +33,30 @@ function setup(say: (c: Chunk) => Promise<Line[]> | Line[], opts: { holdMs?: num
 const line = (c: Chunk, text: string): Line => ({ track: c.track, startMs: c.startMs, endMs: c.startMs + 1000, text })
 
 describe('pipeline', () => {
+  it('raises a per-meeting, per-track CLI problem and clears it after a successful batch', async () => {
+    const problems: Array<{ code: string | null; meetingId: string; track: string; cli?: string }> = []
+    let fail = true
+    const p = createPipeline({
+      meetingId: 'cli-meeting', holdMs: 0, batchMs: 1,
+      transcribe: async c => {
+        if (fail) { fail = false; throw new HarnessError('failed', 'cli-failed', 0, undefined, false, 'agy') }
+        return [line(c, 'recovered')]
+      },
+      onAiProblem: problem => problems.push(problem), save: () => {}, emit: () => {},
+    })
+    const feed = (at: number) => {
+      const audio = Float32Array.from([...tone(1), ...quiet(1)])
+      for (let i = 0; i < audio.length; i += 1600) p.push('them', at + i / 16, audio.subarray(i, i + 1600))
+    }
+    feed(0)
+    await wait(120)
+    expect(problems).toEqual([{ code: 'cli-failed', meetingId: 'cli-meeting', track: 'them', cli: 'agy' }])
+    feed(2000)
+    await wait(120)
+    expect(problems.at(-1)).toEqual({ code: null, meetingId: 'cli-meeting', track: 'them' })
+    await p.finish()
+  })
+
   it('replays only current unfinished words and clears them as finals settle or the meeting ends', async () => {
     const s = setup(() => [])
     s.p.speechPartial('them', { startMs: 0, endMs: 1200, text: 'Keep the launch notes', final: false })

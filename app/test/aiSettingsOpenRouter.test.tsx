@@ -185,7 +185,7 @@ describe('OpenRouter AI settings', () => {
     expect((await screen.findByTestId('ai-openrouter-dataPolicy') as HTMLSelectElement).value).toBe('deny')
     await user.click(screen.getByTestId('ai-openrouter-transcriptionModel'))
     expect(screen.getAllByText('экспериментальная').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Может выдумывать текст на шуме без речи').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Может выдумывать текст на шуме без речи.').length).toBeGreaterThan(0)
   })
 
   it('runs the text and bundled-audio probes and reports time and OpenRouter cost', async () => {

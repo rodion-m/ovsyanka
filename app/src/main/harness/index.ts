@@ -26,15 +26,28 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
     }),
   }) : undefined
   const common = { settings: selected, tempDir, signal: processes.signal }
+  // An opt-in failure fixture exercises the subscription-CLI Retry path without starting agy or Porch.
+  // Once enabled at launch, clearing the environment value returns a short fixture transcript on retry.
+  const fakeCliFailure = process.env.YOGURT_FAKE === '1' && selected.backend !== 'openrouter'
+    && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '')
   return {
     model: createHarnessModel({ ...common, complete: selected.backend === 'porch' ? porch.text
       : selected.backend === 'openrouter' ? (prompt, _directory, signal, maxOutputTokens) => router!.text(prompt, signal!, maxOutputTokens)
         : (prompt, directory, signal) => agy({ prompt, directory, signal }) }),
     transcriber(callbacks: Parameters<typeof createHarnessTranscriber>[1]) {
-      return createHarnessTranscriber({ ...common, transcribe: request => selected.backend === 'porch'
-        ? porch.transcribe(request.prompt, request.directory, request.signal)
-        : selected.backend === 'openrouter' ? router!.transcribe(request)
-          : agy({ prompt: request.prompt, directory: request.directory, signal: request.signal, audio: true, schema: TRANSCRIPT_SCHEMA }) }, callbacks)
+      return createHarnessTranscriber({ ...common, transcribe: request => {
+        if (fakeCliFailure) {
+          const code = process.env.YOGURT_FAKE_CLI_FAILURE
+          if (code === 'cli-failed' || code === 'cli-missing') {
+            throw new HarnessError('Fake CLI transcription failure.', code, 0, undefined, code === 'cli-missing', selected.backend === 'porch' ? 'Porch' : 'agy')
+          }
+          return Promise.resolve(JSON.stringify({ language: 'English', segments: [{ start: 0.1, end: 1, text: 'Retry recovered this transcript.' }] }))
+        }
+        return selected.backend === 'porch'
+          ? porch.transcribe(request.prompt, request.directory, request.signal)
+          : selected.backend === 'openrouter' ? router!.transcribe(request)
+            : agy({ prompt: request.prompt, directory: request.directory, signal: request.signal, audio: true, schema: TRANSCRIPT_SCHEMA })
+      } }, callbacks)
     },
     stop: () => processes.stop(),
   }

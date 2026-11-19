@@ -96,6 +96,20 @@ describe('agy final-answer contract', () => {
     expect(() => agyAnswer(output)).toThrow()
     try { agyAnswer(output) } catch (error) { expect(String(error)).not.toContain('private transcript') }
   })
+
+  it('classifies a failed agy result as a retryable CLI failure without exposing diagnostics', () => {
+    const failed = JSON.stringify({ event: 'result', result: { status: 'ERROR', error: 'private account detail' } })
+    try { agyAnswer(failed); throw new Error('expected failure') }
+    catch (error) {
+      expect(error).toMatchObject({ code: 'cli-failed', permanent: false, cli: 'agy' })
+      expect(String(error)).not.toContain('private account detail')
+    }
+  })
+
+  it('classifies malformed agy output as a permanent bad response', () => {
+    try { agyAnswer('not an event') ; throw new Error('expected failure') }
+    catch (error) { expect(error).toMatchObject({ code: 'bad-response', permanent: true, cli: 'agy' }) }
+  })
 })
 
 describe('transcript validation', () => {
@@ -585,6 +599,17 @@ describe.skipIf(isWindows)('agy forget journal replay at harness creation', () =
 })
 
 describe.skipIf(isWindows)('bounded process lifecycle', () => {
+  it('classifies missing, exited and timed out CLI processes', async () => {
+    const root = await directory(), processes = new HarnessProcesses()
+    stoppers.push(() => processes.stop())
+    await expect(executablePath(join(root, 'missing-agy'), 'agy')).rejects.toMatchObject({ code: 'cli-missing', permanent: true, cli: 'agy' })
+    const fail = await script(root, 'fail-cli', `process.exit(1)`)
+    await expect(processes.run({ label: 'Porch transcription', executable: fail, args: [], cwd: root, timeoutMs: 2000 }))
+      .rejects.toMatchObject({ code: 'cli-failed', permanent: false, cli: 'Porch' })
+    const hang = await script(root, 'hang-cli', `setInterval(() => {}, 1000)`)
+    await expect(processes.run({ label: 'agy', executable: hang, args: [], cwd: root, timeoutMs: 30 }))
+      .rejects.toMatchObject({ code: 'timeout', permanent: false, cli: 'agy', name: 'TimeoutError' })
+  })
   it('preserves argv literally and reports nonzero failures without diagnostics', async () => {
     const root = await directory(), processes = new HarnessProcesses()
     stoppers.push(() => processes.stop())

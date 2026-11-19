@@ -475,6 +475,10 @@ function startDetection() {
       main: () => ({ presented, visible: !!win?.isVisible(), route, settingsOpened, systemSettings, mediaCalls, relaunched, updateRestarts }),
       go: (r) => goTo(r),
       warn: (code) => tell({ t: 'warn', code: code as WarnCode }),
+      setCliFailure: (code) => {
+        if (code === 'cli-failed' || code === 'cli-missing') process.env.YOGURT_FAKE_CLI_FAILURE = code
+        else delete process.env.YOGURT_FAKE_CLI_FAILURE
+      },
       // a long finished meeting: n lines half a second apart, voices taking turns, with quiet low-rate audio to play
       bigMeeting: (n) => {
         const store = storeRef!
@@ -625,7 +629,10 @@ app.whenReady().then(() => {
       if (win && !win.isDestroyed()) win.webContents.send('ai:problem', event)
       tell({ t: 'ai-problem', problem: event })
     },
-    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false, batchMs: 5 * 60_000, firstBatchMs: 60_000, maxQueuedMs: 15 * 60_000 } : {}),
+    ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false,
+      batchMs: isFake() && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 100 : 5 * 60_000,
+      firstBatchMs: isFake() && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 50 : 60_000,
+      maxQueuedMs: 15 * 60_000 } : {}),
     meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
     spoken: () => spokenSetting(loadSettings(settingsFile)),

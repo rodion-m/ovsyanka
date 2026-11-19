@@ -20,7 +20,7 @@
 .model-picker-name { grid-area:name;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .model-picker-hints { grid-area:hints;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:3px;min-width:0; }
 .model-picker-hint { flex:none;padding:0 5px;border-radius:4px;background:var(--control);color:var(--muted);font-size:10.5px;line-height:16px; }
-.model-picker-option .model-picker-sub { grid-area:sub;margin-top:0;color:var(--muted);font-size:11px;line-height:15px;overflow-wrap:anywhere;white-space:normal; }
+.model-picker-option .model-picker-sub { grid-area:sub;margin-top:0;color:var(--muted);font-size:11px;line-height:15px;overflow-wrap:anywhere;white-space:pre-line; }
 .model-picker-option .model-picker-extra-sub { grid-area:extra;color:var(--muted);font-size:11px;line-height:15px; }
 .model-picker-option[aria-selected=true] .model-picker-name { font-weight:550; }
 .model-picker-note { display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;padding:7px 8px;color:var(--muted);font-size:12px;line-height:17px; }

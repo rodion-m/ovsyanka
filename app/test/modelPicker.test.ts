@@ -65,10 +65,26 @@ describe('ModelPicker', () => {
     await userEvent.setup().click(screen.getByRole('combobox'))
     const row = screen.getByRole('option', { name: /Vendor Model/ })
     expect(row.querySelector('.model-picker-sub')?.textContent).toContain('vendor/model')
-    expect(row.querySelector('.model-picker-extra-sub')?.textContent).toBe('May invent text on noise without speech')
+    expect(row.querySelector('.model-picker-extra-sub')?.textContent).toBe('May invent text on noise without speech.')
     expect(row.querySelector('.model-picker-sub')?.className).not.toBe(row.querySelector('.model-picker-extra-sub')?.className)
     expect((row.textContent?.match(/audio/g) ?? [])).toHaveLength(1)
     expect((row.textContent?.match(/verified/g) ?? [])).toHaveLength(1)
+  })
+
+  it('shows the model ID and price on separate lines without an added date', async () => {
+    const option: AiOption = {
+      id: 'acme/test-stt', label: 'Fake STT', group: 'audio', hints: [],
+      price: { inPerMillionUsd: 0.83, outPerMillionUsd: 4.13 },
+      addedAt: Date.parse('2027-01-01') / 1000,
+    }
+    render(createElement(ModelPicker, { id: 'ai-meta', value: option.id, options: [option], onChange() {} }))
+    await userEvent.setup().click(screen.getByRole('combobox'))
+    const meta = screen.getByRole('option', { name: /Fake STT/ }).querySelector('.model-picker-sub')!
+    expect(meta.textContent).toContain('acme/test-stt')
+    expect(meta.textContent).toContain('$0.83 per million input tokens, $4.13 per million output tokens')
+    expect(meta.textContent).not.toContain('·')
+    expect(meta.textContent).not.toMatch(/2027|Jan|янв/i)
+    expect(meta.textContent?.indexOf('\n')).toBeGreaterThan(0)
   })
 
   it('formats catalog update time with the interface locale and 24-hour Russian time', () => {

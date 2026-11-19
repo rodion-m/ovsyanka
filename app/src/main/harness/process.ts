@@ -4,13 +4,15 @@ import { access, chmod, mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promi
 import { homedir } from 'node:os'
 import { delimiter, isAbsolute, join, resolve } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
-import type { AiProblemCode } from '../../shared/ai'
+import type { AiCli, AiProblemCode } from '../../shared/ai'
 import { childEnvironment } from '../childEnv'
 
 /** Errors deliberately omit provider diagnostics: they can contain meeting text or credentials. */
 export class HarnessError extends Error {
-  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string, readonly permanent = false) { super(message); this.name = 'HarnessError' }
+  constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string, readonly permanent = false, readonly cli?: AiCli) { super(message); this.name = 'HarnessError' }
 }
+
+const cliFor = (label: string): AiCli | undefined => /agy/i.test(label) ? 'agy' : /porch/i.test(label) ? 'Porch' : undefined
 
 export function aborted(): Error {
   const error = new Error('AI request cancelled')
@@ -24,7 +26,7 @@ export function assertRunning(signal?: AbortSignal): void {
 
 /** Resolve a real executable, including symlinks, without a shell or login-shell evaluation. */
 export async function executablePath(value: string, label: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
-  if (!value.trim() || /[\0\r\n]/.test(value)) throw new HarnessError(`${label}: select an executable file.`)
+  if (!value.trim() || /[\0\r\n]/.test(value)) throw new HarnessError(`${label}: select an executable file.`, 'cli-missing', 0, undefined, true, cliFor(label))
   const expanded = value.startsWith('~/') ? join(homedir(), value.slice(2)) : value
   const explicit = isAbsolute(expanded) || /[/\\]/.test(expanded)
   const names = process.platform === 'win32' && !/\.[^/\\]+$/.test(expanded) ? [expanded, `${expanded}.exe`, `${expanded}.com`] : [expanded]
@@ -36,7 +38,7 @@ export async function executablePath(value: string, label: string, env: NodeJS.P
     try {
       const path = await realpath(candidate)
       if (process.platform === 'win32' && /\.(?:cmd|bat|ps1)$/i.test(path)) {
-        throw new HarnessError(`${label}: select a native .exe executable. Windows command scripts are not supported.`)
+        throw new HarnessError(`${label}: select a native .exe executable. Windows command scripts are not supported.`, 'cli-missing', 0, undefined, true, cliFor(label))
       }
       if (!(await stat(path)).isFile()) continue
       await access(path, process.platform === 'win32' ? constants.F_OK : constants.X_OK)
@@ -45,7 +47,7 @@ export async function executablePath(value: string, label: string, env: NodeJS.P
       if (error instanceof HarnessError) throw error
     }
   }
-  throw new HarnessError(`${label} was not found. Install it and select its executable path in AI settings.`)
+  throw new HarnessError(`${label} was not found. Install it and select its executable path in AI settings.`, 'cli-missing', 0, undefined, true, cliFor(label))
 }
 
 /** Prepend directories to a child environment's PATH so a Finder launch finds what the checks resolved. */
@@ -146,7 +148,7 @@ export class HarnessProcesses {
         signal.removeEventListener('abort', onAbort)
         if (error) return reject(error)
         if (code === null || !(options.acceptExitCodes ?? [0]).includes(code)) {
-          return reject(new HarnessError(`${options.label} failed${code === null ? '' : ` (exit ${code})`}. Check its terminal sign-in, model access, and quota.`))
+          return reject(new HarnessError(`${options.label} failed${code === null ? '' : ` (exit ${code})`}.`, 'cli-failed', 0, undefined, false, cliFor(options.label)))
         }
         resolveResult({ stdout: Buffer.concat(stdout).toString('utf8'), stderr: Buffer.concat(stderr).toString('utf8'), exitCode: code })
       }
@@ -170,29 +172,29 @@ export class HarnessProcesses {
       }
       const onAbort = () => cancel(aborted())
       const timer = setTimeout(() => {
-        const timeout = new HarnessError(`${options.label} timed out. Increase the AI request timeout or check the CLI in a terminal.`)
+        const timeout = new HarnessError(`${options.label} timed out. Increase the AI request timeout or check the CLI in a terminal.`, 'timeout', 0, undefined, false, cliFor(options.label))
         timeout.name = 'TimeoutError'
         cancel(timeout)
       }, options.timeoutMs)
       signal.addEventListener('abort', onAbort, { once: true })
       child.on('error', () => {
         // No raw OS message: it can contain a sensitive argv or path.
-        error ??= new HarnessError(`${options.label} could not start. Check its executable path and installation.`)
+        error ??= new HarnessError(`${options.label} could not start. Check its executable path and installation.`, 'cli-missing', 0, undefined, true, cliFor(options.label))
         closed = true
         finish()
       })
       child.stdout.on('data', (chunk: Buffer) => {
         emitStdout(stdoutText.write(chunk))
         outBytes += chunk.length
-        if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`))
+        if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`, 'bad-response', 0, undefined, true, cliFor(options.label)))
         else if (!error) stdout.push(chunk)
       })
       child.stderr.on('data', (chunk: Buffer) => {
         errBytes += chunk.length
-        if (errBytes > stderrLimit) cancel(new HarnessError(`${options.label} exceeded the diagnostic size limit.`))
+        if (errBytes > stderrLimit) cancel(new HarnessError(`${options.label} exceeded the diagnostic size limit.`, 'cli-failed', 0, undefined, false, cliFor(options.label)))
         else if (!error) stderr.push(chunk)
       })
-      child.stdin.on('error', () => cancel(new HarnessError(`${options.label} closed its input before accepting the request.`)))
+      child.stdin.on('error', () => cancel(new HarnessError(`${options.label} closed its input before accepting the request.`, 'cli-failed', 0, undefined, false, cliFor(options.label))))
       child.on('close', exitCode => { flushStdout(); closed = true; code = exitCode; finish() })
       // Register EPIPE handling before writing; an auth/startup failure may close stdin immediately.
       child.stdin.end(options.input ?? '')

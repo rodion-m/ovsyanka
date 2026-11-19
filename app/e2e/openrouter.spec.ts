@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { startOpenRouterServer } from './support/openrouterServer'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
+const reviewEvidence = '/Users/rodio/.local/state/coordinator-mode/journals/yogurt-a940b5b7/evidence/cli-problems'
 const FAKE_KEY = `sk-or-v1-${'a'.repeat(64)}`
 async function launch(url: string, userData: string, lang: 'en' | 'ru' = 'en') {
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_AI_BACKEND: '', YOGURT_TEST_OPENROUTER_URL: url, YOGURT_USER_DATA: userData, YOGURT_SYSTEM_LANGUAGES: lang === 'ru' ? 'ru-RU' : 'en-US' } })
@@ -75,6 +76,22 @@ test('OpenRouter first run saves defaults, offers restart, and transcribes a sho
     await expect.poll(() => fake.calls()).toBeGreaterThan(0)
     await page.getByRole('tab', { name: 'Transcript' }).click()
     await expect(page.getByTestId('transcript-text').filter({ hasText: 'Здравствуйте, проверка связи.' })).toHaveCount(2, { timeout: 60_000 })
+  } finally { await app.close(); await fake.close() }
+})
+
+test('captures Russian OpenRouter model list at desktop and narrow widths', async () => {
+  const fake = await startOpenRouterServer()
+  const userData = mkdtempSync(join(tmpdir(), 'yogurt-openrouter-review-'))
+  const { app, page } = await launch(fake.url, userData, 'ru')
+  try {
+    mkdirSync(reviewEvidence, { recursive: true })
+    await configure(page, 'ru')
+    await app.evaluate(({ BrowserWindow }) => { for (const window of BrowserWindow.getAllWindows()) if (window.getSize()[0] > 600) window.setSize(1280, 900) })
+    await page.getByTestId('ai-openrouter-transcriptionModel').click()
+    await expect(page.getByRole('option', { name: /Fake STT/ })).toBeVisible()
+    await page.screenshot({ path: join(reviewEvidence, 'ru-openrouter-open-list-1280.png'), fullPage: true })
+    await app.evaluate(({ BrowserWindow }) => { for (const window of BrowserWindow.getAllWindows()) if (window.getSize()[0] > 600) window.setSize(720, 900) })
+    await page.screenshot({ path: join(reviewEvidence, 'ru-openrouter-open-list-720.png'), fullPage: true })
   } finally { await app.close(); await fake.close() }
 })
 

@@ -1,5 +1,5 @@
 import { language } from '../../../shared/i18n'
-import type { AiProblemCode } from '../../../shared/ai'
+import type { AiCli, AiProblemCode } from '../../../shared/ai'
 
 /** Fork-specific UI is available in Russian and English; other interface locales use English here. */
 const en = {
@@ -105,6 +105,7 @@ const en = {
   hintTokens: 'per token',
   hintExpiring: 'ending soon',
   hintCustom: 'custom ID',
+  hintDefault: 'default',
   hintMissing: 'not in the list',
   listLoading: 'Loading the list…',
   listOffline: 'No connection. Showing the list from {when}.',
@@ -129,6 +130,11 @@ const en = {
   problemTruncated: 'OpenRouter returned a truncated transcript. Your audio is kept. Press Retry after changing the model.',
   problemTooLarge: 'OpenRouter returned an oversized response. Your audio is kept. Press Retry to try again.',
   problemLocalAudio: "Yogurt couldn't read the saved audio for this part. The file was not deleted. Press Retry to try again.",
+  problemCliMissing: 'Yogurt couldn’t start {cli}. Check that it is installed and the path in AI settings. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliFailed: '{cli} couldn’t process this part. Check in Terminal that you are signed in and have quota left. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliConfig: 'The selected Porch profile cannot transcribe audio. Choose another profile in AI settings. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliTimeout: '{cli} did not respond in time. You can increase the timeout in advanced AI settings. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliBadResponse: '{cli} returned a response Yogurt couldn’t read. Your audio is kept. After the meeting, press Retry in the note.',
 } as const
 
 export const aiRussianCopy: Record<keyof typeof en, string> = {
@@ -171,7 +177,7 @@ export const aiRussianCopy: Record<keyof typeof en, string> = {
   audioProfileHelp: 'Выберите точный профиль Porch на базе agy. Для аудио нужна модель, которая принимает звук напрямую; можно указать свой ID профиля.',
   textProfile: 'Профиль для текста',
   textProfileHelp: 'Выберите точный профиль Porch для текстовых задач. Действуют инструменты профиля и разрешения провайдера.',
-  porchTextNote: 'Модель и уровень рассуждения для текста задаёт выбранный профиль.',
+  porchTextNote: 'Модель и уровень рассуждений для текста задаёт выбранный профиль.',
   porchTranscriptionGroup: 'Профили для расшифровки',
   porchListFailed: 'Не удалось загрузить профили Porch. Можно указать свой ID профиля.',
   agyListFailed: 'Не удалось получить список из agy. Показан встроенный список.',
@@ -234,6 +240,7 @@ export const aiRussianCopy: Record<keyof typeof en, string> = {
   hintTokens: 'по токенам',
   hintExpiring: 'скоро отключат',
   hintCustom: 'свой ID',
+  hintDefault: 'по умолчанию',
   hintMissing: 'нет в списке',
   listLoading: 'Загружаем список…',
   listOffline: 'Нет связи. Показан список от {when}.',
@@ -258,6 +265,11 @@ export const aiRussianCopy: Record<keyof typeof en, string> = {
   problemTruncated: 'OpenRouter вернул неполную расшифровку. Аудио сохранено. После смены модели нажмите «Повторить».',
   problemTooLarge: 'OpenRouter вернул слишком большой ответ. Аудио сохранено. Нажмите «Повторить».',
   problemLocalAudio: 'Yogurt не смог прочитать сохранённое аудио этой части. Файл не удалён. Нажмите кнопку Повторить.',
+  problemCliMissing: 'Yogurt не смог запустить {cli}. Проверьте, что он установлен и указан путь в настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliFailed: '{cli} не смог обработать эту часть. Проверьте в Терминале, что вы вошли в аккаунт и квота не исчерпана. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliConfig: 'Выбранный профиль Porch не подходит для расшифровки аудио. Выберите другой в настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliTimeout: '{cli} не ответил вовремя. Можно увеличить тайм-аут в дополнительных настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliBadResponse: '{cli} вернул ответ, который Yogurt не смог прочитать. Аудио сохранено. После встречи нажмите Повторить в заметке.',
 }
 
 export type AiCopyKey = keyof typeof en
@@ -272,11 +284,16 @@ const problemTextKeys: Record<AiProblemCode, AiCopyKey> = {
   unavailable: 'problemUnavailable', timeout: 'problemUnavailable', network: 'problemUnavailable',
   'no-timestamps': 'problemNoTimestamps', moderation: 'problemModeration', keychain: 'problemKeychain',
   'bad-response': 'problemBadResponse', truncated: 'problemTruncated', 'too-large': 'problemTooLarge',
-  'local-audio': 'problemLocalAudio',
+  'local-audio': 'problemLocalAudio', 'cli-missing': 'problemCliMissing', 'cli-failed': 'problemCliFailed', 'cli-config': 'problemCliConfig',
 }
 
 /** The short, actionable transcription warning shown under the live note. */
-export function aiProblemText(code: AiProblemCode, model?: string, locale = language()): string {
+export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli): string {
+  if (code === 'cli-missing') return aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
+  if (code === 'cli-failed') return aiTextF('problemCliFailed', { cli: cli || 'agy' }, locale)
+  if (code === 'cli-config') return aiText('problemCliConfig', locale)
+  if (code === 'timeout' && cli) return aiTextF('problemCliTimeout', { cli }, locale)
+  if (code === 'bad-response' && cli) return aiTextF('problemCliBadResponse', { cli }, locale)
   const key = problemTextKeys[code]
   return key === 'problemModelGone' || key === 'problemNoProvider'
     ? aiTextF(key, { model: model || '…' }, locale)

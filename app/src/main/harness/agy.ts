@@ -20,21 +20,21 @@ export function agyAnswer(stdout: string): string {
   for (const line of stdout.split(/\r?\n/)) {
     if (!line.trim()) continue
     let event: unknown
-    try { event = JSON.parse(line) } catch { throw new HarnessError('agy returned an invalid event stream.') }
-    if (!event || typeof event !== 'object' || Array.isArray(event)) throw new HarnessError('agy returned an invalid event stream.')
+    try { event = JSON.parse(line) } catch { throw new HarnessError('agy returned an invalid event stream.', 'bad-response', 0, undefined, true, 'agy') }
+    if (!event || typeof event !== 'object' || Array.isArray(event)) throw new HarnessError('agy returned an invalid event stream.', 'bad-response', 0, undefined, true, 'agy')
     const message = event as Record<string, unknown>
     if (message.event !== 'result') continue
     results++
     const result = message.result
-    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new HarnessError('agy returned an invalid final result.')
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new HarnessError('agy returned an invalid final result.', 'bad-response', 0, undefined, true, 'agy')
     const value = result as Record<string, unknown>
     if (value.status !== 'SUCCESS' || value.finished_reason || value.error) {
-      throw new HarnessError('agy did not complete the request. Check its terminal sign-in, model access, and quota.')
+      throw new HarnessError('agy did not complete the request.', 'cli-failed', 0, undefined, false, 'agy')
     }
-    if (typeof value.response !== 'string' || !value.response.trim()) throw new HarnessError('agy returned an empty final response.')
+    if (typeof value.response !== 'string' || !value.response.trim()) throw new HarnessError('agy returned an empty final response.', 'bad-response', 0, undefined, true, 'agy')
     answer = value.response
   }
-  if (results !== 1 || answer === undefined) throw new HarnessError('agy did not return exactly one completed result.')
+  if (results !== 1 || answer === undefined) throw new HarnessError('agy did not return exactly one completed result.', 'bad-response', 0, undefined, true, 'agy')
   return answer
 }
 

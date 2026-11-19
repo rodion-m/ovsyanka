@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, RefreshCw } from 'lucide-react'
-import { validAiSettings, type AiBackend, type AiCheck, type AiEffort, type AiOutputLanguage, type AiPreferences, type AiSettings as Configuration } from '../../../shared/ai'
+import { DEFAULT_AI_SETTINGS, validAiSettings, type AiBackend, type AiCheck, type AiEffort, type AiOutputLanguage, type AiPreferences, type AiSettings as Configuration } from '../../../shared/ai'
 import { agyTextOptions, agyTranscriptionOptions, sortAiOptions, validCustomId, type AiOption, type AiOptions, type AiSortMode } from '../../../shared/aiCatalog'
 import { useLanguage } from '../i18n'
 import { language } from '../../../shared/i18n'
@@ -132,7 +132,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
       {shown.backend === 'agy' && <p className="ai-settings-note">{aiText('defaultModel')}</p>}
       {shown.backend === 'porch' && <>
         <Row id="ai-transcriptionProfile" label={aiText('audioProfile')} help={aiText('audioProfileHelp')}>
-          <ModelPicker id="ai-transcriptionProfile" value={shown.transcriptionProfile} options={catalog.transcription} groups={[{ id: 'audio', label: aiText('porchTranscriptionGroup') }, ...pickerGroups(['unavailable'])]}
+          <ModelPicker id="ai-transcriptionProfile" value={shown.transcriptionProfile} defaultValue={DEFAULT_AI_SETTINGS.transcriptionProfile} options={catalog.transcription} groups={[{ id: 'audio', label: aiText('porchTranscriptionGroup') }, ...pickerGroups(['unavailable'])]}
             allowCustom validateCustom={id => /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(id)} onChange={id => {
               const selected = catalog.transcription.find(option => option.id === id)
               const profileModel = selected?.detail?.split(' · ').at(-1)
@@ -141,7 +141,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
             toolbar={<button type="button" className="model-picker-retry" aria-label={aiText('refreshList')} title={aiText('refreshList')} disabled={catalogBusy} onMouseDown={e => e.preventDefault()} onClick={() => void refreshCatalog()}><RefreshCw size={14} aria-hidden="true" /></button>} />
         </Row>
         <Row id="ai-textProfile" label={aiText('textProfile')} help={aiText('textProfileHelp')}>
-          <ModelPicker id="ai-textProfile" value={shown.textProfile} options={catalog.text} groups={porchTextGroups(catalog.text)} allowCustom showErrorWhenClosed
+          <ModelPicker id="ai-textProfile" value={shown.textProfile} defaultValue={DEFAULT_AI_SETTINGS.textProfile} options={catalog.text} groups={porchTextGroups(catalog.text)} allowCustom showErrorWhenClosed
             validateCustom={id => /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(id)} onChange={id => change({ textProfile: id })}
             state={catalogBusy ? { status: 'loading' } : catalog.problem ? { status: 'error', message: aiText('porchListFailed'), onRetry: () => void refreshCatalog() } : { status: 'ready' }}
             toolbar={<button type="button" className="model-picker-retry" aria-label={aiText('refreshList')} title={aiText('refreshList')} disabled={catalogBusy} onMouseDown={e => e.preventDefault()} onClick={() => void refreshCatalog()}><RefreshCw size={14} aria-hidden="true" /></button>} />

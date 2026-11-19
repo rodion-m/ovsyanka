@@ -215,9 +215,10 @@ export function createPipeline(p: {
         const cancelled = closed || (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError')
         const code = typeof e === 'object' && e !== null && 'code' in e ? (e as { code?: AiProblemCode }).code : undefined
         const model = typeof e === 'object' && e !== null && 'model' in e && typeof (e as { model?: unknown }).model === 'string' ? (e as { model: string }).model : undefined
+        const cli = typeof e === 'object' && e !== null && 'cli' in e && ((e as { cli?: unknown }).cli === 'agy' || (e as { cli?: unknown }).cli === 'Porch') ? (e as { cli: 'agy' | 'Porch' }).cli : undefined
         const permanent = typeof e === 'object' && e !== null && 'permanent' in e && (e as { permanent?: unknown }).permanent === true
         if (!cancelled && code) {
-          try { p.onAiProblem?.({ code, meetingId: p.meetingId, track: t, ...(model ? { model } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
+          try { p.onAiProblem?.({ code, meetingId: p.meetingId, track: t, ...(model ? { model } : {}), ...(cli ? { cli } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
         }
         // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
         // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
