@@ -50,8 +50,8 @@ const AGY_TRANSCRIPTION = agyTranscriptionOptions()
 const AGY_TEXT = agyTextOptions()
 const AGY_BUILTIN_OPTIONS: AiOptions = { transcription: AGY_TRANSCRIPTION, text: AGY_TEXT, source: 'builtin' }
 
-function Row({ id, label, help, children }: { id: string; label: string; help?: string; children: ReactNode }) {
-  return <div className="settings-row">
+function Row({ id, label, help, children, className }: { id: string; label: string; help?: string; children: ReactNode; className?: string }) {
+  return <div className={`settings-row${className ? ` ${className}` : ''}`}>
     <div className="settings-row-copy"><label htmlFor={id} className="settings-label">{label}</label>
       {help && <p id={`${id}-help`} className="settings-description">{help}</p>}</div>
     {children}
@@ -124,7 +124,7 @@ export function AiSettingsFields({ value, change, locked }: { value: Configurati
   }
   return <>
     {select('ai-backend', aiText('backend'), shown.backend, [...(['agy', 'porch', 'openrouter', 'local'] as const).map(v => [v, backendName(v)] as [string, string])], v => change({ backend: v as AiBackend }), lockHelp(locked, 'backend'), !!lock(locked, 'backend'))}
-    <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(shown.backend === 'local' ? 'localHelp' : 'subscription')}</p>
+    <p className="ai-settings-note" data-testid="ai-mode-description">{aiText(shown.backend === 'local' ? 'localHelp' : shown.backend === 'openrouter' ? 'openrouterHelp' : 'subscription')}</p>
     {shown.backend !== 'local' && <>
       {shown.backend === 'agy' && <p className="ai-settings-note">{aiText('defaultModel')}</p>}
       {shown.backend === 'porch' && <>
@@ -182,7 +182,6 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
   const [editingKey, setEditingKey] = useState(false)
   const [keyBusy, setKeyBusy] = useState(false)
   const [keyError, setKeyError] = useState(false)
-  const [keyCheckMs, setKeyCheckMs] = useState<number>()
   const [sort, setSort] = useState<AiSortMode>('newest')
   const [usage, setUsage] = useState<import('../../../shared/ai').AiUsage>()
   const [usageUnknown, setUsageUnknown] = useState(false)
@@ -199,16 +198,14 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
     if (!input || !input.value) return
     const pastedKey = input.value
     input.value = ''
-    const started = performance.now()
     setKeyBusy(true); setKeyError(false)
-    try { const status = await window.yogurt.ai.openrouter.setKey(pastedKey); setKeyCheckMs(performance.now() - started); setKeyStatus(status); setKeyError(status.state !== 'ok' && status.state !== 'unchecked'); if (status.state === 'ok' || status.state === 'unchecked') setEditingKey(false) }
+    try { const status = await window.yogurt.ai.openrouter.setKey(pastedKey); setKeyStatus(status); setKeyError(status.state !== 'ok' && status.state !== 'unchecked'); if (status.state === 'ok' || status.state === 'unchecked') setEditingKey(false) }
     catch { setKeyError(true) }
     finally { setKeyBusy(false) }
   }
   const checkKey = async () => {
-    const started = performance.now()
     setKeyBusy(true); setKeyError(false)
-    try { const status = await window.yogurt.ai.openrouter.checkKey(); setKeyCheckMs(performance.now() - started); setKeyStatus(status); setKeyError(status.state !== 'ok') }
+    try { const status = await window.yogurt.ai.openrouter.checkKey(); setKeyStatus(status); setKeyError(status.state !== 'ok') }
     catch { setKeyError(true) }
     finally { setKeyBusy(false) }
   }
@@ -247,7 +244,7 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
   const groups = pickerGroups(['recommended', 'audio', 'stt', 'free'])
   const updated = catalog.fetchedAt ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(catalog.fetchedAt) : undefined
   return <div className="openrouter-fields" data-testid="openrouter-fields">
-    <Row id="ai-openrouter-key" label={aiText('keyLabel')} help={locked ? aiTextF('lockedByEnv', { VAR: locked.variable }) : aiText('keyStored')}>
+    <Row id="ai-openrouter-key" label={aiText('keyLabel')} help={locked ? aiTextF('lockedByEnv', { VAR: locked.variable }) : aiText('keyStored')} className="openrouter-key-row">
       <div className="openrouter-key-controls">
         {locked ? <input key="locked-key" id="ai-openrouter-key" className="settings-name-field" value={`sk-or-v1-••••••••${keyLast4}`} readOnly aria-describedby="ai-openrouter-key-help" />
           : editingKey || !keyStatus || keyStatus.state === 'none' || keyStatus.state === 'unreadable' || keyStatus.state === 'unavailable'
@@ -262,7 +259,7 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
         {!locked && <a className="openrouter-key-link" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">{aiText('keyGet')}</a>}
       </div>
     </Row>
-    <p className="ai-settings-note">{keyStatus?.state === 'ok' ? `${typeof keyStatus.remainingUsd === 'number' ? aiTextF('keyOk', { label: keyStatus.label || 'OpenRouter', x: keyStatus.remainingUsd.toFixed(2) }) : `${aiText('keyWorks')}${keyStatus.label ? ` · “${keyStatus.label}”` : ''}${keyStatus.remainingUsd === null ? ` · ${aiText('keyNoLimit')}` : ''}`}${keyCheckMs === undefined ? '' : ` · ${(keyCheckMs / 1000).toFixed(1)}s`}` : keyError || keyStatus?.state === 'rejected' ? aiText('keyInvalid') : keyStatus?.state === 'unavailable' ? aiText('keychainUnavailable') : keyStatus?.state === 'unreadable' ? aiText('keyUnreadable') : aiText('keyAdvice')}</p>
+    <p className="ai-settings-note">{keyStatus?.state === 'ok' ? `${typeof keyStatus.remainingUsd === 'number' ? aiTextF('keyOk', { label: keyStatus.label || 'OpenRouter', x: keyStatus.remainingUsd.toFixed(2) }) : `${aiText('keyWorks')}${keyStatus.label ? ` · “${keyStatus.label}”` : ''}${keyStatus.remainingUsd === null ? ` · ${aiText('keyNoLimit')}` : ''}`}` : keyError || keyStatus?.state === 'rejected' ? aiText('keyInvalid') : keyStatus?.state === 'unavailable' ? aiText('keychainUnavailable') : keyStatus?.state === 'unreadable' ? aiText('keyUnreadable') : aiText('keyAdvice')}</p>
     {keyStatus?.state === 'ok' && <p className="ai-settings-note">{aiText('keyAdvice')}</p>}
     <Row id="ai-openrouter-transcriptionModel" label={aiText('audioModel')} help={aiText('testQuota')}>
       <div className="openrouter-model-controls"><ModelPicker id="ai-openrouter-transcriptionModel" value={value.openrouterTranscriptionModel} options={audioOptions} groups={groups} allowCustom showErrorWhenClosed validateCustom={validCustomId} hint={audioMissing ? aiTextF('modelMissing', { model: value.openrouterTranscriptionModel }) : undefined} state={busy ? { status: 'loading' } : catalog.problem ? { status: catalog.source === 'cache' ? 'cache' : 'empty', fetchedAt: catalog.fetchedAt, onRetry: refresh } : { status: 'ready' }} onChange={id => { const picked = audioAll.find(option => option.id === id); const kind = picked?.group === 'stt' || picked?.kind === 'stt' ? 'stt' : 'chat'; change({ openrouterTranscriptionModel: id, openrouterTranscriptionKind: kind, ...(kind === 'chat' && sameModel ? { openrouterTextModel: id } : {}) }) }} toolbar={<div className="openrouter-picker-toolbar"><button type="button" aria-pressed={sort === 'newest'} onClick={() => setSort('newest')}>{aiText('sortNewest')}</button><button type="button" aria-pressed={sort === 'cheapest'} onClick={() => setSort('cheapest')}>{aiText('sortCheapest')}</button><span>{updated ? aiTextF('listUpdated', { when: updated }) : ''}</span><button type="button" aria-label={aiText('refresh')} disabled={busy} onClick={refresh}>⟳</button></div>} />
@@ -281,7 +278,7 @@ function OpenRouterFields({ value, change, locked, catalog, busy, refresh }: { v
     {probeResult('text')}
     <Row id="ai-openrouter-textEffort" label={aiText('textEffort')}><span className="settings-select-wrap"><select id="ai-openrouter-textEffort" data-testid="ai-openrouter-textEffort" className="settings-select" value={value.textEffort} onChange={event => change({ textEffort: event.target.value as AiEffort })}><option value="low">{aiText('low')}</option><option value="medium">{aiText('medium')}</option><option value="high">{aiText('high')}</option></select><ChevronDown size={14} aria-hidden="true" /></span></Row>
     {selectOpenRouterPolicy(value, change)}
-    {usage && <p className="ai-settings-note" data-testid="openrouter-usage">{aiTextF('spend', { a: `$${usage.todayUsd.toFixed(2)}`, b: `$${usage.thirtyDayUsd.toFixed(2)}` })}</p>}
+    {usage && <p className="ai-settings-note" data-testid="openrouter-usage">{aiTextF('spend', { a: usage.todayUsd.toFixed(2), b: usage.thirtyDayUsd.toFixed(2) })}</p>}
     {(usageUnknown || usage?.transcriptionCostUnknown || usage?.textCostUnknown || (usage?.missingCostCount ?? 0) > 0) && <p className="ai-settings-note">{aiText('spendUnknown')}</p>}
   </div>
 }
@@ -368,12 +365,12 @@ export function AiSettings({ onPreferences }: { onPreferences?: (preferences: Ai
         {!valid && <p className="ai-settings-status" role="alert" data-error="true">{aiText('invalid')}</p>}
         <div className="ai-settings-actions">
           <button type="submit" data-testid="ai-save" className="workspace-button primary" disabled={!valid || !dirty}>{aiText(busy === 'save' ? 'saving' : 'save')}</button>
-          {shownBackend !== 'local' && <button type="button" data-testid="ai-check" className="workspace-button" disabled={!valid} onClick={() => void checkExecutable()}>{aiText(busy === 'check' ? 'checking' : 'check')}</button>}
+          {(shownBackend === 'agy' || shownBackend === 'porch') && <button type="button" data-testid="ai-check" className="workspace-button" disabled={!valid} onClick={() => void checkExecutable()}>{aiText(busy === 'check' ? 'checking' : 'check')}</button>}
         </div>
       </fieldset>
-      {shownBackend !== 'local' && <p className="ai-settings-status">{aiText('checkHelp')}</p>}
+      {(shownBackend === 'agy' || shownBackend === 'porch') && <p className="ai-settings-status">{aiText('checkHelp')}</p>}
       {notice && <p data-testid="ai-notice" className="ai-settings-status" data-error={failed} role={failed ? 'alert' : 'status'}>{aiText(notice)}</p>}
-      {check && <p data-testid="ai-check-result" className="ai-settings-status" data-error={!check.ok} role={check.ok ? 'status' : 'alert'}>
+      {check && shownBackend !== 'openrouter' && <p data-testid="ai-check-result" className="ai-settings-status" data-error={!check.ok} role={check.ok ? 'status' : 'alert'}>
         {aiText(check.ok ? 'checkPassed' : 'checkFailed')}<span className="ai-settings-result">{check.message}</span>
       </p>}
     </form>}

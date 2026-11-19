@@ -31,11 +31,12 @@ test('the spoken language picker: Multi-language by default, explicit choices ar
     const menu = page.getByTestId('spoken-menu')
     await expect(menu).toBeVisible()
     await expect(page.getByTestId('spoken-en')).toContainText('English only')
-    await expect(page.getByTestId('spoken-en')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('spoken-en')).toHaveAttribute('aria-checked', 'false')
     await expect(page.getByTestId('spoken-ru')).toContainText('Russian')
     await expect(page.getByTestId('spoken-ru')).toContainText('Transcribes Russian in Cyrillic')
     await expect(page.getByTestId('spoken-multi')).toContainText('Multi-language')
     await expect(page.getByTestId('spoken-multi')).toContainText('99 languages supported')
+    await expect(page.getByTestId('spoken-multi')).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByTestId('spoken-multi-info')).toHaveAttribute('title', /automatically/)
 
     // Explicit Russian reaches transcription immediately and is retained by the settings IPC.

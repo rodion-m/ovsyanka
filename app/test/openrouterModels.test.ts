@@ -142,6 +142,24 @@ describe('OpenRouter model cache and network boundary', () => {
     expect(await readFile(path)).toEqual(before)
   })
 
+  it('uses the fake API base for both text and transcription model endpoints', async () => {
+    const userData = await root()
+    const requests: string[] = []
+    const fetch = vi.fn<OpenRouterFetch>(async input => {
+      const url = input.toString()
+      requests.push(url)
+      return response(url.includes('output_modalities=transcription') ? sttBody : textBody)
+    })
+    const catalog = createOpenRouterModels({ userData, fetch, baseUrl: 'http://127.0.0.1:1234/api/v1', now: () => nowOnSnapshotDate })
+    const result = await catalog.openRouterOptions()
+    expect(result.source).toBe('live')
+    expect(result.transcription.some(option => option.id === 'google/gemini-3.8-flash')).toBe(true)
+    expect(requests).toEqual(expect.arrayContaining([
+      'http://127.0.0.1:1234/api/v1/models',
+      'http://127.0.0.1:1234/api/v1/models?output_modalities=transcription',
+    ]))
+  })
+
   it('throttles failed refreshes for two minutes, then permits the next one', async () => {
     const userData = await root()
     await writeSeed(userData, nowOnSnapshotDate - OPENROUTER_MODELS_FRESHNESS_MS - 1)

@@ -65,8 +65,14 @@ test('checks an unsaved missing executable without changing settings, and valida
     await page.getByTestId('ai-backend').selectOption('porch')
     await expect(page.getByTestId('ai-textProfile')).toBeVisible()
     await expect(page.getByTestId('ai-textModel')).toHaveCount(0)
-    await page.getByTestId('ai-textProfile').fill('')
-    await expect(page.getByTestId('ai-save')).toBeDisabled()
+    const profile = page.getByTestId('ai-textProfile')
+    await profile.click()
+    await expect(profile).toHaveAttribute('aria-expanded', 'true')
+    await profile.fill('!!!')
+    await expect(page.getByText('IDs may contain Latin letters, digits and . - _ / :', { exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /custom ID/ })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('ai-textProfile')).not.toHaveValue('!!!')
   } finally { await app.close() }
 })
 

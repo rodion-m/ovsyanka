@@ -48,6 +48,7 @@ export async function startOpenRouterServer() {
   return {
     url: `http://127.0.0.1:${address.port}/api/v1`,
     setCredits: (value: boolean) => { credits = value },
+    calls: () => calls,
     close: () => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())),
   }
 }

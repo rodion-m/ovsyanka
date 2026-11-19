@@ -48,6 +48,24 @@ function installApi(catalog = options) {
 }
 
 describe('OpenRouter AI settings', () => {
+  it('uses OpenRouter-specific help, omits the CLI check, and formats spend once in both locales', async () => {
+    installApi()
+    const { container, rerender } = render(createElement(AiSettings))
+    await screen.findByTestId('ai-openrouter-dataPolicy')
+    expect(screen.getByTestId('ai-mode-description').textContent).toContain('Audio and text are sent to OpenRouter')
+    expect(screen.queryByTestId('ai-check')).toBeNull()
+    expect(container.textContent).not.toContain('Checks availability and version only')
+    await screen.findByTestId('openrouter-usage')
+    expect(screen.getByTestId('openrouter-usage').textContent).toContain('$0.20 today · $1.00 in 30 days')
+    expect(screen.getByTestId('openrouter-usage').textContent).not.toContain('$$')
+    setLanguage('ru')
+    rerender(createElement(AiSettings))
+    await waitFor(() => expect(screen.getByTestId('openrouter-usage').textContent).toContain('Расход: сегодня $0.20 · за 30 дней $1.00'))
+    expect(screen.getByTestId('ai-mode-description').textContent).toContain('Аудио и текст отправляются в OpenRouter')
+    expect(screen.queryByTestId('ai-check')).toBeNull()
+    expect(screen.getByTestId('openrouter-usage').textContent).not.toContain('$$')
+  })
+
   it('clears a pasted key before submitting it and only renders its masked status', async () => {
     installApi()
     const user = userEvent.setup()

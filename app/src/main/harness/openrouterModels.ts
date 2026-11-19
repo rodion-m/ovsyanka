@@ -149,7 +149,8 @@ export class OpenRouterModels {
     })
     try {
       const base = this.dependencies.baseUrl?.replace(/\/$/, '')
-      const requestUrl = base ? `${base}${url.slice(OPENROUTER_MODELS_URL.length)}` : url
+      const requestPath = `${new URL(url).pathname.replace(/^\/api\/v1/, '')}${new URL(url).search}`
+      const requestUrl = base ? `${base}${requestPath}` : url
       const response = await Promise.race([
         this.dependencies.fetch(requestUrl, {
           signal: controller.signal,
