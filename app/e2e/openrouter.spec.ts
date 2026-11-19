@@ -75,7 +75,10 @@ test('OpenRouter first run saves defaults, offers restart, and transcribes a sho
     await recordShort(page)
     await expect.poll(() => fake.calls()).toBeGreaterThan(0)
     await page.getByRole('tab', { name: 'Transcript' }).click()
-    await expect(page.getByTestId('transcript-text').filter({ hasText: 'Здравствуйте, проверка связи.' })).toHaveCount(2, { timeout: 60_000 })
+    const sentence = 'Здравствуйте, проверка связи.'
+    for (const track of ['me', 'them']) {
+      await expect.poll(() => page.locator(`[data-testid="transcript-line"][data-track="${track}"]`).filter({ hasText: sentence }).count()).toBeGreaterThan(0)
+    }
   } finally { await app.close(); await fake.close() }
 })
 

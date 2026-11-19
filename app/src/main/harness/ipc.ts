@@ -33,6 +33,8 @@ export function hookAiPreferences(o: {
   }
   const savedSettings = () => aiSettings(loadSettings(o.file).ai ?? active)
   const recoverSpool = () => {
+    // Saving a different launch configuration must not spend subscription attempts with the old harness.
+    if (preferences().restartRequired) return
     try {
       void Promise.resolve(o.onAiConfigChanged?.()).catch(error => console.error('AI spool recovery after settings changed failed', error))
     } catch (error) { console.error('AI spool recovery after settings changed failed', error) }

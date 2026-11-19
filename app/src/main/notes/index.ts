@@ -8,6 +8,8 @@ import type { Queue } from './queue'
 
 /** The notes wait for the transcript and the names from the call, but never longer than this for the names */
 export const NAMES_WAIT_MS = 60_000
+/** Provisional notes are written after this limit even if a remote transcript is still recovering. */
+export const TRANSCRIPT_WAIT_MS = 4 * 60_000
 /** people changed after the notes were written: they are written again once no more changes came for this long */
 export const PEOPLE_REWRITE_MS = 3000
 /** Reject oversized notes without silently discarding any accepted editor text. */
@@ -20,7 +22,7 @@ const DRAFT_EVERY_MS = 50
  * the one model queue, streamed to the window as they are written, then saved. "Write again" goes the same way.
  */
 export function hookNotes(p: {
-  store: Pick<Store, 'meeting' | 'notes' | 'setNotes' | 'writtenWith' | 'setWrittenWith' | 'segments' | 'updateMeeting' | 'unenhancedMeetings'>
+  store: Pick<Store, 'meeting' | 'notes' | 'setNotes' | 'writtenWith' | 'setWrittenWith' | 'segments' | 'updateMeeting' | 'unenhancedMeetings' | 'transcriptCount' | 'notesTranscriptCount' | 'setNotesTranscriptCount' | 'meetingsWithStaleTranscriptNotes'>
   queue: Queue
   model: Pick<NotesModel, 'llm'> & Partial<Pick<NotesModel, 'needsLoad'>>
   /** Windows and Linux: say when the notes wait for the model to load (a Mac shows what it always did) */
@@ -38,6 +40,7 @@ export function hookNotes(p: {
   changed: (id: string) => void
   summarized?: (id: string) => void
   namesWaitMs?: number
+  transcriptWaitMs?: number
   /** a long meeting's parts summarised while it was recorded (readAhead.ts) */
   earlier?: (id: string) => PartSummary[]
   peopleRewriteMs?: number
@@ -49,6 +52,8 @@ export function hookNotes(p: {
   /** a rewrite for new people, waiting for the changes to settle */
   const rewriteTimers = new Map<string, NodeJS.Timeout>()
   const rewriting = new Set<string>()
+  const transcriptRewriting = new Set<string>()
+  const pendingTranscriptWrites = new Set<string>()
   /** who the notes had before a rewrite swapped new ones in: put back if the open note kept its own edits instead */
   const writingPeople = new Map<string, { stamp: string }>()
   const stampBefore = new Map<string, string | null>()
@@ -71,8 +76,10 @@ export function hookNotes(p: {
     const n = currentNotes(id)
     const l = live.get(id)
     const saved = edits.get(id)
+    const writtenTranscriptCount = p.store.notesTranscriptCount(id)
+    const transcriptAdded = n.edited && writtenTranscriptCount != null && p.store.transcriptCount(id) > writtenTranscriptCount
     const saves = saved && Object.fromEntries(Object.entries(saved).map(([side, edit]) => [side, { revision: edit.revision, status: edit.status, ...(edit.reason ? { reason: edit.reason } : {}) }]))
-    return { meetingId: id, mine: n.mine, enhanced: n.enhanced, edited: n.edited, status: l?.status ?? (n.enhanced != null ? 'done' : 'idle'), draft: l?.draft ?? '', peopleChanged: peopleChanged(id, n.enhanced != null) && !rewriteTimers.has(id) && !rewriting.has(id), ...(l?.part ? { part: l.part } : {}), ...(l?.step ? { step: l.step } : {}), ...(saves ? { saves } : {}) }
+    return { meetingId: id, mine: n.mine, enhanced: n.enhanced, edited: n.edited, status: l?.status ?? (n.enhanced != null ? 'done' : 'idle'), draft: l?.draft ?? '', peopleChanged: peopleChanged(id, n.enhanced != null) && !rewriteTimers.has(id) && !rewriting.has(id), ...(transcriptAdded ? { transcriptAdded: true } : {}), ...(l?.part ? { part: l.part } : {}), ...(l?.step ? { step: l.step } : {}), ...(saves ? { saves } : {}) }
   }
   const set = (id: string, status: NoteStatus, draft = '', part?: { part: number; of: number }, step?: 'loading') => { live.set(id, { status, draft, part, step }); p.send(view(id)) }
 
@@ -109,6 +116,8 @@ export function hookNotes(p: {
     return saved
   }
 
+  let applyTranscript: (id: string, force?: boolean) => Promise<void> = async () => {}
+
   /**
    * quiet: written again for new people, out of sight. The notes on screen stay as they are until the new ones are done,
    * then change all at once (never if the person edited them meanwhile).
@@ -119,6 +128,7 @@ export function hookNotes(p: {
     const was = currentNotes(id)
     const mine = was.mine
     const segments = p.store.segments(id)
+    const transcriptCount = p.store.transcriptCount(id)
     // nothing said and nothing typed: there is nothing to write up
     if (!segments.length && !mine.trim()) { if (!quiet) finish(m, 'empty'); return }
     // still "getting ready" while the model loads: "writing" comes with the first words (or a long meeting's first part)
@@ -153,15 +163,20 @@ export function hookNotes(p: {
         stampBefore.set(id, p.store.writtenWith(id))
         p.store.setNotes(id, { enhanced: md, edited: false })
         p.store.setWrittenWith(id, used.stamp)
+        p.store.setNotesTranscriptCount(id, transcriptCount)
         p.send({ ...view(id), rewrittenFrom: was.enhanced ?? '' })
         queueTitle(id, askTitle, m.attendees)
         p.summarized?.(id)
         return
       }
       if (signal.aborted) { set(id, 'waiting'); return }
+      // A manual edit made while the model was working takes precedence over its generated answer.
+      const current = currentNotes(id)
+      if (current.edited || current.enhanced !== was.enhanced) { finish(m, 'done'); return }
       // the person's own notes stay as they typed them, even if they typed on while this was written
       p.store.setNotes(id, { enhanced: md, edited: false })
       p.store.setWrittenWith(id, used.stamp)
+      p.store.setNotesTranscriptCount(id, transcriptCount)
       finish(m, 'done')
       queueTitle(id, askTitle, m.attendees)
       p.summarized?.(id)
@@ -173,7 +188,13 @@ export function hookNotes(p: {
       console.error('writing the notes failed', id, e)
       set(id, 'failed')
       throw e
-    } finally { if (writingPeople.get(id) === used) writingPeople.delete(id) }
+    } finally {
+      if (writingPeople.get(id) === used) writingPeople.delete(id)
+      if (!signal.aborted && (pendingTranscriptWrites.has(id) || p.store.transcriptCount(id) !== p.store.notesTranscriptCount(id))) {
+        pendingTranscriptWrites.delete(id)
+        void applyTranscript(id)
+      }
+    }
   }
 
   /**
@@ -206,7 +227,7 @@ export function hookNotes(p: {
   /** wait for something, but never longer than this */
   const upTo = async (wait: Promise<void>, ms: number) => {
     let timer: NodeJS.Timeout | undefined
-    await Promise.race([wait.catch(() => {}), new Promise<void>((r) => { timer = setTimeout(r, ms) })])
+    await Promise.race([wait.catch(() => {}), new Promise<void>((r) => { timer = setTimeout(r, ms); timer.unref?.() })])
     clearTimeout(timer)
   }
 
@@ -223,12 +244,39 @@ export function hookNotes(p: {
     return p.queue.enqueue((signal) => write(id, signal), 'enhance', id).catch(() => {})
   }
 
+  applyTranscript = async (id: string, force = false) => {
+    const m = p.store.meeting(id)
+    if (!m || m.state === 'recording' || resuming.has(id)) return
+    const n = currentNotes(id)
+    if (n.edited) { pendingTranscriptWrites.delete(id); p.send(view(id)); return }
+    const written = p.store.notesTranscriptCount(id), current = p.store.transcriptCount(id)
+    if (!force && (written == null || written === current)) { pendingTranscriptWrites.delete(id); return }
+    if (!p.store.segments(id).length) return
+    const status = live.get(id)?.status
+    if (status === 'waiting' || status === 'writing' || transcriptRewriting.has(id) || rewriting.has(id)) {
+      pendingTranscriptWrites.add(id)
+      return
+    }
+    pendingTranscriptWrites.delete(id)
+    transcriptRewriting.add(id)
+    let aborted = false
+    await p.queue.enqueue(async (signal) => { try { await write(id, signal, true) } finally { aborted = signal.aborted } }, 'enhance', id).catch(error => {
+      console.error('quietly updating notes for a recovered transcript failed', id, error)
+    }).finally(() => {
+      transcriptRewriting.delete(id)
+      if (!aborted && (pendingTranscriptWrites.has(id) || p.store.transcriptCount(id) !== p.store.notesTranscriptCount(id))) {
+        pendingTranscriptWrites.delete(id)
+        void applyTranscript(id)
+      }
+    })
+  }
+
   /** each meeting's notes after it stopped, until they are written */
   const afterStop = new Map<string, Promise<void>>()
   p.onStop((m) => {
     set(m.id, 'waiting')
     const done = (async () => {
-      await p.transcribed(m.id)
+      await upTo(p.transcribed(m.id), p.transcriptWaitMs ?? TRANSCRIPT_WAIT_MS)
       // the names from the call are quick; a stuck pass never holds the notes back for long
       if (p.named) await upTo(p.named(m.id), p.namesWaitMs ?? NAMES_WAIT_MS)
       if (!resuming.has(m.id)) await queueWrite(m.id)
@@ -301,6 +349,7 @@ export function hookNotes(p: {
     writeAgain(id: string) {
       if (resuming.has(id) || p.store.meeting(id)?.state === 'recording') return Promise.resolve()
       if (!retryDrafts(id)) return Promise.resolve()
+      if (currentNotes(id).edited) return Promise.resolve()
       const s = live.get(id)?.status
       if (s === 'waiting' || s === 'writing') return Promise.resolve()
       return queueWrite(id)
@@ -308,7 +357,10 @@ export function hookNotes(p: {
     /** at launch: meetings a quit or crash left without notes get them now, one at a time */
     recover() {
       for (const m of p.store.unenhancedMeetings()) if (!live.has(m.id) && !resuming.has(m.id)) void queueWrite(m.id)
+      for (const id of p.store.meetingsWithStaleTranscriptNotes()) void applyTranscript(id)
     },
+    /** after recovery added transcript lines, quietly regenerate only unedited notes; queue behind an active write */
+    applyTranscript(id: string) { return applyTranscript(id, true) },
   }
   return notes
 }

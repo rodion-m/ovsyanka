@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { clampTranscriptionEffort, type AiSettings } from '../../shared/ai'
 import { agyStoreRoot, appendForget, conversationId, forgetConversation, removeForget } from './agyStore'
-import { assertRunning, executablePath, HarnessError, HarnessProcesses, prependPath } from './process'
+import { assertRunning, executablePath, HarnessError, HarnessProcesses, prependPath, TranscriptOutputError } from './process'
 import { MIN_AUDIO_TIMEOUT_SECONDS } from './transcribe'
 
 type Request = {
@@ -20,21 +20,21 @@ export function agyAnswer(stdout: string): string {
   for (const line of stdout.split(/\r?\n/)) {
     if (!line.trim()) continue
     let event: unknown
-    try { event = JSON.parse(line) } catch { throw new HarnessError('agy returned an invalid event stream.', 'bad-response', 0, undefined, true, 'agy') }
-    if (!event || typeof event !== 'object' || Array.isArray(event)) throw new HarnessError('agy returned an invalid event stream.', 'bad-response', 0, undefined, true, 'agy')
+    try { event = JSON.parse(line) } catch { throw new TranscriptOutputError('agy returned an invalid event stream.', 'bad-response', 0, 'agy', stdout) }
+    if (!event || typeof event !== 'object' || Array.isArray(event)) throw new TranscriptOutputError('agy returned an invalid event stream.', 'bad-response', 0, 'agy', stdout)
     const message = event as Record<string, unknown>
     if (message.event !== 'result') continue
     results++
     const result = message.result
-    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new HarnessError('agy returned an invalid final result.', 'bad-response', 0, undefined, true, 'agy')
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new TranscriptOutputError('agy returned an invalid final result.', 'bad-response', 0, 'agy', stdout)
     const value = result as Record<string, unknown>
     if (value.status !== 'SUCCESS' || value.finished_reason || value.error) {
       throw new HarnessError('agy did not complete the request.', 'cli-failed', 0, undefined, false, 'agy')
     }
-    if (typeof value.response !== 'string' || !value.response.trim()) throw new HarnessError('agy returned an empty final response.', 'bad-response', 0, undefined, true, 'agy')
+    if (typeof value.response !== 'string' || !value.response.trim()) throw new TranscriptOutputError('agy returned an empty final response.', 'bad-response', 0, 'agy', '')
     answer = value.response
   }
-  if (results !== 1 || answer === undefined) throw new HarnessError('agy did not return exactly one completed result.', 'bad-response', 0, undefined, true, 'agy')
+  if (results !== 1 || answer === undefined) throw new TranscriptOutputError('agy did not return exactly one completed result.', 'bad-response', 0, 'agy', stdout)
   return answer
 }
 

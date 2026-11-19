@@ -110,6 +110,41 @@ describe('OpenRouter text adapter', () => {
 })
 
 describe('OpenRouter audio adapter', () => {
+  it('makes one fresh model call for malformed transcript output, then blocks only after the second bad response', async () => {
+    const rootPath = await root(), meeting = join(rootPath, 'meeting'), spool = createSpool(spoolDirOf(meeting))
+    const bad = () => answer({ choices: [{ message: { content: 'not a transcript object' } }] })
+    const good = () => answer({ choices: [{ message: { content: JSON.stringify({ language: 'ru', segments: [{ start: 0, end: 0.5, text: 'Анонимная реплика.' }] }) } }] })
+    const fetch = vi.fn<OpenRouterKeyFetch>().mockResolvedValueOnce(bad()).mockResolvedValueOnce(good())
+    const router = createOpenRouter({ settings: settings(), key: key(), fetch, lookupModel: async () => model(), log: () => {} })
+    const transcriber = createHarnessTranscriber({ settings: settings(), tempDir: join(rootPath, 'stage'), signal: signal(), transcribe: request => router.transcribe(request) }, {
+      prompt: () => '', language: () => undefined, onLanguage: vi.fn(),
+    })
+    const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000), clearMs: 1000 }
+    const saved: string[] = []
+    const pipeline = createPipeline({ meetingId: 'openrouter-retry', backend: 'openrouter', batchMs: 100, spool,
+      transcribe: async c => transcriber(c), save: lines => saved.push(...lines.map(line => line.text)), emit: () => {} })
+    pipeline.enqueue(chunk, spool.add(chunk))
+    await pipeline.finish()
+    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(saved).toEqual(['Анонимная реплика.'])
+    expect(spool.entries()).toEqual([])
+
+    const failedMeeting = join(rootPath, 'failed-meeting'), failedSpool = createSpool(spoolDirOf(failedMeeting))
+    const badFetch = vi.fn<OpenRouterKeyFetch>().mockResolvedValueOnce(bad()).mockResolvedValueOnce(bad())
+    const badRouter = createOpenRouter({ settings: settings(), key: key(), fetch: badFetch, lookupModel: async () => model(), log: () => {} })
+    const badTranscriber = createHarnessTranscriber({ settings: settings(), tempDir: join(rootPath, 'bad-stage'), signal: signal(), transcribe: request => badRouter.transcribe(request) }, {
+      prompt: () => '', language: () => undefined, onLanguage: vi.fn(),
+    })
+    const failedChunk = { ...chunk, track: 'me' as const }
+    const keyOnDisk = failedSpool.add(failedChunk)!
+    const failedPipeline = createPipeline({ meetingId: 'openrouter-block', backend: 'openrouter', batchMs: 100, spool: failedSpool,
+      transcribe: async c => badTranscriber(c), save: () => {}, emit: () => {} })
+    failedPipeline.enqueue(failedChunk, keyOnDisk)
+    await failedPipeline.finish()
+    expect(badFetch).toHaveBeenCalledTimes(2)
+    expect(failedSpool.entries()[0]).toMatchObject({ attempts: 0, blocked: true, lastCode: 'bad-response', lastBackend: 'openrouter' })
+  })
+
   it('sends STT JSON with ISO language, consumes verbose segments and records provider seconds and unknown zero cost', async () => {
     const rootPath = await root(), samples: Record<string, unknown>[] = [], usage = { record: vi.fn(async () => {}) }
     await writeFile(join(rootPath, 'audio.wav'), Buffer.alloc(44 + 32_000))
@@ -152,7 +187,7 @@ describe('OpenRouter audio adapter', () => {
     const adapter = createOpenRouter({ settings: settings({ openrouterTranscriptionKind: 'stt' }), key: key(), fetch: async () => answer(response), lookupModel: async () => model(), log: () => {} })
     expect(parseTranscript(await adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() }), 60).segments[0].end).toBe(60)
     response = { segments: [{ start: 59.5, end: 62.01, text: 'Beyond tolerance.' }] }
-    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() }).then(raw => parseTranscript(raw, 60))).rejects.toMatchObject({ code: 'no-timestamps' })
+    await expect(adapter.transcribe({ directory: rootPath, language: undefined, instructions: '', prompt: '', signal: signal() }).then(raw => parseTranscript(raw, 60))).rejects.toMatchObject({ code: 'bad-timestamps' })
   })
 
   it('rejects an STT audio upload over 25 MB before sending', async () => {
@@ -452,13 +487,12 @@ describe('OpenRouter usage and spooled pipeline', () => {
     expect(transcribe).toHaveBeenCalledOnce()
   })
 
-  it('does not retry permanent adapter errors in the real pipeline and shares the bounded retry budget for 429', async () => {
+  it('keeps permanent adapter errors immediate and shares the bounded retry budget for 429', async () => {
     const rootPath = await root()
     const chunk: Chunk = { track: 'them', startMs: 0, samples: new Float32Array(16_000) }
     for (const [code, status, body, blocked] of [
       ['auth', 401, { error: { type: 'invalid_api_key' } }, false],
       ['credits', 402, { error: { metadata: { limit_source: 'openrouter_credits' } } }, false],
-      ['truncated', 200, { choices: [{ finish_reason: 'length', message: { content: null } }] }, true],
       ['too-large', 413, { error: { message: 'payload too large' } }, true],
     ] as const) {
       const spool = createSpool(spoolDirOf(join(rootPath, code))), fetch = vi.fn<OpenRouterKeyFetch>(async () => answer(body, status))

@@ -668,7 +668,6 @@
   "Transcribes Russian in Cyrillic": "Cirill betűkkel írja át az orosz beszédet",
   "Choose English or Russian, or let Yogurt detect the language.": "Válassz angolt vagy oroszt, vagy bízd a nyelv felismerését a Yogurtra.",
   "Yogurt detects the spoken language automatically.": "A Yogurt automatikusan felismeri a beszélt nyelvet.",
-  "The transcript is incomplete: part of the recording is not transcribed yet.": "Az átirat hiányos: a felvétel egy része még nincs leírva.",
   "Retry": "Újra",
   "Can't hear the other side": "A másik fél nem hallatszik",
   "Restart sound capture": "Hangrögzítés újraindítása",

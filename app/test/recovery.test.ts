@@ -1,10 +1,14 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hookTranscription, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcribing } from '../src/main/asr'
 import { createSpool, spoolDirOf, SPOOL_MAX_ATTEMPTS } from '../src/main/asr/spool'
 import { openStore, type Meeting, type Store } from '../src/main/store'
+import { createPipeline } from '../src/main/asr/pipeline'
+import { DEFAULT_AI_SETTINGS } from '../src/shared/ai'
+import { createHarnessTranscriber, type AudioRequest } from '../src/main/harness/transcribe'
+import { HarnessError } from '../src/main/harness/process'
 import type { Line } from '../src/main/asr/transcribe'
 import type { Chunk } from '../src/main/asr/chunker'
 import type { Spoken } from '../src/shared/spoken'
@@ -88,6 +92,134 @@ function spoolAudio(id: string, entries: Array<{ track: 'me' | 'them'; startMs: 
 const spooled = (id: string) => createSpool(spoolDirOf(join(meetingsDir, id))).list()
 
 describe('recovering a pending remote transcript', () => {
+  it('gives a bad model response a fresh transcriber call before the spool can be blocked', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'yogurt-output-retry-'))
+    try {
+      const spool = createSpool(spoolDirOf(join(root, 'meeting')))
+      const source: Chunk = {
+        track: 'me', startMs: 4_548_905, samples: new Float32Array(Math.round(61.8 * RATE)), clearMs: 2_700,
+        parts: Array.from({ length: 26 }, (_, i) => ({ atMs: i * 2_300, startMs: 4_548_905 + i * 11_500, durationMs: 1_400 })),
+      }
+      const replies = [
+        JSON.stringify({ segments: [{ start: 3, end: 2, text: 'анонимная реплика' }] }),
+        JSON.stringify({ language: 'ru', segments: [{ start: 1, end: 2, text: 'анонимная реплика' }] }),
+      ]
+      const providerCalls: AudioRequest[] = []
+      const transcribe = createHarnessTranscriber({
+        settings: { ...DEFAULT_AI_SETTINGS, backend: 'agy' }, tempDir: join(root, 'stage'), signal: new AbortController().signal,
+        transcribe: async (request: AudioRequest) => { providerCalls.push(request); return replies.shift()! },
+      }, { prompt: () => '', language: () => 'ru', onLanguage: vi.fn(), rejectedDir: spoolDirOf(join(root, 'meeting')) })
+      const logicalCalls: number[] = []
+      const saved: Line[] = []
+      const pipeline = createPipeline({
+        meetingId: 'output-retry', holdMs: 0, batchMs: 300_000, spool,
+        transcribe: async chunk => { logicalCalls.push(chunk.samples.length); return transcribe(chunk) },
+        save: lines => saved.push(...lines), emit: () => {},
+      })
+      const key = spool.add(source, 'ru')!
+      pipeline.enqueue(source, key)
+      await pipeline.finish()
+
+      expect(logicalCalls).toHaveLength(1)
+      expect(providerCalls).toHaveLength(2)
+      expect(spool.entries()).toEqual([])
+      expect(saved.map(line => line.text)).toEqual(['анонимная реплика'])
+      const rejected = join(spoolDirOf(join(root, 'meeting')), 'rejected')
+      expect(readdirSync(rejected)).toHaveLength(1)
+      expect(statSync(join(rejected, readdirSync(rejected)[0]!)).mode & 0o777).toBe(0o600)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('keeps audio after two bad responses and recovers it in the single bounded post-meeting pass', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'yogurt-output-postpass-'))
+    try {
+      const spool = createSpool(spoolDirOf(join(root, 'meeting')))
+      const source: Chunk = { track: 'me', startMs: 0, samples: new Float32Array(Math.round(61.8 * RATE)), clearMs: 2_700,
+        parts: Array.from({ length: 26 }, (_, i) => ({ atMs: i * 2_300, startMs: i * 11_500, durationMs: 1_400 })) }
+      const replies = [
+        JSON.stringify({ segments: [{ start: 3, end: 2, text: 'анонимная реплика' }] }),
+        JSON.stringify({ segments: [{ start: 3, end: 2, text: 'анонимная реплика' }] }),
+        JSON.stringify({ language: 'ru', segments: [{ start: 1, end: 2, text: 'анонимная реплика' }] }),
+      ]
+      const providerCalls: AudioRequest[] = []
+      const transcribe = createHarnessTranscriber({ settings: { ...DEFAULT_AI_SETTINGS, backend: 'agy' }, tempDir: join(root, 'stage'), signal: new AbortController().signal,
+        transcribe: async request => { providerCalls.push(request); return replies.shift()! } }, { prompt: () => '', language: () => 'ru', onLanguage: vi.fn() })
+      const saved: Line[] = []
+      const pipeline = createPipeline({ meetingId: 'postpass', holdMs: 0, batchMs: 300_000, spool, backend: 'agy', postMeetingRecovery: true,
+        transcribe: c => transcribe(c), save: lines => saved.push(...lines), emit: () => {} })
+      const key = spool.add(source, 'ru')!
+      pipeline.enqueue(source, key)
+      await pipeline.finish()
+
+      expect(providerCalls).toHaveLength(3) // two bad outputs, one fresh call from the post-meeting pass
+      expect(spool.entries()).toEqual([])
+      expect(saved.map(line => line.text)).toEqual(['анонимная реплика'])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('blocks a truly permanent input failure on its first logical send', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'yogurt-permanent-input-'))
+    try {
+      const spool = createSpool(spoolDirOf(join(root, 'meeting')))
+      const chunk: Chunk = { track: 'me', startMs: 0, samples: pcm(1), clearMs: 800 }
+      let providerCalls = 0
+      const transcribe = createHarnessTranscriber({
+        settings: { ...DEFAULT_AI_SETTINGS, backend: 'agy' }, tempDir: join(root, 'stage'), signal: new AbortController().signal,
+        transcribe: async () => { providerCalls++; throw new HarnessError('Audio is too large.', 'too-large', 0, undefined, true, 'agy') },
+      }, { prompt: () => '', language: () => 'ru', onLanguage: vi.fn() })
+      const pipeline = createPipeline({ meetingId: 'permanent-input', backend: 'agy', batchMs: 300_000, spool,
+        transcribe: c => transcribe(c), save: () => {}, emit: () => {} })
+      const key = spool.add(chunk)!
+      pipeline.enqueue(chunk, key)
+      await pipeline.finish()
+      expect(providerCalls).toBe(1)
+      expect(spool.entries()[0]).toMatchObject({ attempts: 0, blocked: true, lastCode: 'too-large', lastBackend: 'agy' })
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('does not clear a track warning when a later batch succeeds but an earlier chunk remains spooled', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'yogurt-problem-spool-'))
+    try {
+      const spool = createSpool(spoolDirOf(join(root, 'meeting')))
+      const failed: Chunk = { track: 'them', startMs: 0, samples: pcm(59), clearMs: 1 }
+      const later: Chunk = { track: 'them', startMs: 120_000, samples: pcm(1), clearMs: 1 }
+      const problems: Array<{ code: string | null }> = []
+      const firstKey = spool.add(failed)!, secondKey = spool.add(later)!
+      let calls = 0
+      const pipeline = createPipeline({ meetingId: 'warning', backend: 'agy', batchMs: 60_000, spool,
+        transcribe: async c => {
+          if (++calls === 1) throw Object.assign(new Error('provider unavailable'), { code: 'network' })
+          return [{ track: c.track, startMs: c.startMs, endMs: c.startMs + 10, text: 'анонимная реплика' }]
+        }, save: () => {}, emit: () => {}, onAiProblem: problem => problems.push({ code: problem.code }) })
+      pipeline.enqueue(failed, firstKey)
+      pipeline.enqueue(later, secondKey)
+      await pipeline.finish()
+      expect(calls).toBe(2)
+      expect(spool.entries().map(entry => entry.key)).toEqual([firstKey])
+      expect(problems).toEqual([{ code: 'network' }])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('stops later post-meeting rounds at the first non-output failure', async () => {
+    const entries = [
+      { key: 'me-0', track: 'me' as const, startMs: 0, durationMs: 15 * 60_000, attempts: 0 },
+      { key: 'me-900000', track: 'me' as const, startMs: 900_000, durationMs: 15 * 60_000, attempts: 0 },
+    ]
+    const spool = {
+      add: () => undefined, remove: () => {}, hasEntries: () => true, entries: () => entries,
+      load: (batch: typeof entries) => batch.map(entry => ({ ...entry, samples: new Float32Array(16_000) })),
+      bump: (key: string, attempts = 1) => { const entry = entries.find(item => item.key === key)!; entry.attempts += attempts },
+      block: () => {},
+    }
+    const calls: string[] = []
+    const pipeline = createPipeline({ meetingId: 'stop-pass', backend: 'agy', batchMs: 60_000, spool, postMeetingRecovery: true,
+      transcribe: async chunk => { calls.push(chunk.track); throw Object.assign(new Error('provider unavailable'), { code: 'network' }) },
+      save: () => {}, emit: () => {} })
+    await pipeline.finish()
+    expect(calls).toEqual(['me'])
+    expect(entries.map(entry => entry.attempts)).toEqual([1, 0])
+  })
+
   it('sends the spooled chunks again, saves their lines on the meeting clock, and clears the pending mark', async () => {
     const r = rig()
     const m = meeting()
@@ -165,7 +297,7 @@ describe('recovering a pending remote transcript', () => {
     const r = rig()
     const m = meeting()
     store.updateMeeting(m.id, { transcriptionPending: true })
-    const [key] = spoolAudio(m.id, [{ track: 'them', startMs: 0 }])
+    const key = spoolAudio(m.id, [{ track: 'them', startMs: 0 }])[0]!
     const spool = createSpool(spoolDirOf(join(meetingsDir, m.id)))
     for (let i = 0; i < SPOOL_MAX_ATTEMPTS; i++) spool.bump(key)
     await recoverTranscription(m.id)
@@ -267,7 +399,8 @@ describe('the incomplete-transcript banner state', () => {
     r2.begin(m)
     r2.stops.forEach((f) => f(m))
     // audio a crash left behind, still on disk while the drain runs
-    spoolAudio(m.id, [{ track: 'them', startMs: 0 }])
+    const [key] = spoolAudio(m.id, [{ track: 'them', startMs: 0 }])
+    createSpool(spoolDirOf(join(meetingsDir, m.id))).block(key, 'bad-response', 'openrouter')
     expect(transcriptIncomplete(m.id)).toBe(false)
     await settleTranscription(2000)
     // the drain ended with the entry never sent: now it really is waiting

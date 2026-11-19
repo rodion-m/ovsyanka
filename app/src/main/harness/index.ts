@@ -30,6 +30,9 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
   // Once enabled at launch, clearing the environment value returns a short fixture transcript on retry.
   const fakeCliFailure = process.env.YOGURT_FAKE === '1' && selected.backend !== 'openrouter'
     && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '')
+  const fakeBadOutputOnce = process.env.YOGURT_FAKE === '1' && selected.backend !== 'openrouter'
+    && process.env.YOGURT_FAKE_CLI_FAILURE === 'bad-output-once'
+  let fakeBadOutputSent = false
   return {
     model: createHarnessModel({ ...common, complete: selected.backend === 'porch' ? porch.text
       : selected.backend === 'openrouter' ? (prompt, _directory, signal, maxOutputTokens) => router!.text(prompt, signal!, maxOutputTokens)
@@ -43,6 +46,11 @@ export function createSubscriptionHarness({ settings, tempDir, storeRoot = agySt
           }
           return Promise.resolve(JSON.stringify({ language: 'English', segments: [{ start: 0.1, end: 1, text: 'Retry recovered this transcript.' }] }))
         }
+        if (fakeBadOutputOnce && !fakeBadOutputSent) {
+          fakeBadOutputSent = true
+          return Promise.resolve(JSON.stringify({ language: 'English', segments: [{ start: 1, end: 0.2, text: 'Rejected once, then recovered.' }] }))
+        }
+        if (fakeBadOutputOnce) return Promise.resolve(JSON.stringify({ language: 'English', segments: [{ start: 0.1, end: 1, text: 'Bad output recovered automatically.' }] }))
         return selected.backend === 'porch'
           ? porch.transcribe(request.prompt, request.directory, request.signal)
           : selected.backend === 'openrouter' ? router!.transcribe(request)

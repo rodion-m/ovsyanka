@@ -180,7 +180,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS segments_meeting ON segments(meeting_id, start_ms);
       CREATE TABLE IF NOT EXISTS notes (
         id INTEGER PRIMARY KEY AUTOINCREMENT, meeting_id TEXT NOT NULL UNIQUE REFERENCES meetings(id) ON DELETE CASCADE,
-        mine TEXT NOT NULL DEFAULT '', enhanced TEXT, edited INTEGER NOT NULL DEFAULT 0);
+        mine TEXT NOT NULL DEFAULT '', enhanced TEXT, edited INTEGER NOT NULL DEFAULT 0, transcript_count INTEGER);
 
       CREATE VIRTUAL TABLE IF NOT EXISTS segments_fts USING fts5(text, content='segments', content_rowid='id');
       CREATE TRIGGER IF NOT EXISTS segments_ai AFTER INSERT ON segments BEGIN
@@ -240,6 +240,7 @@ export class Store {
     }
     // who was at the meeting when its notes were written (a "names" column from voice naming is left as it is, unread)
     if (!(this.db.prepare('PRAGMA table_info(notes)').all() as Row[]).some((r) => r.name === 'written_with')) this.db.exec('ALTER TABLE notes ADD COLUMN written_with TEXT')
+    if (!(this.db.prepare('PRAGMA table_info(notes)').all() as Row[]).some((r) => r.name === 'transcript_count')) this.db.exec('ALTER TABLE notes ADD COLUMN transcript_count INTEGER')
     const segmentCols = (this.db.prepare('PRAGMA table_info(segments)').all() as Row[]).map((r) => String(r.name))
     if (!segmentCols.includes('hidden')) this.db.exec('ALTER TABLE segments ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0')
     if (!segmentCols.includes('echo_confident')) {
@@ -489,6 +490,27 @@ export class Store {
   }
   setWrittenWith(meetingId: string, people: string) {
     this.db.prepare('UPDATE notes SET written_with = ? WHERE meeting_id = ?').run(people, meetingId)
+  }
+
+  /** Number of visible transcript segments captured by the last generated summary; null for legacy notes. */
+  notesTranscriptCount(meetingId: string): number | null {
+    const r = this.db.prepare('SELECT transcript_count FROM notes WHERE meeting_id = ?').get(meetingId) as Row | undefined
+    return r?.transcript_count == null ? null : Number(r.transcript_count)
+  }
+  setNotesTranscriptCount(meetingId: string, count: number) {
+    this.db.prepare('UPDATE notes SET transcript_count = ? WHERE meeting_id = ?').run(count, meetingId)
+  }
+  /** Visible transcript size, used to notice lines added while notes were being written. */
+  transcriptCount(meetingId: string): number {
+    const r = this.db.prepare('SELECT count(*) AS count FROM segments WHERE meeting_id = ? AND hidden = 0').get(meetingId) as Row
+    return Number(r.count)
+  }
+  /** Notes left stale by a quit between saving recovered segments and scheduling their quiet rewrite. */
+  meetingsWithStaleTranscriptNotes(): string[] {
+    return (this.db.prepare(`SELECT n.meeting_id FROM notes n JOIN meetings m ON m.id = n.meeting_id
+      WHERE m.state != 'recording' AND m.trashed_at IS NULL AND n.enhanced IS NOT NULL AND n.edited = 0 AND n.transcript_count IS NOT NULL
+      AND n.transcript_count != (SELECT count(*) FROM segments s WHERE s.meeting_id = n.meeting_id AND s.hidden = 0)
+      ORDER BY m.started_at`).all() as Row[]).map(r => String(r.meeting_id))
   }
 
   /** Stopped meetings with no enhanced notes: a quit or crash came before they were written */

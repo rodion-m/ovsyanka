@@ -6,7 +6,7 @@ import type { Meeting, MeetingCard as StoredMeetingCard, Person, Segment, Snippe
 import type { CalEvent, CalendarSource, CalendarStatus } from '../main/calendar'
 import type { Access, PermissionKind, PermissionStatus } from '../main/permissions'
 import type { Capabilities } from './platform'
-import type { AiProblemEvent } from './ai'
+import type { AiBackend, AiProblemCode, AiProblemEvent } from './ai'
 export type { Access, PermissionKind, PermissionStatus }
 /** one first-run question: a permission, or open at login last */
 export type OnboardingStep = { kind: PermissionKind; status: Access }
@@ -18,7 +18,7 @@ export type DeleteRecordingResult = 'deleted' | 'missing' | 'recording' | 'not-t
 
 export type Theme = 'light' | 'dark' | 'system'
 /** The capture has stopped, but its final database state may still need an explicit retry. */
-export type MeetingView = Meeting & { stopSavePending?: true; paused?: true; transcriptIncomplete?: boolean }
+export type MeetingView = Meeting & { stopSavePending?: true; paused?: true; transcriptIncomplete?: boolean; transcriptIssue?: { track: 'me' | 'them'; code?: AiProblemCode; backend?: AiBackend; attempts: number; blocked: boolean } }
 export type MeetingCard = StoredMeetingCard & { paused?: true }
 
 /** What the window sees of the app: window.yogurt (the preload bridge, contextIsolation on) */
@@ -392,6 +392,8 @@ export type NoteView = {
   step?: 'loading'
   /** the people at the meeting changed after these edited notes were written, so they may be out of date */
   peopleChanged: boolean
+  /** the transcript grew after this edited note was saved; the edit was kept */
+  transcriptAdded?: boolean
   /** the notes were just written again (for new people): what they replaced, so an open editor with no edits since takes them */
   rewrittenFrom?: string
   /** latest acknowledged edit revision on each side; failed text is retained in main and overlaid above */

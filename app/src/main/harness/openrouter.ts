@@ -4,7 +4,7 @@ import type { AiProblemCode, AiSettings, OpenRouterDataPolicy } from '../../shar
 import { clampTranscriptionEffort } from '../../shared/ai'
 import type { OpenRouterModel } from '../../shared/aiCatalog'
 import { STRICT_TRANSCRIPT_SCHEMA, TRANSCRIPTION_RULES, type AudioRequest } from './transcribe'
-import { aborted, assertRunning, HarnessError } from './process'
+import { aborted, assertRunning, HarnessError, TranscriptOutputError } from './process'
 import type { OpenRouterKeyFetch, OpenRouterKeyStore } from './openrouterKey'
 import type { OpenRouterUsage } from './openrouterUsage'
 import { validatedOpenRouterModelsCache } from './openrouterModels'
@@ -123,7 +123,7 @@ export function classifyOpenRouterError(status: number, body: unknown): ErrorSha
   else if (status >= 500) code = 'unavailable'
   else if (status === 402) code = 'credits'
   else code = 'bad-response'
-  const permanent = ['truncated', 'bad-response', 'no-timestamps', 'too-large', 'moderation'].includes(code)
+  const permanent = ['too-large', 'moderation', 'no-timestamps'].includes(code)
   const optionalParameterError = status === 400 && /unsupported|not supported|unknown parameter|invalid (?:parameter|schema)|response_format|structured.outputs|reasoning|temperature/i.test(signal)
   return { code, permanent: permanent && !optionalParameterError, ...(errorType ? { errorType } : {}) }
 }
@@ -326,11 +326,11 @@ export class OpenRouterAdapter {
           return new TextDecoder().decode(Buffer.concat(chunks.map(chunk => Buffer.from(chunk))))
         }, timeoutOverrideMs)
         const text = result
-        if (!response) throw new HarnessError('OpenRouter did not return a response.', 'bad-response')
+        if (!response) throw new TranscriptOutputError('OpenRouter did not return a response.', 'bad-response', attempt + 1, undefined, '')
         status = response.status
         bodySize = Buffer.byteLength(text, 'utf8')
         let parsed: unknown
-        try { parsed = text ? JSON.parse(text) : undefined } catch { if (responseOk(response)) throw new HarnessError('OpenRouter returned an invalid response.', 'bad-response') }
+        try { parsed = text ? JSON.parse(text) : undefined } catch { if (responseOk(response)) throw new TranscriptOutputError('OpenRouter returned an invalid response.', 'bad-response', attempt + 1, undefined, text) }
         const object = record(parsed)
         generationId = safeDiagnostic(object?.id, key) ?? safeDiagnostic(response.headers.get('X-Generation-Id'), key)
         const usage = usageOf(object)
@@ -380,16 +380,21 @@ export class OpenRouterAdapter {
         const returnedModel = safeDiagnostic(object?.model, key)
         if (returnedModel && returnedModel !== model) console.info('openrouter response model differs from request', { requested: safeModel(model), returned: safeModel(returnedModel) })
         if (content.finishReason === 'length' || content.nativeFinishReason === 'MAX_TOKENS') {
-          throw new HarnessError('OpenRouter truncated the response.', 'truncated', attempt + 1, safeModel(model), true)
+          throw new TranscriptOutputError('OpenRouter truncated the response.', 'truncated', attempt + 1, undefined, content.content ?? '')
         }
         if (!content.content?.trim()) {
           const code: AiProblemCode = content.finishReason === 'length' ? 'truncated' : 'bad-response'
-          throw new HarnessError(code === 'truncated' ? 'OpenRouter truncated the response.' : 'OpenRouter returned no answer.', code, attempt + 1, safeModel(model), true)
+          if (code === 'truncated') throw new TranscriptOutputError('OpenRouter truncated the response.', 'truncated', attempt + 1, undefined, content.content ?? '')
+          throw new TranscriptOutputError('OpenRouter returned no answer.', 'bad-response', attempt + 1, undefined, content.content ?? '')
         }
         logAttempt()
         return content.content
       } catch (error) {
         if (signal.aborted) throw aborted()
+        if (error instanceof TranscriptOutputError) {
+          logAttempt()
+          throw error
+        }
         const harnessError = error instanceof HarnessError
           ? new HarnessError(error.message, error.code, error.attempts || attempt + 1, error.model ?? safeModel(model), error.permanent)
           : undefined

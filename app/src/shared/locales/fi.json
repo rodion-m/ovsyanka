@@ -680,7 +680,6 @@
   "Transcribes Russian in Cyrillic": "Kirjoittaa venäjän kyrillisin kirjaimin",
   "Choose English or Russian, or let Yogurt detect the language.": "Valitse englanti tai venäjä tai anna Yogurtin tunnistaa kieli.",
   "Yogurt detects the spoken language automatically.": "Yogurt tunnistaa puhutun kielen automaattisesti.",
-  "The transcript is incomplete: part of the recording is not transcribed yet.": "Litterointi on epätäydellinen: osa tallenteesta on vielä transkriboimatta.",
   "Retry": "Yritä uudelleen",
   "Can't hear the other side": "Toista osapuolta ei kuulosta",
   "Restart sound capture": "Käynnistä äänen kaappaus uudelleen",

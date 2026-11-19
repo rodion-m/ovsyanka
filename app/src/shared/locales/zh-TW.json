@@ -632,7 +632,6 @@
   "Transcribes Russian in Cyrillic": "使用西里爾字母轉寫俄語",
   "Choose English or Russian, or let Yogurt detect the language.": "選擇英語或俄語，也可以讓 Yogurt 自動辨識語言。",
   "Yogurt detects the spoken language automatically.": "Yogurt 會自動辨識所說的語言。",
-  "The transcript is incomplete: part of the recording is not transcribed yet.": "轉寫不完整：錄音的一部分尚未轉寫。",
   "Retry": "重試",
   "Can't hear the other side": "聽不到對方",
   "Restart sound capture": "重新啟動聲音擷取",

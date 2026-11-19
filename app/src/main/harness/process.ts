@@ -12,6 +12,23 @@ export class HarnessError extends Error {
   constructor(message: string, readonly code?: AiProblemCode, readonly attempts = 0, readonly model?: string, readonly permanent = false, readonly cli?: AiCli) { super(message); this.name = 'HarnessError' }
 }
 
+export type TranscriptOutputFacts = Record<string, number | string | boolean | null | undefined>
+const outputPayloads = new WeakMap<TranscriptOutputError, { response?: string; facts?: TranscriptOutputFacts }>()
+
+/** A provider response defect: it is retried once by createHarnessTranscriber, with no permanent flag. */
+export class TranscriptOutputError extends Error {
+  constructor(message: string, readonly code: Extract<AiProblemCode, 'bad-response' | 'bad-timestamps' | 'truncated'>,
+    readonly attempts = 0, readonly cli?: AiCli, response?: string, facts?: TranscriptOutputFacts) {
+    super(message)
+    this.name = 'TranscriptOutputError'
+    outputPayloads.set(this, { ...(response === undefined ? {} : { response }), ...(facts ? { facts } : {}) })
+  }
+}
+
+/** Raw provider text is carried privately for meeting-local diagnostics and never becomes an enumerable error field. */
+export const transcriptOutputResponse = (error: TranscriptOutputError): string | undefined => outputPayloads.get(error)?.response
+export const transcriptOutputFacts = (error: TranscriptOutputError): TranscriptOutputFacts | undefined => outputPayloads.get(error)?.facts
+
 const cliFor = (label: string): AiCli | undefined => /agy/i.test(label) ? 'agy' : /porch/i.test(label) ? 'Porch' : undefined
 
 export function aborted(): Error {
@@ -186,7 +203,7 @@ export class HarnessProcesses {
       child.stdout.on('data', (chunk: Buffer) => {
         emitStdout(stdoutText.write(chunk))
         outBytes += chunk.length
-        if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`, 'bad-response', 0, undefined, true, cliFor(options.label)))
+        if (outBytes > stdoutLimit) cancel(new HarnessError(`${options.label} exceeded the response size limit.`, 'too-large', 0, undefined, true, cliFor(options.label)))
         else if (!error) stdout.push(chunk)
       })
       child.stderr.on('data', (chunk: Buffer) => {

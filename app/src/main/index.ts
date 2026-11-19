@@ -49,7 +49,7 @@ import { isId, text } from './ipcArgs'
 import { hookMics } from './mics'
 import { activeCapture, audioHelperPath, hookCapture, joinParts, onCaptureStart, onRecordingEvent, prepareAppend, recordingFinished, recordingPaused, recordingSettled, rebuildSystemCapture, rejoinInterrupted, setRecordingPaused, settleRecording, tell, type WarnCode } from './capture'
 import { createWidget } from './widget'
-import { hookTranscription, onWhisperGpuOff, meetingLanguage, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcriptPartials, transcribing } from './asr'
+import { hookTranscription, onWhisperGpuOff, meetingLanguage, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, speechLocaleFor, spokenChanged, transcriptionBacklogMs, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcriptIssue, transcriptPartials, transcribing } from './asr'
 import { meetingsWithSpool } from './asr/spool'
 import { hookCallNames, type CallNames, type Watch } from './callNames'
 import { createThemSilence, type ThemSilence } from './themSilence'
@@ -82,7 +82,7 @@ import { hookFolders } from './foldersIpc'
 import { hookMcp } from './mcp'
 import { startedHidden } from './mcp/paths'
 import { deleteRecording } from './deleteRecording'
-import { recoverMeetingTranscript } from './transcriptRecovery'
+import { recoverMeetingTranscript, type TranscriptFollowUp } from './transcriptRecovery'
 import { runCatchUp } from './startup'
 import { AUDIO_SCHEME, audioExts, createAudioHandler, trackFile, type AudioExt } from './audio'
 import { finishQuit, hookUpdates, isPreviewBuild, isSubscriptionBuild, updateOfferChanged, updatesOn } from './updates'
@@ -476,7 +476,7 @@ function startDetection() {
       go: (r) => goTo(r),
       warn: (code) => tell({ t: 'warn', code: code as WarnCode }),
       setCliFailure: (code) => {
-        if (code === 'cli-failed' || code === 'cli-missing') process.env.YOGURT_FAKE_CLI_FAILURE = code
+        if (code === 'cli-failed' || code === 'cli-missing' || code === 'bad-output-once') process.env.YOGURT_FAKE_CLI_FAILURE = code
         else delete process.env.YOGURT_FAKE_CLI_FAILURE
       },
       // a long finished meeting: n lines half a second apart, voices taking turns, with quiet low-rate audio to play
@@ -568,6 +568,7 @@ app.whenReady().then(() => {
   storeRef = store
   store.markInterrupted()
   initMeetings(store)
+  let transcriptFollowUp: TranscriptFollowUp | undefined
   // the person's own names, never given to the other side: the one in Settings and the Mac's
   const settingsFile = join(userDataDir(), 'settings.json')
   themWarnOn = loadSettings(settingsFile).themSilenceWarn !== false
@@ -585,7 +586,8 @@ app.whenReady().then(() => {
     return true
   }, onAiConfigChanged: async () => {
     const meetings = meetingsWithSpool(join(userDataDir(), 'meetings'))
-    await Promise.all(meetings.map(id => recoverTranscription(id)))
+    if (!transcriptFollowUp) return
+    for (const id of meetings) await recoverMeetingTranscript(id, undefined, transcriptFollowUp)
   } })
   setCalendarSelection(() => loadSettings(settingsFile).hiddenCalendarIds ?? [])
   const me = () => loadSettings(settingsFile).myName?.trim() || macName()
@@ -610,7 +612,7 @@ app.whenReady().then(() => {
       tell({ t: 'ai-problem', problem: event })
     }
   })
-  hookTranscription({ store, modelPath: () => setup.installed()?.asr, send: (seg) => {
+  hookTranscription({ store, modelPath: () => setup.installed()?.asr, backend: ai.backend, send: (seg) => {
     const order = seg.track === 'them' && seg.speaker ? store.speakerOrder(seg.meetingId, seg.speaker) : []
     const colored = { ...seg, speakerColor: speakerColor(seg.track, seg.speaker, order) }
     win?.webContents.send('transcript:segment', colored); sendWidgetTranscript('transcript:segment', colored)
@@ -619,6 +621,12 @@ app.whenReady().then(() => {
     refresh: (id) => { win?.webContents.send('transcript:speakers', id); sendWidgetTranscript('transcript:speakers', id) },
     // the note's incomplete-transcript banner may have flipped: reload the meeting
     changed: (id) => win?.webContents.send('meetings:changed'),
+    // A bounded note wait can write a provisional summary; refresh it when the live drain adds late lines.
+    transcriptRecovered: (id) => {
+      if (!transcriptFollowUp) return
+      void transcriptFollowUp.applyTranscript(id, true)
+      void transcriptFollowUp.scheduleIndex()
+    },
     // a meeting being resumed gets a fresh session: spool recovery must not open one beside it
     resuming: (id) => resumingId === id,
     sendPartial: (part) => { win?.webContents.send('transcript:partial', part); sendWidgetTranscript('transcript:partial', part) },
@@ -630,8 +638,8 @@ app.whenReady().then(() => {
       tell({ t: 'ai-problem', problem: event })
     },
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false,
-      batchMs: isFake() && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 100 : 5 * 60_000,
-      firstBatchMs: isFake() && ['cli-failed', 'cli-missing'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 50 : 60_000,
+      batchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 100 : 5 * 60_000,
+      firstBatchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 50 : 60_000,
       maxQueuedMs: 15 * 60_000 } : {}),
     meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once
@@ -676,7 +684,9 @@ app.whenReady().then(() => {
   }, (e) => { console.warn("couldn't check the graphics", e); return null })
   // fake mode: the fixed Mac (a bigger one) unless a test asks for a 16 GB one
   const smallMac = !subscription && (isFake() ? process.env.YOGURT_FAKE_SMALL_MAC === '1' : isSmallMac(os.totalmem()))
-  const model = harness?.model ?? createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path) })
+  // Fake-mode recordings use the in-process fixture model even when the test selects a remote transcription backend.
+  const model = isFake() ? createNotesModel({ engine, modelPath: () => 'fake' })
+    : harness?.model ?? createNotesModel({ engine, modelPath: () => setup.notesPath(), onLoaded: path => setup.notesModelLoaded(path) })
   // first run: the notes model lands after recording already works; jobs wait in the queue for it
   // the embedding model (meaning search across meetings) runs in the same worker and is let go with the notes model
   const embedder = subscription ? keywordOnlyEmbedder() : createEmbedder({ engine, modelPath: () => setup.installed()?.embed, id: bundledCatalog.embedding.id, dims: bundledCatalog.embedding.dims })
@@ -758,10 +768,9 @@ app.whenReady().then(() => {
     }
   })
   // what a finished spool recovery feeds back into: unedited notes written again, and the library re-indexed
-  const transcriptFollowUp = {
+  transcriptFollowUp = {
     segmentCount: (id: string) => store.segments(id).length,
-    notesEdited: (id: string) => store.notes(id).edited,
-    writeAgain: (id: string) => notes.writeAgain(id),
+    applyTranscript: (id: string) => notes.applyTranscript(id),
     scheduleIndex: () => indexer.schedule(),
   }
   // a pending remote transcript's audio is still on disk: send it again, this time including the chunks that failed enough times to be skipped
@@ -966,7 +975,7 @@ app.whenReady().then(() => {
   ipcMain.handle('meetings:get', (_e, id: unknown) => {
     const m = isId(id) ? getMeeting(id) : undefined
     if (m) store.noteOpened(m.id)
-    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}), transcriptIncomplete: transcriptIncomplete(m.id) }
+    return m && { ...m, ...(recordingPaused(m.id) ? { paused: true } : {}), transcriptIncomplete: transcriptIncomplete(m.id), transcriptIssue: transcriptIssue(m.id) }
   })
   // the person's own title for a note
   ipcMain.handle('meetings:rename', (_e, id: unknown, title: unknown) => { if (isId(id) && typeof title === 'string') renameMeeting(id, title) })

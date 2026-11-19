@@ -7,8 +7,9 @@ import { echoConfidence, isVerbatimCopy, type EchoCheck } from './echo'
 import { EchoDetector } from './echoDetect'
 import type { Line, Transcribe } from './transcribe'
 import type { Spoken } from '../../shared/spoken'
-import type { AiProblemCode, AiProblemUpdate } from '../../shared/ai'
+import { aiFailureClass, aiSpoolFailureAction, type AiBackend, type AiProblemCode, type AiProblemUpdate } from '../../shared/ai'
 import { takeBatch, type Batch } from './batch'
+import { SPOOL_MAX_ATTEMPTS, SPOOL_ROUND_MS, spoolRounds, type SpooledEntry } from './spool'
 
 type Out = Omit<Segment, 'id'>
 
@@ -38,7 +39,22 @@ export function createPipeline(p: {
   /** remote path only (batchMs > 0): each track's first batch goes once its oldest queued chunk is this old in meeting time; every later batch waits batchMs. Local reads stay unchanged. */
   firstBatchMs?: number
   /** remote path only (batchMs > 0): every queued chunk is kept on disk until its lines are saved, so a quit or crash can send it again */
-  spool?: { add(chunk: Chunk, spoken?: Spoken): string | undefined; remove(keys: string[]): void; bump?(key: string, attempts?: number): void; block?(key: string): void }
+  spool?: {
+    add(chunk: Chunk, spoken?: Spoken): string | undefined
+    remove(keys: string[]): void
+    bump?(key: string, attempts?: number, code?: AiProblemCode, backend?: AiBackend): void
+    block?(key: string, code?: AiProblemCode, backend?: AiBackend): void
+    hasEntries?(): boolean
+    entries?(): SpooledEntry[]
+    load?(entries: readonly SpooledEntry[]): Array<SpooledEntry & { samples: Float32Array }>
+  }
+  /** The active provider selects the shared class table's post-failure spool policy. */
+  backend?: AiBackend
+  /** Run one bounded attempt over eligible audio after a live meeting's regular queue drains. */
+  postMeetingRecovery?: boolean
+  postMeetingRecoveryMs?: number
+  /** Called after a live meeting's final drain if it added transcript lines. */
+  transcriptRecovered?: (meetingId: string) => void
   /** the meeting's spoken language setting as its sidecars should remember it; read each time a chunk is queued */
   spoken?: () => Spoken | undefined
   /** for tests: stand in for the echo detector */
@@ -63,12 +79,24 @@ export function createPipeline(p: {
   const spooling = batchMs > 0 && !!p.spool
   /** queued chunk → its spool entry, so a saved batch drops exactly its own files */
   const spoolKeys = new Map<Chunk, string>()
+  const queuedSignals = new WeakMap<Chunk, AbortSignal>()
   const waiting: Record<Track, Chunk[]> = { me: [], them: [] }
   const running: Record<Track, boolean> = { me: false, them: false }
   const queued = (t: Track) => waiting[t].length + (running[t] ? 1 : 0)
   const dropped: Array<{ track: Track; startMs: number; endMs: number }> = []
   const warned = new Set<string>()
+  const problemTracks = new Set<Track>()
+  let postMeetingRecoveryController: AbortController | undefined
   const warn = (k: 'transcribe-failed' | 'falling-behind') => { if (!warned.has(k)) { warned.add(k); try { p.onWarn?.(k) } catch (e) { console.error('warning failed', e) } } }
+  const clearProblemIfDrained = (track?: Track) => {
+    if (spooling && p.spool?.hasEntries?.()) return
+    const tracks = spooling ? [...new Set([...problemTracks, ...(track ? [track] : [])])] : track ? [track] : [...problemTracks]
+    for (const t of tracks) {
+      const hadProblem = problemTracks.delete(t)
+      if (!hadProblem && !(spooling && track === t)) continue
+      try { p.onAiProblem?.({ code: null, meetingId: p.meetingId, track: t }) } catch (err) { console.error('clearing an AI problem failed', err) }
+    }
+  }
   let idle: Array<() => void> = []
   const them: Line[] = []
   /** is their voice reaching the mic in this meeting (no headphones)? only then are echo lines hidden */
@@ -126,6 +154,7 @@ export function createPipeline(p: {
     for (const s of sources) spoolKeys.delete(s)
     if (!keys.length) return
     try { p.spool!.remove(keys) } catch (e) { console.error('dropping saved audio from the spool failed', e) }
+    clearProblemIfDrained()
   }
   const give = (lines: Line[]): boolean => {
     if (!lines.length) return true
@@ -203,10 +232,12 @@ export function createPipeline(p: {
     /** the queued chunks this batch was packed from (a single chunk is its own source): their spool entries go when its lines are saved */
     const sources = c.sources ?? [c]
     // the call is deferred to a microtask so a synchronous throw takes the same failure path as a rejection
-    Promise.resolve().then(() => p.transcribe(c))
+    const callSignal = sources.map(source => queuedSignals.get(source)).find((signal): signal is AbortSignal => signal !== undefined)
+    Promise.resolve().then(() => p.transcribe(c, callSignal ? { signal: callSignal } : undefined))
       .then((lines) => {
-        try { p.onAiProblem?.({ code: null, meetingId: p.meetingId, track: t }) } catch (err) { console.error('clearing an AI problem failed', err) }
         onLines(t, lines, c.startMs, chunkEnd, sources)
+        // A later good batch must not erase the warning for failed audio that is still in the spool.
+        clearProblemIfDrained(t)
       })
       // its quick reading goes too: nothing final will replace it
       .catch((e) => {
@@ -217,8 +248,11 @@ export function createPipeline(p: {
         const model = typeof e === 'object' && e !== null && 'model' in e && typeof (e as { model?: unknown }).model === 'string' ? (e as { model: string }).model : undefined
         const cli = typeof e === 'object' && e !== null && 'cli' in e && ((e as { cli?: unknown }).cli === 'agy' || (e as { cli?: unknown }).cli === 'Porch') ? (e as { cli: 'agy' | 'Porch' }).cli : undefined
         const permanent = typeof e === 'object' && e !== null && 'permanent' in e && (e as { permanent?: unknown }).permanent === true
+        const action = code ? aiSpoolFailureAction(code, p.backend ?? 'local') : permanent ? 'block' : 'bump'
+        if (postMeetingRecoveryController && (!code || aiFailureClass(code) !== 'output')) postMeetingRecoveryController.abort()
         if (!cancelled && code) {
-          try { p.onAiProblem?.({ code, meetingId: p.meetingId, track: t, ...(model ? { model } : {}), ...(cli ? { cli } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
+          problemTracks.add(t)
+          try { p.onAiProblem?.({ code, meetingId: p.meetingId, track: t, ...(model ? { model } : {}), ...(cli ? { cli } : {}), ...(p.backend ? { backend: p.backend } : {}) }) } catch (err) { console.error('sending an AI problem failed', err) }
         }
         // its audio stays in the spool for the next launch or a Retry; only the map entry can go.
         // a batch that failed for good counts one send against each chunk's entry; aborts, quits and
@@ -226,7 +260,7 @@ export function createPipeline(p: {
         for (const s of sources) {
           const key = spoolKeys.get(s)
           spoolKeys.delete(s)
-          if (!cancelled && key !== undefined) { try { if (permanent) p.spool?.block?.(key); else p.spool?.bump?.(key, 1) } catch (err) { console.error('counting a transcription retry failed', err) } }
+          if (!cancelled && key !== undefined) { try { if (action === 'block') p.spool?.block?.(key, code, p.backend); else p.spool?.bump?.(key, 1, code, p.backend) } catch (err) { console.error('counting a transcription retry failed', err) } }
         }
         warn('transcribe-failed'); settle(t, chunkEnd)
       })
@@ -282,6 +316,14 @@ export function createPipeline(p: {
   }
   const cut = chunker(queue, p.emitPartial ? partial : undefined)
   let finishing: Promise<void> | undefined
+  const enqueueSpool = (c: Chunk, spoolKey?: string, signal?: AbortSignal) => {
+    if (closed) return
+    if (spoolKey !== undefined) spoolKeys.set(c, spoolKey)
+    if (signal) queuedSignals.set(c, signal)
+    waiting[c.track].push(c)
+    newest[c.track] = Math.max(newest[c.track], c.startMs + c.samples.length / 16)
+    pump(c.track)
+  }
 
   return {
     /** Reopening a transcript uses the same current words as its live updates. */
@@ -299,21 +341,37 @@ export function createPipeline(p: {
      * Audio already cut into chunks (recovering the spool): queued for transcription as-is — no chunker, no batch wait,
      * and past the queue cap, since the spool itself is the bound. finish() sends it; the batch packing still applies.
      */
-    enqueue(c: Chunk, spoolKey?: string) {
-      if (closed) return
-      if (spoolKey !== undefined) spoolKeys.set(c, spoolKey)
-      waiting[c.track].push(c)
-      newest[c.track] = Math.max(newest[c.track], c.startMs + c.samples.length / 16)
-      pump(c.track)
-    },
+    enqueue(c: Chunk, spoolKey?: string, options?: { signal?: AbortSignal }) { enqueueSpool(c, spoolKey, options?.signal) },
     /** the meeting is over: what is left is transcribed, held lines are checked and saved now */
     finish(): Promise<void> {
       finishing ??= (async () => {
         ending = true
         cut.flush()
-        // a track whose last chunk was already queued gets no new queue() call from the flush
-        pump('me'); pump('them')
-        await new Promise<void>((r) => { if (!queued('me') && !queued('them')) r(); else idle.push(r) })
+        const drain = async () => {
+          // a track whose last chunk was already queued gets no new queue() call from the flush
+          pump('me'); pump('them')
+          await new Promise<void>((r) => { if (!queued('me') && !queued('them')) r(); else idle.push(r) })
+        }
+        await drain()
+        if (spooling && p.postMeetingRecovery && p.spool?.entries && p.spool.load) {
+          // This one in-session pass keeps the same echo detector, and stops starting work after three minutes.
+          const controller = new AbortController()
+          postMeetingRecoveryController = controller
+          const deadline = Date.now() + (p.postMeetingRecoveryMs ?? 180_000)
+          const timer = setTimeout(() => controller.abort(), Math.max(0, deadline - Date.now()))
+          try {
+            const eligible = p.spool.entries().filter(entry => !entry.blocked && entry.attempts < SPOOL_MAX_ATTEMPTS)
+            for (const round of spoolRounds(eligible, SPOOL_ROUND_MS)) {
+              if (controller.signal.aborted) break
+              for (const entry of p.spool.load(round)) {
+                if (controller.signal.aborted) break
+                enqueueSpool({ track: entry.track, startMs: entry.startMs, samples: entry.samples, ...(entry.clearMs !== undefined ? { clearMs: entry.clearMs } : {}) }, entry.key, controller.signal)
+              }
+              await drain()
+              if (Date.now() >= deadline) controller.abort()
+            }
+          } finally { clearTimeout(timer); postMeetingRecoveryController = undefined }
+        }
         closed = true
         release(true)
         clearLive('me'); clearLive('them')

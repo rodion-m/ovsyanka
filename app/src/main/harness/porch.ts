@@ -2,7 +2,7 @@ import { access, readFile, stat, writeFile } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { clampTranscriptionEffort, type AiSettings } from '../../shared/ai'
-import { assertRunning, executablePath, HarnessError, HarnessProcesses, prependPath } from './process'
+import { assertRunning, executablePath, HarnessError, HarnessProcesses, prependPath, TranscriptOutputError } from './process'
 import { MIN_AUDIO_TIMEOUT_SECONDS, TRANSCRIPT_SCHEMA } from './transcribe'
 
 /** Internal (not public semver) adapter contract audited against CodeAlive-AI/pragmatic-orchestration. */
@@ -74,10 +74,10 @@ export async function readPorchCapabilities(o: {
     env: prependPath(porchEnvironment(o.directory), o.pathDirs), signal: o.signal,
     timeoutMs: 5000, stdoutLimit: 128 * 1024 })
   let capabilities: unknown
-  try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.', 'bad-response', 0, undefined, true, 'Porch') }
+  try { capabilities = JSON.parse(result.stdout) } catch { throw new HarnessError('Porch did not return valid media capabilities. Install the supported pragmatic-orchestration package.', 'cli-config', 0, undefined, true, 'Porch') }
   if (!capabilities || typeof capabilities !== 'object' || !('transcribe' in capabilities)
     || !Array.isArray(capabilities.transcribe) || !capabilities.transcribe.every(value => typeof value === 'string')) {
-    throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.', 'bad-response', 0, undefined, true, 'Porch')
+    throw new HarnessError('Porch did not return valid audio profile capabilities. Install the supported pragmatic-orchestration package.', 'cli-config', 0, undefined, true, 'Porch')
   }
   return capabilities.transcribe
 }
@@ -123,7 +123,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
           }
           throw error
         })
-      if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.', 'bad-response', 0, undefined, true, 'Porch')
+      if (!result.stdout.trim()) throw new HarnessError('Porch returned an empty final response.')
       return result.stdout
     },
     async transcribe(prompt: string, directory: string, signal?: AbortSignal): Promise<string> {
@@ -142,7 +142,7 @@ export function createPorch(settings: AiSettings, processes: HarnessProcesses) {
         env: prependPath({ ...porchEnvironment(directory), PORCH_BIN_AGY: agy, AGY_MODEL: settings.transcriptionModel,
           AGY_EFFORT: clampTranscriptionEffort(settings.transcriptionEffort), PORCH_OUTPUT_SCHEMA: schema }, await porchChildPathDirs(settings.agyPath)),
         signal, timeoutMs: Math.max(settings.timeoutSeconds, MIN_AUDIO_TIMEOUT_SECONDS) * 1000, stdoutLimit: 2 * 1024 * 1024 })
-      if (!result.stdout.trim()) throw new HarnessError('Porch transcription returned an empty response.', 'bad-response', 0, undefined, true, 'Porch')
+      if (!result.stdout.trim()) throw new TranscriptOutputError('Porch transcription returned an empty response.', 'bad-response', 0, 'Porch', '')
       return result.stdout
     },
   }

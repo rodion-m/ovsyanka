@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, s
 import { join } from 'node:path'
 import type { Track } from '../capture'
 import type { Spoken } from '../../shared/spoken'
+import type { AiBackend, AiProblemCode } from '../../shared/ai'
 import type { Chunk } from './chunker'
 
 /**
@@ -26,6 +27,9 @@ export type SpooledEntry = {
   clearMs?: number
   attempts: number
   blocked?: boolean
+  /** last provider error which left this audio pending; drives honest note copy after restart */
+  lastCode?: AiProblemCode
+  lastBackend?: AiBackend
   /** length of the kept audio, ms */
   durationMs: number
   /** the spoken language the meeting had when this was queued */
@@ -48,8 +52,8 @@ export type AudioSpool = ChunkSpool & {
   load(entries: readonly SpooledEntry[]): SpooledChunk[]
   list(): SpooledChunk[]
   /** counts one more failed send of this chunk (its sidecar is rewritten) */
-  bump(key: string, attempts?: number): void
-  block(key: string): void
+  bump(key: string, attempts?: number, code?: AiProblemCode, backend?: AiBackend): void
+  block(key: string, code?: AiProblemCode, backend?: AiBackend): void
 }
 
 export const spoolDirOf = (meetingDir: string): string => join(meetingDir, SPOOL_DIR)
@@ -101,7 +105,7 @@ export function createSpool(dir: string): AudioSpool {
 
   /** the sidecar's metadata, or undefined when it is not a readable entry; the sound file's size backs durationMs for older sidecars */
   const metaOf = (key: string): SpooledEntry | undefined => {
-    let meta: { track?: unknown; startMs?: unknown; clearMs?: unknown; attempts?: unknown; durationMs?: unknown; spoken?: unknown; blocked?: unknown }
+    let meta: { track?: unknown; startMs?: unknown; clearMs?: unknown; attempts?: unknown; durationMs?: unknown; spoken?: unknown; blocked?: unknown; lastCode?: unknown; lastBackend?: unknown }
     try { meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) } catch { return undefined }
     if ((meta.track !== 'me' && meta.track !== 'them') || typeof meta.startMs !== 'number' || !Number.isFinite(meta.startMs)) return undefined
     let size: number
@@ -113,6 +117,8 @@ export function createSpool(dir: string): AudioSpool {
       ...(typeof meta.clearMs === 'number' && Number.isFinite(meta.clearMs) ? { clearMs: meta.clearMs } : {}),
       attempts: typeof meta.attempts === 'number' && Number.isInteger(meta.attempts) && meta.attempts > 0 ? meta.attempts : 0,
       ...(meta.blocked === true ? { blocked: true } : {}),
+      ...(typeof meta.lastCode === 'string' && ['auth', 'credits', 'budget', 'rate-limit', 'model-gone', 'no-provider', 'unavailable', 'timeout', 'network', 'too-large', 'moderation', 'truncated', 'no-timestamps', 'bad-timestamps', 'bad-response', 'no-key', 'keychain', 'local-audio', 'cli-missing', 'cli-failed', 'cli-config'].includes(meta.lastCode) ? { lastCode: meta.lastCode as AiProblemCode } : {}),
+      ...(meta.lastBackend === 'agy' || meta.lastBackend === 'porch' || meta.lastBackend === 'openrouter' || meta.lastBackend === 'local' ? { lastBackend: meta.lastBackend } : {}),
       ...(meta.spoken === 'en' || meta.spoken === 'ru' || meta.spoken === 'multi' ? { spoken: meta.spoken } : {}),
     }
   }
@@ -177,18 +183,22 @@ export function createSpool(dir: string): AudioSpool {
       return this.entries().flatMap((e) => this.load([e]))
     },
 
-    bump(key: string, attempts = 1): void {
+    bump(key: string, attempts = 1, code?: AiProblemCode, backend?: AiBackend): void {
       try {
-        const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { attempts?: unknown }
+        const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { attempts?: unknown; lastCode?: unknown; lastBackend?: unknown }
         meta.attempts = (typeof meta.attempts === 'number' && Number.isInteger(meta.attempts) ? meta.attempts : 0) + attempts
+        if (code) meta.lastCode = code
+        if (backend) meta.lastBackend = backend
         writeAtomic(fileOf(key, 'json'), JSON.stringify(meta))
       } catch (e) { console.error('counting a transcription retry failed', e) }
     },
 
-    block(key: string): void {
+    block(key: string, code?: AiProblemCode, backend?: AiBackend): void {
       try {
-        const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { blocked?: unknown }
+        const meta = JSON.parse(readFileSync(fileOf(key, 'json'), 'utf8')) as { blocked?: unknown; lastCode?: unknown; lastBackend?: unknown }
         meta.blocked = true
+        if (code) meta.lastCode = code
+        if (backend) meta.lastBackend = backend
         writeAtomic(fileOf(key, 'json'), JSON.stringify(meta))
       } catch (e) { console.error('marking a transcription as blocked failed', e) }
     },

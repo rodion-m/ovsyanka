@@ -33,6 +33,7 @@ import { SummaryActions } from '../components/ViewPill'
 import { MicMenu } from '../components/MicMenu'
 import { SpokenMenu } from '../components/SpokenMenu'
 import { RecordingHint } from '../components/RecordingHint'
+import { transcriptEditedText, transcriptPendingText } from '../components/aiCopy'
 import { ThemSilence } from '../components/ThemSilence'
 import { themSilentText } from '../../../shared/themSilent'
 import { FolderChip, FolderPicker, type FolderSuggestion } from '../components/FolderPicker'
@@ -396,8 +397,13 @@ export function Note({ id, onTitleChange, at, folderSuggestion, onSource, onResu
             {transcriptPending && (
               <div data-testid="note-transcript-pending" role="status" className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed">
                 <TriangleAlert size={16} aria-hidden="true" className="shrink-0 text-muted" />
-                <p className="min-w-48 flex-1">{t('The transcript is incomplete: part of the recording is not transcribed yet.')}</p>
+                <p className="min-w-48 flex-1">{transcriptPendingText(m.transcriptIssue)}</p>
                 <button data-testid="note-transcript-retry" disabled={retryingTranscript} onClick={retryTranscript} className="workspace-button"><RotateCcw size={13} aria-hidden="true" />{t('Retry')}</button>
+              </div>
+            )}
+            {notes?.transcriptAdded && (
+              <div data-testid="note-transcript-added" role="status" className="mt-5 rounded-xl border border-line bg-card px-4 py-3 text-[13px] leading-relaxed text-muted">
+                {transcriptEditedText()}
               </div>
             )}
             {themSilentNote && (

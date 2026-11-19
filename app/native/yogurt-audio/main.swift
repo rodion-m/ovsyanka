@@ -746,6 +746,7 @@ final class Recorder {
   /// the "them" tap's health, all on the work queue: the exact-zero stretch, the self-heal's backoff, per-minute stats
   var zeroSince: Double?, zeroLogged = false, nonZeroSince: Double?
   var autoRebuilds = 0, nextAutoRebuildAt = 0.0
+  var lastSystemRebuildAt: TimeInterval?
   var lastOutputCheckAt = -1000.0, cachedOutputProcesses = 0
   var lastThemHeardAt: Double?
   var themCallbacks = 0, themPeakDb = -Double.infinity
@@ -914,8 +915,10 @@ final class Recorder {
     let item = DispatchWorkItem { [unowned self] in
       guard !self.finishing, self.sysAllowed else { return }
       self.sys.stop(); self.them.resync()
-      if self.sys.start() { send(["t": "system-ready"]) }
-      else { send(["t": "warn", "code": "no-system-audio"]) }
+      if self.sys.start() {
+        self.lastSystemRebuildAt = ProcessInfo.processInfo.systemUptime
+        send(["t": "system-ready"])
+      } else { send(["t": "warn", "code": "no-system-audio"]) }
       if announceDeviceChange { send(["t": "warn", "code": "device-changed"]) }
     }
     sysRebuild = item
@@ -991,7 +994,11 @@ final class Recorder {
     case "pause": paused = true; zeroSince = nil; nonZeroSince = nil; lastThemHeardAt = nil; nextAutoRebuildAt = 0; me.flushPending(); them.flushPending()
     case "resume": paused = false; zeroSince = nil; nonZeroSince = nil; lastThemHeardAt = nil; nextAutoRebuildAt = 0; me.resync(); them.resync()
     case "stop": finish()
-    case "rebuild-system": log("rebuilding the system tap: requested by the app"); rebuildSystem()
+    case "rebuild-system":
+      let now = ProcessInfo.processInfo.systemUptime
+      if let last = lastSystemRebuildAt, now - last < 5 {
+        log("ignoring the app's system rebuild request within 5 s of a successful tap rebuild")
+      } else { log("rebuilding the system tap: requested by the app"); rebuildSystem() }
     case _ where c.hasPrefix("mic "): chooseMic(String(c.dropFirst(4)).trimmingCharacters(in: .whitespaces))
     // local measurements only (YOGURT_AUDIO_TEST=1): the engine stopped as a configuration change stops it, then
     // brought back the way an output switch now does (restart) or used to (rebuild)

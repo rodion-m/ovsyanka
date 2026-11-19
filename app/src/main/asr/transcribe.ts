@@ -11,7 +11,7 @@ export type Line = Omit<Segment, 'id' | 'meetingId' | 'speaker'> & {
   words?: Array<{ text: string; startMs: number; endMs: number }>
 }
 /** partial: a quick greedy reading of a chunk still being spoken (shown, never saved); the default is the careful beam search */
-export type Transcribe = (c: Chunk, o?: { partial?: boolean }) => Promise<Line[]>
+export type Transcribe = (c: Chunk, o?: { partial?: boolean; signal?: AbortSignal }) => Promise<Line[]>
 
 /** 16 kHz mono 16-bit wav, built in memory */
 export function wavBytes(samples: Float32Array): Buffer {

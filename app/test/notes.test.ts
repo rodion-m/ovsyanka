@@ -16,7 +16,7 @@ afterEach(() => {
 })
 const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 
-function setup(o: { me?: string; named?: () => Promise<void>; namesWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
+function setup(o: { me?: string; named?: () => Promise<void>; namesWaitMs?: number; transcriptWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
   const d = mkdtempSync(join(tmpdir(), 'yogurt-notes-'))
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
@@ -37,7 +37,7 @@ function setup(o: { me?: string; named?: () => Promise<void>; namesWaitMs?: numb
   const queue = createQueue({ recording: o.recording ?? (() => false), smallMac: o.smallMac ?? false })
   const notes = hookNotes({
     store, queue, model: { llm: async () => { await o.load; return llm }, needsLoad: () => true }, showLoading: o.showLoading,
-    transcribed: () => transcript, named: o.named, namesWaitMs: o.namesWaitMs, language: () => 'spanish',
+    transcribed: () => transcript, named: o.named, namesWaitMs: o.namesWaitMs, transcriptWaitMs: o.transcriptWaitMs, language: () => 'spanish',
     onStop: (fn) => stops.push(fn), send: (v) => sent.push(v), changed: (id) => changed.push(id), peopleRewriteMs: 30, me: () => o.me ?? '',
   })
   return { store, m, notes, sent, prompts, changed, queue, stop: () => stops.forEach((f) => f(m)), transcribed }
@@ -64,11 +64,12 @@ describe('hookNotes', () => {
     release(); await s.notes.written(s.m.id)
   })
 
-  it('resume cancels obsolete generation without replacing the prior summary and next Finish writes combined notes', async () => {
+  it('resume preserves edited notes and appends new transcript lines without replacing them', async () => {
     let release!: () => void
     const load = new Promise<void>((resolve) => { release = resolve })
     const s = setup({ load })
     s.store.setNotes(s.m.id, { enhanced: 'Keep the previous summary.', edited: true })
+    s.store.setNotesTranscriptCount(s.m.id, 1)
     s.stop(); s.transcribed(); await wait()
     const held = s.notes.suspendForResume(s.m.id)
     release(); await held.settled
@@ -81,7 +82,8 @@ describe('hookNotes', () => {
     await s.notes.written(s.m.id)
     expect(s.prompts.at(-1)).toContain('More decisions from the resumed session.')
     expect(s.prompts.at(-1)).toContain('Zentrik')
-    expect(s.store.notes(s.m.id).enhanced).toContain('## Plan')
+    expect(s.store.notes(s.m.id).enhanced).toBe('Keep the previous summary.')
+    expect(s.notes.view(s.m.id).transcriptAdded).toBe(true)
     expect(s.store.notes(s.m.id).mine).toBe('- ship tuesday')
   })
 
@@ -163,27 +165,59 @@ describe('hookNotes', () => {
     await wait(60)
     expect(s.store.notes(s.m.id).enhanced).not.toBeNull()
   })
-  it('edits to the enhanced notes are saved and marked as edited; writing again clears that', async () => {
+  it('writes provisional notes after the transcript wait, then quietly refreshes them when late lines arrive', async () => {
+    const s = setup({ transcriptWaitMs: 30 })
+    s.stop()
+    await wait(10)
+    expect(s.prompts).toEqual([])
+    await wait(50)
+    await s.notes.written(s.m.id)
+    expect(s.prompts).toHaveLength(1)
+    expect(s.store.notesTranscriptCount(s.m.id)).toBe(1)
+    s.store.addSegments([{ meetingId: s.m.id, track: 'me', startMs: 10_000, endMs: 11_000, text: 'A recovered decision.', speaker: 'me' }])
+    await s.notes.applyTranscript(s.m.id)
+    expect(s.prompts).toHaveLength(2)
+    expect(s.prompts[1]).toContain('A recovered decision.')
+    expect(s.store.notesTranscriptCount(s.m.id)).toBe(2)
+  })
+  it('edits to the enhanced notes are never replaced by Write again or transcript recovery', async () => {
     const s = setup()
     s.stop(); s.transcribed(); await wait(20)
     s.notes.setEnhanced(s.m.id, '## Mine')
     expect(s.store.notes(s.m.id)).toMatchObject({ enhanced: '## Mine', edited: true })
     await s.notes.writeAgain(s.m.id)
-    expect(s.store.notes(s.m.id)).toMatchObject({ enhanced: '## Plan\n- <mine>We ship Tuesday</mine>\n## Next steps\n- **Ann:** Send it.', edited: false })
+    s.store.addSegments([{ meetingId: s.m.id, track: 'me', startMs: 10_000, endMs: 11_000, text: 'A recovered decision.', speaker: 'me' }])
+    await s.notes.applyTranscript(s.m.id)
+    expect(s.store.notes(s.m.id)).toMatchObject({ enhanced: '## Mine', edited: true })
+    expect(s.notes.view(s.m.id).transcriptAdded).toBe(true)
+    expect(s.prompts).toHaveLength(1)
   })
-  it('a failed rewrite retains the previous edited Enhanced text; a later successful retry replaces it', async () => {
+  it('a failed rewrite retains the previous unedited Enhanced text; a later successful retry replaces it', async () => {
     let failing = true
     const s = setup({ reply: () => { if (failing) throw new Error('model unavailable'); return '## Recovered\n- The new version.' } })
-    s.notes.setEnhanced(s.m.id, '## Kept\n- My exact edited decision.')
+    s.store.setNotes(s.m.id, { enhanced: '## Kept\n- The previous decision.', edited: false })
     s.transcribed()
     await s.notes.writeAgain(s.m.id)
-    expect(s.notes.view(s.m.id)).toMatchObject({ status: 'failed', enhanced: '## Kept\n- My exact edited decision.', edited: true })
-    expect(s.store.notes(s.m.id).enhanced).toBe('## Kept\n- My exact edited decision.')
+    expect(s.notes.view(s.m.id)).toMatchObject({ status: 'failed', enhanced: '## Kept\n- The previous decision.', edited: false })
+    expect(s.store.notes(s.m.id).enhanced).toBe('## Kept\n- The previous decision.')
     failing = false
     await s.notes.writeAgain(s.m.id)
     expect(s.notes.view(s.m.id)).toMatchObject({ status: 'done', edited: false })
     expect(s.notes.view(s.m.id).enhanced).toContain('## Recovered\n- The new version.')
-    expect(s.notes.view(s.m.id).enhanced).not.toContain('My exact edited decision.')
+    expect(s.notes.view(s.m.id).enhanced).not.toContain('The previous decision.')
+  })
+  it('quietly rewrites notes once when the transcript grows during the initial write', async () => {
+    let release!: () => void
+    let s!: ReturnType<typeof setup>
+    const load = new Promise<void>(resolve => { release = resolve })
+    s = setup({ load })
+    s.stop(); s.transcribed(); await wait(10)
+    s.store.addSegments([{ meetingId: s.m.id, track: 'me', startMs: 10_000, endMs: 11_000, text: 'Recovered while notes were starting.', speaker: 'me' }])
+    release()
+    await vi.waitFor(() => expect(s.prompts).toHaveLength(2))
+    await vi.waitFor(() => expect(s.store.notesTranscriptCount(s.m.id)).toBe(2))
+    expect(s.prompts[1]).toContain('Recovered while notes were starting.')
+    expect(s.store.notes(s.m.id).edited).toBe(false)
   })
   it('a first-generation failure has no previous Enhanced result and can retry', async () => {
     let failing = true

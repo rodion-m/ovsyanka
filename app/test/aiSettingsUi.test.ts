@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { aiSettings, type AiBackend, type AiPreferences } from '../src/shared/ai'
 import { setLanguage } from '../src/shared/i18n'
 import { AiSettingsFields, AiStatus } from '../src/renderer/src/components/AiSettings'
-import { aiProblemText, aiText, aiRussianCopy } from '../src/renderer/src/components/aiCopy'
+import { aiProblemText, aiText, aiRussianCopy, transcriptPendingText } from '../src/renderer/src/components/aiCopy'
 import { screenCopy } from '../src/renderer/src/permissionCopy'
 import { setupItems } from '../src/renderer/src/components/SetupStatus'
 import { spokenSupportText } from '../src/renderer/src/components/SpokenMenu'
@@ -178,7 +178,7 @@ describe('AI settings fields', () => {
 
   it('shows actionable remote transcription problems in Russian and English across locale fallback', () => {
     expect(aiProblemText('credits', undefined, 'en')).toContain('Add credits')
-    expect(aiProblemText('credits', undefined, 'en')).toContain('Yogurt will continue by itself')
+    expect(aiProblemText('credits', undefined, 'en')).toContain('press Retry if it remains incomplete')
     expect(aiProblemText('no-key', undefined, 'ru')).toContain('Добавьте API-ключ OpenRouter')
     expect(aiProblemText('model-gone', 'vendor/model', 'ru')).toContain('vendor/model')
     expect(aiProblemText('auth', undefined, 'de')).toContain('OpenRouter rejected the key')
@@ -196,26 +196,36 @@ it('keeps Russian AI copy free of unapproved Latin words', () => {
   expect([...new Set(words.filter(word => !allowed.has(word.toLocaleLowerCase())))]).toEqual([])
 })
 
-it('shows actionable CLI transcription problems in Russian and English', () => {
+it('chooses transcription help text by error class in Russian and English', () => {
   const retryEn = 'After the meeting, press Retry in the note.'
   const retryRu = 'После встречи нажмите Повторить в заметке.'
-  for (const code of ['cli-missing', 'cli-failed', 'cli-config', 'timeout', 'bad-response'] as const) {
+  for (const code of ['cli-missing', 'cli-config'] as const) {
     expect(aiProblemText(code, undefined, 'en', 'agy')).toContain(retryEn)
     expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain(retryRu)
     expect(aiProblemText(code, undefined, 'en', 'agy')).toContain('Your audio is kept.')
     expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain('Аудио сохранено.')
-    expect(aiProblemText(code, undefined, 'en', 'agy', true)).not.toContain(retryEn)
-    expect(aiProblemText(code, undefined, 'ru', 'agy', true)).not.toContain(retryRu)
-    expect(aiProblemText(code, undefined, 'en', 'agy', true)).toMatch(/Your audio is kept\.$/)
-    expect(aiProblemText(code, undefined, 'ru', 'agy', true)).toMatch(/Аудио сохранено\.$/)
   }
+  for (const code of ['cli-failed', 'timeout'] as const) {
+    expect(aiProblemText(code, undefined, 'en', 'agy')).toContain('automatically after the meeting')
+    expect(aiProblemText(code, undefined, 'en', 'agy')).not.toContain(retryEn)
+    expect(aiProblemText(code, undefined, 'ru', 'agy')).toContain('после встречи Yogurt попробует ещё раз автоматически')
+    expect(aiProblemText(code, undefined, 'ru', 'agy')).not.toContain(retryRu)
+  }
+  expect(aiProblemText('bad-response', undefined, 'en', 'agy')).toContain('Yogurt will try again after the meeting')
+  expect(aiProblemText('bad-response', undefined, 'en', 'agy')).not.toContain('press Retry')
   expect(aiProblemText('cli-missing', undefined, 'en', 'agy')).toContain('couldn’t start agy')
   expect(aiProblemText('cli-missing', undefined, 'ru', 'agy')).toContain('не смог запустить agy')
   expect(aiProblemText('cli-failed', undefined, 'ru', 'Porch')).toContain('Porch не смог обработать эту часть')
   expect(aiProblemText('timeout', undefined, 'en', 'agy')).toContain('increase the timeout')
-  expect(aiProblemText('bad-response', undefined, 'ru', 'Porch')).toContain('вернул ответ')
+  expect(aiProblemText('bad-response', undefined, 'ru', 'Porch')).toContain('Модель вернула расшифровку')
   expect(aiProblemText('cli-config', undefined, 'ru', 'Porch')).toContain('профиль Porch')
   expect(aiProblemText('cli-failed', undefined, 'ru', 'Porch')).not.toContain('«')
+  expect(aiProblemText('cli-failed', undefined, 'en', 'agy', 'agy')).toContain('Yogurt will try again automatically after the meeting')
+  expect(aiProblemText('cli-failed', undefined, 'en', 'agy', 'agy')).not.toContain('press Retry')
+  const openrouterOutput = aiProblemText('bad-response', undefined, 'en', undefined, 'openrouter')
+  expect(openrouterOutput.match(/Retry/g)).toHaveLength(1)
+  expect(transcriptPendingText({ code: 'bad-response', backend: 'agy', attempts: 2, blocked: false }, 'ru')).toContain('при следующем запуске')
+  expect(transcriptPendingText({ code: 'bad-response', backend: 'openrouter', attempts: 0, blocked: true }, 'ru')).toContain('Нажмите «Повторить»')
 })
 
 describe('provider-aware onboarding privacy', () => {

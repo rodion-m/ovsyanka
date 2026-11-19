@@ -221,7 +221,7 @@ function Preview({ view, open }: { view: WidgetView; open: boolean }) {
   return <div data-testid="widget-preview" className="widget-preview" role="region" aria-label={t('Live transcript')} inert={!open} aria-hidden={!open}>
     {note && <div className="widget-preview-warning" role="status" aria-live="polite">
       {note.code === 'them-silent' ? <ThemSilentNote note={note} meetingId={view.meetingId} /> : <>
-        <p data-testid="widget-note" data-tone={note.tone}>{note.aiProblem?.code ? aiProblemText(note.aiProblem.code, note.aiProblem.model, undefined, note.aiProblem.cli) : note.text}</p>
+        <p data-testid="widget-note" data-tone={note.tone}>{note.aiProblem?.code ? aiProblemText(note.aiProblem.code, note.aiProblem.model, undefined, note.aiProblem.cli, note.aiProblem.backend) : note.text}</p>
         {permission && <button className="widget-settings" onClick={() => { void window.yogurt.permissions.open(permission) }}>{t('Open Settings')}</button>}
       </>}
     </div>}

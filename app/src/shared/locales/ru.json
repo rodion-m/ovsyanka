@@ -709,7 +709,6 @@
   "Transcribes Russian in Cyrillic": "Записывает русскую речь кириллицей",
   "Choose English or Russian, or let Yogurt detect the language.": "Выберите английский или русский либо доверьте определение языка Yogurt.",
   "Yogurt detects the spoken language automatically.": "Yogurt автоматически определяет язык речи.",
-  "The transcript is incomplete: part of the recording is not transcribed yet.": "Расшифровка неполная: часть записи ещё не расшифрована.",
   "Retry": "Повторить",
   "Can't hear the other side": "Не слышно собеседника",
   "Restart sound capture": "Перезапустить захват звука",

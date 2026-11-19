@@ -1,5 +1,5 @@
 import { language } from '../../../shared/i18n'
-import type { AiCli, AiProblemCode } from '../../../shared/ai'
+import { AI_FAILURE_POLICY, AI_PROBLEM_CLASS, type AiBackend, type AiCli, type AiProblemCode } from '../../../shared/ai'
 
 /** Fork-specific UI is available in Russian and English; other interface locales use English here. */
 const en = {
@@ -115,26 +115,31 @@ const en = {
   pricePerHour: '≈ ${x} per hour of speech',
   pricePerMillion: '${in} per million input tokens, ${out} per million output tokens',
   addedOn: 'on OpenRouter since {when}',
-  problemNoKey: 'Add your OpenRouter API key in Settings. Yogurt will continue by itself; your audio is kept.',
-  problemAuth: 'OpenRouter rejected the key. Check or replace it in Settings. Yogurt will continue by itself; your audio is kept.',
-  problemCredits: 'Your OpenRouter credits have run out. Add credits. Yogurt will continue by itself; your audio is kept.',
-  problemBudget: "This key's spending limit is reached. Raise it in your OpenRouter account or wait for the reset. Yogurt will continue by itself.",
+  problemNoKey: 'Add your OpenRouter API key in Settings. Yogurt will retry the kept audio after the key is saved; press Retry if it remains incomplete.',
+  problemAuth: 'OpenRouter rejected the key. Replace it in Settings. Yogurt will retry the kept audio after the key is saved; press Retry if it remains incomplete.',
+  problemCredits: 'Your OpenRouter credits have run out. Add credits. Yogurt will retry the kept audio after the change; press Retry if it remains incomplete.',
+  problemBudget: "This key's spending limit is reached. Raise it in your OpenRouter account or wait for the reset, then press Retry in the note.",
   problemRateLimit: 'OpenRouter asked to wait. Yogurt will retry by itself.',
-  problemModelGone: 'The model "{model}" is unavailable. Choose another in Settings. Yogurt will continue by itself; your audio is kept.',
-  problemNoProvider: 'No provider of "{model}" meets the selected data policy. Change the model or data policy. Yogurt will continue by itself.',
+  problemModelGone: 'The model "{model}" is unavailable. Choose another in Settings, then Yogurt will retry the kept audio. Press Retry if it remains incomplete.',
+  problemNoProvider: 'No provider of "{model}" meets the selected data policy. Change the model or data policy, then Yogurt will retry the kept audio.',
   problemUnavailable: "Couldn't reach OpenRouter. Yogurt will retry by itself; your audio is kept.",
   problemNoTimestamps: "This model doesn't return phrase timings, so Yogurt can't use it. Press Retry after changing the model.",
   problemModeration: 'The provider declined to process this part. Press Retry to try this audio again.',
-  problemKeychain: "Couldn't use the saved key. Enter it again in Settings. Yogurt will continue by itself.",
+  problemKeychain: "Couldn't use the saved key. Enter it again in Settings; Yogurt will retry the kept audio after the key is saved.",
   problemBadResponse: "OpenRouter returned a response Yogurt couldn't read. Your audio is kept. Press Retry to try again.",
   problemTruncated: 'OpenRouter returned a truncated transcript. Your audio is kept. Press Retry after changing the model.',
   problemTooLarge: 'OpenRouter returned an oversized response. Your audio is kept. Press Retry to try again.',
   problemLocalAudio: "Yogurt couldn't read the saved audio for this part. The file was not deleted. Press Retry to try again.",
   problemCliMissing: 'Yogurt couldn’t start {cli}. Check that it is installed and the path in AI settings. Your audio is kept. After the meeting, press Retry in the note.',
-  problemCliFailed: '{cli} couldn’t process this part. Check in Terminal that you are signed in and have quota left. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliFailed: '{cli} couldn’t process this part. Check in Terminal that you are signed in and have quota left. Your audio is kept; Yogurt will try again automatically after the meeting.',
   problemCliConfig: 'The selected Porch profile cannot transcribe audio. Choose another profile in AI settings. Your audio is kept. After the meeting, press Retry in the note.',
-  problemCliTimeout: '{cli} did not respond in time. You can increase the timeout in advanced AI settings. Your audio is kept. After the meeting, press Retry in the note.',
+  problemCliTimeout: '{cli} did not respond in time. You can increase the timeout in advanced AI settings. Your audio is kept; Yogurt will try again automatically after the meeting.',
   problemCliBadResponse: '{cli} returned a response Yogurt couldn’t read. Your audio is kept. After the meeting, press Retry in the note.',
+  problemTranscriptOutput: 'The model returned a transcript Yogurt could not read. Your audio is kept; Yogurt will try again after the meeting.',
+  problemTranscriptRetry: 'The transcript is incomplete. Your audio is kept. Press Retry in the note to try again.',
+  problemTranscriptAuto: 'The transcript is incomplete. Your audio is kept; Yogurt will retry automatically when it opens again.',
+  problemTranscriptAction: 'The transcript is incomplete. Your audio is kept. Fix AI settings; Yogurt will retry when they take effect. If it remains incomplete, press Retry in the note.',
+  problemTranscriptEdited: 'The transcript was extended. Your edited notes were left unchanged.',
 } as const
 
 export const aiRussianCopy: Record<keyof typeof en, string> = {
@@ -250,26 +255,31 @@ export const aiRussianCopy: Record<keyof typeof en, string> = {
   pricePerHour: '≈ ${x} за час речи',
   pricePerMillion: '${in} за млн входных токенов, ${out} за млн выходных',
   addedOn: 'на OpenRouter с {when}',
-  problemNoKey: 'Добавьте API-ключ OpenRouter в настройках. Yogurt продолжит расшифровку автоматически; аудио сохранено.',
-  problemAuth: 'OpenRouter не принял ключ. Проверьте или замените его в настройках. Yogurt продолжит автоматически; аудио сохранено.',
-  problemCredits: 'На счёте OpenRouter закончились кредиты. Пополните счёт. Yogurt продолжит автоматически; аудио сохранено.',
-  problemBudget: 'Достигнут лимит расходов этого ключа. Увеличьте лимит или дождитесь сброса. Yogurt продолжит автоматически.',
+  problemNoKey: 'Добавьте API-ключ OpenRouter в настройках. После сохранения ключа Yogurt повторит расшифровку; если она останется неполной, нажмите «Повторить».',
+  problemAuth: 'OpenRouter не принял ключ. Замените его в настройках. После сохранения Yogurt повторит расшифровку; если она останется неполной, нажмите «Повторить».',
+  problemCredits: 'На счёте OpenRouter закончились кредиты. Пополните счёт. После этого Yogurt повторит расшифровку; если она останется неполной, нажмите «Повторить».',
+  problemBudget: 'Достигнут лимит расходов этого ключа. Увеличьте лимит или дождитесь его сброса, затем нажмите «Повторить» в заметке.',
   problemRateLimit: 'OpenRouter просит подождать. Yogurt повторит запрос сам.',
-  problemModelGone: 'Модель «{model}» недоступна. Выберите другую в настройках. Yogurt продолжит автоматически; аудио сохранено.',
-  problemNoProvider: 'Для модели «{model}» нет провайдера с выбранным правилом данных. Измените модель или правило. Yogurt продолжит автоматически.',
+  problemModelGone: 'Модель «{model}» недоступна. Выберите другую в настройках, и Yogurt повторит расшифровку. Если она останется неполной, нажмите «Повторить».',
+  problemNoProvider: 'Для модели «{model}» нет провайдера с выбранным правилом данных. Измените модель или правило, и Yogurt повторит расшифровку.',
   problemUnavailable: 'Не удалось связаться с OpenRouter. Yogurt повторит попытку самостоятельно; аудио сохранено.',
   problemNoTimestamps: 'Эта модель не возвращает время фраз. После смены модели нажмите «Повторить».',
   problemModeration: 'Провайдер отказался обрабатывать этот фрагмент. Нажмите «Повторить», чтобы отправить его снова.',
-  problemKeychain: 'Не удалось использовать сохранённый ключ. Введите его заново в настройках. Yogurt продолжит автоматически.',
+  problemKeychain: 'Не удалось использовать сохранённый ключ. Введите его заново в настройках; после сохранения Yogurt повторит расшифровку.',
   problemBadResponse: 'OpenRouter вернул ответ, который Yogurt не смог прочитать. Аудио сохранено. Нажмите «Повторить».',
   problemTruncated: 'OpenRouter вернул неполную расшифровку. Аудио сохранено. После смены модели нажмите «Повторить».',
   problemTooLarge: 'OpenRouter вернул слишком большой ответ. Аудио сохранено. Нажмите «Повторить».',
   problemLocalAudio: 'Yogurt не смог прочитать сохранённое аудио этой части. Файл не удалён. Нажмите кнопку Повторить.',
   problemCliMissing: 'Yogurt не смог запустить {cli}. Проверьте, что он установлен и указан путь в настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
-  problemCliFailed: '{cli} не смог обработать эту часть. Проверьте в Терминале, что вы вошли в аккаунт и квота не исчерпана. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliFailed: '{cli} не смог обработать эту часть. Проверьте в Терминале, что вы вошли в аккаунт и квота не исчерпана. Аудио сохранено; после встречи Yogurt попробует ещё раз автоматически.',
   problemCliConfig: 'Выбранный профиль Porch не подходит для расшифровки аудио. Выберите другой в настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
-  problemCliTimeout: '{cli} не ответил вовремя. Можно увеличить тайм-аут в дополнительных настройках ИИ. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemCliTimeout: '{cli} не ответил вовремя. Можно увеличить тайм-аут в дополнительных настройках ИИ. Аудио сохранено; после встречи Yogurt попробует ещё раз автоматически.',
   problemCliBadResponse: '{cli} вернул ответ, который Yogurt не смог прочитать. Аудио сохранено. После встречи нажмите Повторить в заметке.',
+  problemTranscriptOutput: 'Модель вернула расшифровку, которую Yogurt не смог прочитать. Аудио сохранено; после встречи Yogurt попробует ещё раз.',
+  problemTranscriptRetry: 'Расшифровка неполная. Аудио сохранено. Нажмите «Повторить» в заметке, чтобы попробовать ещё раз.',
+  problemTranscriptAuto: 'Расшифровка неполная. Аудио сохранено; Yogurt автоматически повторит попытку при следующем запуске.',
+  problemTranscriptAction: 'Расшифровка неполная. Аудио сохранено. Исправьте настройки ИИ; Yogurt повторит попытку после их применения. Если расшифровка останется неполной, нажмите «Повторить» в заметке.',
+  problemTranscriptEdited: 'Расшифровка дополнена. Ваши изменения в заметках сохранены.',
 }
 
 export type AiCopyKey = keyof typeof en
@@ -282,15 +292,20 @@ const problemTextKeys: Record<AiProblemCode, AiCopyKey> = {
   'no-key': 'problemNoKey', auth: 'problemAuth', credits: 'problemCredits', budget: 'problemBudget',
   'rate-limit': 'problemRateLimit', 'model-gone': 'problemModelGone', 'no-provider': 'problemNoProvider',
   unavailable: 'problemUnavailable', timeout: 'problemUnavailable', network: 'problemUnavailable',
-  'no-timestamps': 'problemNoTimestamps', moderation: 'problemModeration', keychain: 'problemKeychain',
+  'no-timestamps': 'problemNoTimestamps', 'bad-timestamps': 'problemBadResponse', moderation: 'problemModeration', keychain: 'problemKeychain',
   'bad-response': 'problemBadResponse', truncated: 'problemTruncated', 'too-large': 'problemTooLarge',
   'local-audio': 'problemLocalAudio', 'cli-missing': 'problemCliMissing', 'cli-failed': 'problemCliFailed', 'cli-config': 'problemCliConfig',
 }
 
 /** The short, actionable transcription warning shown under the live note. */
-export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli, afterMeeting = false): string {
+export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli, backend?: AiBackend): string {
   let text: string
-  if (code === 'cli-missing') text = aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
+  if (AI_PROBLEM_CLASS[code] === 'output') {
+    const selectedBackend = backend ?? (cli === 'agy' ? 'agy' : cli === 'Porch' ? 'porch' : 'openrouter')
+    const action = AI_FAILURE_POLICY.output.liveCopy[selectedBackend]
+    text = aiText(action === 'retry' ? 'problemTranscriptRetry' : 'problemTranscriptOutput', locale)
+  }
+  else if (code === 'cli-missing') text = aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
   else if (code === 'cli-failed') text = aiTextF('problemCliFailed', { cli: cli || 'agy' }, locale)
   else if (code === 'cli-config') text = aiText('problemCliConfig', locale)
   else if (code === 'timeout' && cli) text = aiTextF('problemCliTimeout', { cli }, locale)
@@ -301,7 +316,14 @@ export function aiProblemText(code: AiProblemCode, model?: string, locale = lang
       ? aiTextF(key, { model: model || '…' }, locale)
       : aiText(key, locale)
   }
-  if (!afterMeeting) return text
-  const retrySentence = locale === 'ru' ? ' После встречи нажмите Повторить в заметке.' : ' After the meeting, press Retry in the note.'
-  return text.endsWith(retrySentence) ? text.slice(0, -retrySentence.length) : text
+  return text
 }
+
+/** The note banner follows persisted spool disposition, not whichever problem event arrived last. */
+export function transcriptPendingText(issue?: { blocked: boolean; attempts: number; backend?: AiBackend; code?: AiProblemCode }, locale = language()): string {
+  const classCopy = issue?.code ? AI_FAILURE_POLICY[AI_PROBLEM_CLASS[issue.code]].pendingCopy[issue.backend ?? 'agy'] : 'automatic'
+  if (classCopy === 'action') return aiText('problemTranscriptAction', locale)
+  return issue && (issue.blocked || issue.attempts >= 3 || classCopy === 'retry') ? aiText('problemTranscriptRetry', locale) : aiText('problemTranscriptAuto', locale)
+}
+
+export function transcriptEditedText(locale = language()): string { return aiText('problemTranscriptEdited', locale) }

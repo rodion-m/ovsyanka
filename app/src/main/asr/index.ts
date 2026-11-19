@@ -10,7 +10,7 @@ import { createWhisperServer, recoverer, vadModelPath, whisperServerPath, type W
 import { createTranscriber, type Line, type Transcribe } from './transcribe'
 import { meetingWords, respell, whisperPrompt } from '../vocab'
 import type { TranscriptPartial } from '../../shared/types'
-import type { AiProblemUpdate } from '../../shared/ai'
+import type { AiBackend, AiProblemCode, AiProblemUpdate } from '../../shared/ai'
 import type { Chunk } from './chunker'
 import { createSpool, spoolDirOf, spoolRounds, SPOOL_MAX_ATTEMPTS, type AudioSpool, type SpooledChunk } from './spool'
 
@@ -35,7 +35,9 @@ type Session = { complete?: () => boolean; pipeline: Pipeline | null; priorLines
   /** omitted in older/local callers: no explicit language, so detected batches choose the meeting language */
   spokenExplicit?: boolean
   /** the session left the map while audio is still spooled: the note's incomplete-transcript state may have flipped */
-  drained?: () => void }
+  drained?: () => void
+  /** a live meeting's drain added transcript lines after a provisional note could have been written */
+  transcriptRecovered?: (id: string) => void }
 
 /**
  * The saved transcript comes from whisper; Apple's words are the live view. Languages listed here are the ones where Apple's
@@ -174,12 +176,16 @@ export function hookTranscription(p: {
   warn: (code: TranscribeWarn) => void
   /** remote transcription problem; success clears the most recent problem */
   aiProblem?: (problem: AiProblemUpdate) => void
+  /** a live meeting's drain or post-meeting pass added lines after notes may have been written provisionally */
+  transcriptRecovered?: (meetingId: string) => void
   /** where whisper-server keeps its pid, so a later start can clean up after a crash */
   pidFile?: string
   /** for tests; heard(language, chars, locked) says what language a chunk was in */
   transcriber?: ((c: Chunk, heard?: (language: string, chars: number, locked?: boolean) => void, o?: { partial?: boolean }) => Promise<Line[]> | Line[]) | undefined
   /** A provider instance per meeting, with that meeting's vocabulary and language callbacks. */
-  transcriberFactory?: (o: { prompt: () => string; language: () => string | undefined; onLanguage: (track: Chunk['track'], language: string, chars: number, locked: boolean) => void }) => Transcribe
+  transcriberFactory?: (o: { prompt: () => string; language: () => string | undefined; onLanguage: (track: Chunk['track'], language: string, chars: number, locked: boolean) => void; rejectedDir?: string }) => Transcribe
+  /** active backend for shared spool failure policy */
+  backend?: AiBackend
   /** Remote providers receive finished speech only, never the high-frequency local previews. */
   quickReads?: boolean
   batchMs?: number
@@ -224,6 +230,11 @@ export function hookTranscription(p: {
     const spool = spoolFor(id)
     return !!spool && !sessions.has(id) && spool.hasEntries()
   }
+  issueImpl = (id) => {
+    const entries = spoolFor(id)?.entries().filter(entry => entry.lastCode || entry.blocked || entry.attempts > 0) ?? []
+    const entry = entries.find(item => item.blocked || item.attempts >= SPOOL_MAX_ATTEMPTS) ?? entries[0]
+    return entry ? { track: entry.track, ...(entry.lastCode ? { code: entry.lastCode } : {}), ...(entry.lastBackend ? { backend: entry.lastBackend } : {}), attempts: entry.attempts, blocked: !!entry.blocked } : undefined
+  }
 
   const open = (id: string, o?: { recovery?: boolean }): Session => {
     const have = sessions.get(id)
@@ -247,7 +258,7 @@ export function hookTranscription(p: {
     const promptOf = () => { const m = p.store.meeting?.(id); return m ? whisperPrompt(meetingWords(m)) : '' }
     let frozenSpoken: Spoken | undefined
     const language = () => whisperLanguage(s.forceSpoken ?? frozenSpoken ?? spokenNow())
-    if (p.transcriberFactory) transcribe = p.transcriberFactory({ prompt: promptOf, language, onLanguage: (_track, lang, chars, locked) => hear(lang, chars, locked) })
+    if (p.transcriberFactory) transcribe = p.transcriberFactory({ prompt: promptOf, language, onLanguage: (_track, lang, chars, locked) => hear(lang, chars, locked), ...(spool ? { rejectedDir: spoolDirOf(p.meetingDir!(id)) } : {}) })
     else if (p.transcriber) { const f = p.transcriber; transcribe = async (c, o) => f(c, (l, n, locked) => hear(l, n, locked), o) }
     // fake mode's stand-in is loaded only in fake mode, so it stays out of what real runs load
     else if (isFake()) transcribe = async (c, o) => (await import('./fake')).fakeTranscribe(c, o, promptOf(), language())
@@ -273,13 +284,15 @@ export function hookTranscription(p: {
       complete: () => spool ? !spool.hasEntries() : !!transcribe && !pendingBefore && !saveFailed && !warned.has('transcribe-failed') && !warned.has('falling-behind'),
       store: p.store, refresh: p.refresh, speech: speechLocaleFor(id), priorLines: new Set(p.store.segments?.(id).map((s) => s.id) ?? []),
       langs,
+      transcriptRecovered: p.transcriptRecovered,
       drained: spool ? () => { if (spool.hasEntries()) p.changed?.(id) } : undefined,
       pipeline: transcribe ? createPipeline({ meetingId: id, transcribe, save: (segs) => {
         try { p.store.addSegments(segs) } catch (e) { saveFailed = true; throw e }
         // a renderer that went away must not turn a committed save into a failed one (its audio would stay spooled)
         if (segs.some(s => s.hidden)) { try { p.refresh?.(id) } catch (e) { console.error('refreshing the transcript failed', e) } }
       }, emit: p.send, emitPartial: p.sendPartial, holdMs: p.holdMs, extraWaitMs: p.extraWaitMs, onWarn: warnOnce, onAiProblem: p.aiProblem,
-        batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, spoken: () => s.forceSpoken ?? frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
+        batchMs: p.batchMs, maxQueuedMs: p.maxQueuedMs, spool, backend: p.backend, postMeetingRecovery: !!spool && !o?.recovery,
+        spoken: () => s.forceSpoken ?? frozenSpoken ?? spokenNow(), echoForTests: p.echoForTests,
         // recovery drains everything at finish; the first-batch wait does not apply
         firstBatchMs: o?.recovery ? undefined : p.firstBatchMs,
         // recovered lines get no call-participant names: the call watch is gone by then, and a name guessed late is worse than Them
@@ -354,7 +367,13 @@ export function hookTranscription(p: {
         if (sessions.get(id)) return
       }
       // every entry can turn out corrupt while loading: with nothing left, the pending mark clears the way a drained spool's does
-      if (!spool.hasEntries() && m.transcriptionPending) p.store.updateMeeting(id, { transcriptionPending: false })
+      if (!spool.hasEntries()) {
+        if (m.transcriptionPending) p.store.updateMeeting(id, { transcriptionPending: false })
+        // A recovery pipeline has no live warning set to clear, but its saved audio may have raised one earlier.
+        for (const track of ['me', 'them'] as const) {
+          try { p.aiProblem?.({ code: null, meetingId: id, track }) } catch (e) { console.error('clearing a recovered AI problem failed', id, e) }
+        }
+      }
     } catch (e) { console.error('recovering a pending transcript failed', id, e) }
   }
   return () => {
@@ -387,8 +406,13 @@ function sweepEcho(id: string, s: Session) {
 function finishSession(id: string, s: Session, audioDone: () => Promise<void> = () => Promise.resolve(), store?: SessionStore): Promise<void> {
   s.freezeLanguage?.()
   s.store ??= store
+  const transcriptBefore = s.store?.segments?.(id).length ?? 0
   s.done ??= audioDone().then(() => s.pipeline?.finish()).then(() => {
     sweepEcho(id, s)
+    const transcriptAfter = s.store?.segments?.(id).length ?? transcriptBefore
+    if (s.recovery !== true && transcriptAfter > transcriptBefore) {
+      try { s.transcriptRecovered?.(id) } catch (e) { console.error('following up a recovered transcript failed', id, e) }
+    }
     if (s.complete?.()) s.store?.updateMeeting(id, { transcriptionPending: false })
   }).catch((e) => console.error('finishing the transcript failed', e)).finally(() => {
     // a session that was replaced meanwhile (open() never hands out a finished one) owns nothing left to clean up
@@ -431,8 +455,13 @@ export function recoverTranscription(id: string, o?: { retry?: boolean }): Promi
 export const pendingRecovery = (id: string): Promise<void> => recovering.get(id) ?? Promise.resolve()
 
 let incompleteImpl: ((id: string) => boolean) | undefined
+let issueImpl: ((id: string) => { track: Chunk['track']; code?: AiProblemCode; backend?: AiBackend; attempts: number; blocked: boolean } | undefined) | undefined
 /** remote path only: spooled audio is waiting for this meeting and nothing is transcribing it right now */
 export const transcriptIncomplete = (id: string): boolean => incompleteImpl?.(id) ?? false
+/** Persisted retry disposition for the note banner; the most relevant pending entry wins. */
+export function transcriptIssue(id: string): { track: Chunk['track']; code?: AiProblemCode; backend?: AiBackend; attempts: number; blocked: boolean } | undefined {
+  return issueImpl?.(id)
+}
 
 export const transcriptPartials = (): TranscriptPartial[] => [...sessions.values()].flatMap((s) => s.pipeline?.partials() ?? [])
 

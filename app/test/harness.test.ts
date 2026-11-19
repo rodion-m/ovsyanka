@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, utimes, writeFile } from 'node:fs/promises'
 import { delimiter, dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AI_SETTINGS, type AiSettings } from '../src/shared/ai'
@@ -9,7 +9,8 @@ import { countTokens } from '../src/main/harness/model'
 import { createPorch, exactProfile, porchInstallation } from '../src/main/harness/porch'
 import { executablePath, HarnessError, HarnessProcesses, inStage } from '../src/main/harness/process'
 import { childEnvironment } from '../src/main/childEnv'
-import { createHarnessTranscriber, parseTranscript, TRANSCRIPT_SCHEMA } from '../src/main/harness/transcribe'
+import { createHarnessTranscriber, parseTranscript, parseTranscriptDetailed, TRANSCRIPT_SCHEMA, type AudioRequest } from '../src/main/harness/transcribe'
+import { keepRejectedResponse, REJECTED_RESPONSE_MAX_AGE_MS, REJECTED_RESPONSE_MAX_BYTES, REJECTED_RESPONSE_MAX_FILES } from '../src/main/harness/rejectedResponses'
 import { takeBatch } from '../src/main/asr/batch'
 import { chunker, type Chunk } from '../src/main/asr/chunker'
 import { wavBytes } from '../src/main/asr/transcribe'
@@ -72,6 +73,7 @@ process.stdin.on('end', () => {
   return { root, log, tempDir, settings, harness, calls: async () => (await readFile(log, 'utf8')).trim().split('\n').map(line => JSON.parse(line)) }
 }
 const callbacks = () => ({ prompt: () => '', language: () => undefined as string | undefined, onLanguage: vi.fn() })
+const RATE = 16_000
 const chunk = () => ({ track: 'them' as const, startMs: 12_000, samples: new Float32Array(32_000) })
 const isWindows = process.platform === 'win32'
 
@@ -106,9 +108,9 @@ describe('agy final-answer contract', () => {
     }
   })
 
-  it('classifies malformed agy output as a permanent bad response', () => {
+  it('classifies malformed agy output as a retryable model output error', () => {
     try { agyAnswer('not an event') ; throw new Error('expected failure') }
-    catch (error) { expect(error).toMatchObject({ code: 'bad-response', permanent: true, cli: 'agy' }) }
+    catch (error) { expect(error).toMatchObject({ code: 'bad-response', cli: 'agy' }); expect(error).not.toHaveProperty('permanent') }
   })
 })
 
@@ -117,20 +119,60 @@ describe('transcript validation', () => {
     expect(parseTranscript('{"segments":[]}', 2)).toEqual({ segments: [] })
     expect(parseTranscript('{"segments":[{"start":0,"end":2.0005,"text":" Да. "}]}', 2).segments).toEqual([{ start: 0, end: 2, text: 'Да.' }])
   })
-  it('clamps a small timestamp overshoot and sorts segments by start', () => {
-    expect(parseTranscript(JSON.stringify({ segments: [
-      { start: 30, end: 45, text: 'later' }, { start: 5, end: 61.5, text: 'early' },
-    ] }), 60).segments).toEqual([
-      { start: 5, end: 60, text: 'early' }, { start: 30, end: 45, text: 'later' },
-    ])
+  it('clamps a small timestamp overshoot and sorts segments when disorder stays below the global error threshold', () => {
+    const segments = Array.from({ length: 10 }, (_, i) => ({ start: i * 5, end: i * 5 + 1, text: `phrase ${i}` }))
+    segments[0] = { start: 30, end: 45, text: 'later' }
+    segments[1] = { start: 5, end: 61.5, text: 'early' }
+    const result = parseTranscript(JSON.stringify({ segments }), 60).segments
+    expect(result[0]).toEqual({ start: 5, end: 60, text: 'early' })
+    expect(result[1]).toEqual({ start: 10, end: 11, text: 'phrase 2' })
+    expect(result.find(segment => segment.text === 'later')).toEqual({ start: 30, end: 45, text: 'later' })
     expect(() => parseTranscript(JSON.stringify({ segments: [{ start: 0, end: 70, text: 'too far' }] }), 60)).toThrow('timestamps outside')
+  })
+  it('rejects mostly invalid output instead of masking a batch-wide timeline error', () => {
+    const segments = Array.from({ length: 26 }, (_, i) => ({ start: i, end: i + 0.5, text: `анонимная реплика ${i}` }))
+    for (const i of [3, 10, 17]) segments[i] = { start: 80 + i, end: 81 + i, text: `ошибка ${i}` }
+    expect(() => parseTranscriptDetailed(JSON.stringify({ segments }), 61.8, { salvage: true })).toThrow(/timestamps outside/)
+  })
+  it('retries an empty answer when clear speech is substantial, but accepts a genuinely quiet batch', async () => {
+    const tempDir = await directory(), calls: AudioRequest[] = []
+    const transcriber = createHarnessTranscriber({ settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async request => {
+        calls.push(request)
+        return calls.length === 1 ? '{"segments":[]}' : JSON.stringify({ segments: [{ start: 0, end: 1, text: 'Длительная реплика.' }] })
+      } }, callbacks())
+    const clear = { track: 'me' as const, startMs: 0, samples: new Float32Array(16_000 * 30), clearMs: 20_000 }
+    expect(await transcriber(clear)).toHaveLength(1)
+    expect(calls).toHaveLength(2)
+
+    calls.length = 0
+    const quietTranscriber = createHarnessTranscriber({ settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async request => { calls.push(request); return '{"segments":[]}' } }, callbacks())
+    expect(await quietTranscriber({ ...clear, clearMs: 19_999 })).toEqual([])
+    expect(calls).toHaveLength(1)
+  })
+  it('salvages one impossible segment and a slight overshoot only after a fresh model response', async () => {
+    const tempDir = await directory(), calls: AudioRequest[] = []
+    const valid = Array.from({ length: 26 }, (_, i) => ({ start: i * 2, end: i * 2 + 0.5, text: `анонимная реплика ${i}` }))
+    valid[0] = { ...valid[0]!, end: 62.8 }
+    valid[12] = { ...valid[12]!, start: 80, end: 81 }
+    const transcriber = createHarnessTranscriber({ settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async request => {
+        calls.push(request)
+        return calls.length === 1 ? 'неполный ответ без объекта' : JSON.stringify({ language: 'ru', segments: valid })
+      } }, callbacks())
+    const result = await transcriber({ track: 'me', startMs: 0, samples: new Float32Array(Math.round(61.8 * RATE)), clearMs: 2700 })
+    expect(calls).toHaveLength(2)
+    expect(result).toHaveLength(25)
+    expect(result[0]?.endMs).toBe(61_800)
+    expect(result.some(line => line.startMs >= 80_000)).toBe(false)
   })
   it('accepts a BOM, prose and a fenced JSON object', () => {
     const response = '\ufeffHere is the transcript:\n```json\n{"language":"ru","segments":[{"start":0,"end":1,"text":"Привет."}]}\n```\nDone.'
     expect(parseTranscript(response, 2)).toEqual({ language: 'ru', segments: [{ start: 0, end: 1, text: 'Привет.' }] })
   })
   it.each([
-    '{"segments":[{"start":-0.1,"end":1,"text":"secret"}]}',
+    '{"segments":[{"start":-2.1,"end":1,"text":"secret"}]}',
     '{"segments":[{"start":1,"end":0.5,"text":"secret"}]}',
     '{"segments":[{"start":0,"end":5,"text":"secret"}]}',
     '{"segments":[{"start":0,"end":70,"text":"secret"}]}',
@@ -162,6 +204,29 @@ describe('transcript validation', () => {
       { track: 'them', startMs: 14_000, endMs: 14_500, text: 'пакет латунный горизонт закрывает' },
       { track: 'them', startMs: 14_500, endMs: 15_000, text: 'сохранил C:\\проект\\файл' },
     ])
+  })
+})
+
+describe('private rejected response evidence', () => {
+  it('keeps raw output only in a capped, private, expiring meeting spool folder', async () => {
+    const tempDir = await directory(), now = Date.now()
+    const name = `${'a'.repeat(32)}-attempt-1`
+    const path = await keepRejectedResponse(tempDir, name, 'anonymized rejected response', now)
+    expect(path).toBeTruthy()
+    expect(await readFile(path!, 'utf8')).toBe('anonymized rejected response')
+    expect((await stat(join(tempDir, 'rejected'))).mode & 0o777).toBe(0o700)
+    expect((await stat(path!)).mode & 0o777).toBe(0o600)
+    expect(await keepRejectedResponse(tempDir, `${'b'.repeat(32)}-attempt-1`, 'x'.repeat(REJECTED_RESPONSE_MAX_BYTES + 1), now)).toBeUndefined()
+
+    for (let i = 0; i < REJECTED_RESPONSE_MAX_FILES; i++) {
+      await keepRejectedResponse(tempDir, `${i.toString(16).padStart(32, '0')}-attempt-1`, `response ${i}`, now)
+    }
+    await keepRejectedResponse(tempDir, `${'c'.repeat(32)}-attempt-2`, 'new response', now)
+    expect((await readdir(join(tempDir, 'rejected'))).filter(file => file.endsWith('.txt'))).toHaveLength(REJECTED_RESPONSE_MAX_FILES)
+    const old = new Date(now - REJECTED_RESPONSE_MAX_AGE_MS - 1000)
+    for (const file of await readdir(join(tempDir, 'rejected'))) await utimes(join(tempDir, 'rejected', file), old, old)
+    await keepRejectedResponse(tempDir, `${'d'.repeat(32)}-attempt-1`, 'fresh response', now + REJECTED_RESPONSE_MAX_AGE_MS + 1)
+    expect((await readdir(join(tempDir, 'rejected'))).filter(file => file.endsWith('.txt'))).toEqual([`${'d'.repeat(32)}-attempt-1.txt`])
   })
 })
 
@@ -862,15 +927,22 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
   })
   it.each([
     '{"segments":[],"error":"PRIVATE AUDIO ERROR"}',
-    '{"segments":[{"start":-0.1,"end":1,"text":"PRIVATE AUDIO ERROR"}]}',
     '{"segments":[{"start":1,"end":0.5,"text":"PRIVATE AUDIO ERROR"}]}',
     '{"segments":[{"start":0,"end":4.088,"text":"PRIVATE AUDIO ERROR"}]}',
     '{"segments":[{"start":0,"end":1e999,"text":"PRIVATE AUDIO ERROR"}]}',
-  ])('rejects raw provider errors and malformed timestamps without public Porch clamping (%#)', async response => {
+  ])('rejects repeated raw provider errors and clearly malformed timestamps without leaking provider text (%#)', async response => {
     const fixture = await porchFixture({ response }), cb = callbacks()
     const result = await fixture.harness.transcriber(cb)(chunk()).catch(error => error)
     expect(result).toBeInstanceOf(Error); expect(String(result)).not.toContain('PRIVATE AUDIO ERROR')
     expect(cb.onLanguage).not.toHaveBeenCalled(); expect(await readdir(fixture.tempDir)).toEqual([])
+  })
+  it('asks Porch for a fresh response before clamping a bounded timestamp overshoot', async () => {
+    const fixture = await porchFixture({ response: '{"segments":[{"start":-0.1,"end":1,"text":"anonymous phrase"}]}' })
+    const lines = await fixture.harness.transcriber(callbacks())(chunk())
+    expect(lines).toEqual([{ track: 'them', startMs: 12_000, endMs: 13_000, text: 'anonymous phrase' }])
+    const calls = await fixture.porchCalls()
+    expect(calls.filter(call => call.args[0] === '--mode')).toHaveLength(2)
+    expect(calls.filter(call => call.args[0] === 'media' && call.args[1] === 'capabilities')).toHaveLength(2)
   })
   it('rejects an audio-looking profile absent from machine-readable audio capabilities, and retries after configuration is repaired', async () => {
     const fixture = await porchFixture({ capabilities: { transcribe: ['another-profile'], 'image.describe': ['agy-gemini-3.8-flash'] } })

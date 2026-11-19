@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { matchMedia: () => ({ matches: true }), yogurt: {
     meetings: { get: async () => meeting, onChange: (cb: typeof meetingChanged) => { meetingChanged = cb; return vi.fn() }, retryTranscription },
     notes: { get: async () => notes, onChange: (cb: typeof notesChanged) => { notesChanged = cb; return vi.fn() } },
-    ai: { problemState: async () => null, onProblem: (cb: typeof aiProblemChanged) => { aiProblemChanged = cb; return vi.fn() } },
+    ai: { get: async () => ({ active: { backend: 'agy' } }), problemState: async () => null, onProblem: (cb: typeof aiProblemChanged) => { aiProblemChanged = cb; return vi.fn() } },
     widget: { state: async () => null, onState: () => vi.fn() },
   } })
 })

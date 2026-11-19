@@ -3,8 +3,7 @@ import { recoverTranscription } from './asr'
 /** what a recovered transcript feeds back into: unedited notes are written again and the library re-indexed */
 export type TranscriptFollowUp = {
   segmentCount: (id: string) => number
-  notesEdited: (id: string) => boolean
-  writeAgain: (id: string) => unknown
+  applyTranscript: (id: string, force?: boolean) => unknown
   scheduleIndex: () => unknown
   /** for tests: stand in for the real recovery */
   recover?: (id: string, o?: { retry?: boolean }) => Promise<void>
@@ -18,6 +17,6 @@ export async function recoverMeetingTranscript(id: string, o: { retry?: boolean 
   const before = d.segmentCount(id)
   await (d.recover ?? recoverTranscription)(id, o)
   if (d.segmentCount(id) <= before) return
-  if (!d.notesEdited(id)) void d.writeAgain(id)
+  void d.applyTranscript(id, true)
   void d.scheduleIndex()
 }

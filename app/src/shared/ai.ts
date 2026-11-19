@@ -6,12 +6,57 @@ export type OpenRouterAudioKind = 'chat' | 'stt'
 export type OpenRouterDataPolicy = 'deny' | 'zdr' | 'any'
 export type AiProblemCode = 'auth' | 'credits' | 'budget' | 'rate-limit' | 'model-gone' | 'no-provider'
   | 'unavailable' | 'timeout' | 'network' | 'too-large' | 'moderation' | 'truncated'
-  | 'no-timestamps' | 'bad-response' | 'no-key' | 'keychain' | 'local-audio'
+  | 'no-timestamps' | 'bad-timestamps' | 'bad-response' | 'no-key' | 'keychain' | 'local-audio'
   | 'cli-missing' | 'cli-failed' | 'cli-config'
 /** Main-to-renderer notice about the last remote transcription failure; a null code clears it. */
 export type AiCli = 'agy' | 'Porch'
-export type AiProblemEvent = { code: AiProblemCode | null; meetingId: string; track: 'me' | 'them'; model?: string; cli?: AiCli; at: number }
-export type AiProblemUpdate = { code: AiProblemCode; meetingId: string; track: 'me' | 'them'; model?: string; cli?: AiCli } | { code: null; meetingId: string; track: 'me' | 'them' }
+export type AiFailureClass = 'output' | 'transient' | 'user-action' | 'permanent'
+export type SpoolFailureAction = 'bump' | 'block'
+export type AiCopyAction = 'automatic' | 'action' | 'retry'
+
+/** One place classifies every visible AI problem. Output errors get one fresh model response first. */
+export const AI_PROBLEM_CLASS: Record<AiProblemCode, AiFailureClass> = {
+  auth: 'user-action', credits: 'user-action', budget: 'user-action', 'rate-limit': 'transient',
+  'model-gone': 'user-action', 'no-provider': 'user-action', unavailable: 'transient', timeout: 'transient', network: 'transient',
+  'too-large': 'permanent', moderation: 'permanent', truncated: 'output', 'no-timestamps': 'permanent',
+  'bad-timestamps': 'output', 'bad-response': 'output', 'no-key': 'user-action', keychain: 'user-action',
+  'local-audio': 'permanent', 'cli-missing': 'permanent', 'cli-failed': 'transient', 'cli-config': 'permanent',
+}
+
+/** Spool disposition after the logical transcriber call has exhausted its output retry. */
+export const AI_FAILURE_POLICY: Record<AiFailureClass, {
+  spool: Record<AiBackend, SpoolFailureAction>
+  liveCopy: Record<AiBackend, AiCopyAction>
+  pendingCopy: Record<AiBackend, AiCopyAction>
+}> = {
+  output: {
+    spool: { agy: 'bump', porch: 'bump', openrouter: 'block', local: 'bump' },
+    liveCopy: { agy: 'automatic', porch: 'automatic', openrouter: 'retry', local: 'retry' },
+    pendingCopy: { agy: 'automatic', porch: 'automatic', openrouter: 'retry', local: 'retry' },
+  },
+  transient: {
+    spool: { agy: 'bump', porch: 'bump', openrouter: 'bump', local: 'bump' },
+    liveCopy: { agy: 'automatic', porch: 'automatic', openrouter: 'automatic', local: 'automatic' },
+    pendingCopy: { agy: 'automatic', porch: 'automatic', openrouter: 'automatic', local: 'automatic' },
+  },
+  'user-action': {
+    spool: { agy: 'bump', porch: 'bump', openrouter: 'bump', local: 'bump' },
+    liveCopy: { agy: 'action', porch: 'action', openrouter: 'action', local: 'action' },
+    pendingCopy: { agy: 'action', porch: 'action', openrouter: 'action', local: 'action' },
+  },
+  permanent: {
+    spool: { agy: 'block', porch: 'block', openrouter: 'block', local: 'block' },
+    liveCopy: { agy: 'retry', porch: 'retry', openrouter: 'retry', local: 'retry' },
+    pendingCopy: { agy: 'retry', porch: 'retry', openrouter: 'retry', local: 'retry' },
+  },
+}
+
+export const aiFailureClass = (code: AiProblemCode): AiFailureClass => AI_PROBLEM_CLASS[code]
+export const aiSpoolFailureAction = (code: AiProblemCode, backend: AiBackend): SpoolFailureAction =>
+  AI_FAILURE_POLICY[aiFailureClass(code)].spool[backend]
+
+export type AiProblemEvent = { code: AiProblemCode | null; meetingId: string; track: 'me' | 'them'; model?: string; cli?: AiCli; backend?: AiBackend; at: number }
+export type AiProblemUpdate = { code: AiProblemCode; meetingId: string; track: 'me' | 'them'; model?: string; cli?: AiCli; backend?: AiBackend } | { code: null; meetingId: string; track: 'me' | 'them' }
 
 export type AiSettings = {
   backend: AiBackend

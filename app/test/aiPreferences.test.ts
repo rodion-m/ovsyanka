@@ -25,7 +25,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 describe('AI preferences IPC', () => {
-  it('triggers spool recovery after settings save and a saved unchecked key', async () => {
+  it('recovers only when the active harness still matches settings after save or key update', async () => {
     const resumed = vi.fn()
     const openrouter = {
       status: vi.fn(async () => ({ state: 'none' as const })), check: vi.fn(async () => ({ state: 'none' as const })),
@@ -33,9 +33,12 @@ describe('AI preferences IPC', () => {
       clear: vi.fn(async () => ({ state: 'none' as const })),
     }
     hookAiPreferences({ file, active, restart, check, env: {}, openrouter, onAiConfigChanged: resumed })
-    call('ai:save', aiSettings({ backend: 'openrouter' }))
+    call('ai:save', active)
     expect(resumed).toHaveBeenCalledOnce()
     await call('ai.openrouter.setKey', `sk-or-v1-${'abcdef0123456789'.repeat(4)}`)
+    expect(resumed).toHaveBeenCalledTimes(2)
+
+    call('ai:save', aiSettings({ ...active, transcriptionModel: 'gemini-4-argon' }))
     expect(resumed).toHaveBeenCalledTimes(2)
   })
 
