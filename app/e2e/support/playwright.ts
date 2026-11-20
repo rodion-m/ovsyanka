@@ -10,7 +10,9 @@ import { join } from 'node:path'
 export { expect } from '@playwright/test'
 export type { ElectronApplication, Locator, Page } from '@playwright/test'
 
-type Scope = { dirs: string[]; apps: ElectronApplication[] }
+// the child is taken at launch: app.process() throws once the app has closed
+type Launched = { app: ElectronApplication; child: ReturnType<ElectronApplication['process']> }
+type Scope = { dirs: string[]; apps: Launched[] }
 const worker: Scope = { dirs: [], apps: [] }
 let current: Scope | undefined
 const keep = () => process.env.YOGURT_KEEP_TEMP === '1'
@@ -24,14 +26,13 @@ export function tempDir(name: string): string {
 
 const launch: typeof playwrightElectron.launch = async (options) => {
   const app = await playwrightElectron.launch(options)
-  ;(current ?? worker).apps.push(app)
+  ;(current ?? worker).apps.push({ app, child: app.process() })
   return app
 }
 export const _electron = { launch }
 
 // an app still running here belongs to a test that failed or timed out before its own app.close()
-async function close(app: ElectronApplication) {
-  const child = app.process()
+async function close({ app, child }: Launched) {
   if (child.exitCode !== null || child.signalCode !== null) return
   const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
   await Promise.race([app.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 10_000))])
@@ -40,11 +41,14 @@ async function close(app: ElectronApplication) {
 
 async function release(scope: Scope, annotate?: (dir: string) => void) {
   const apps = scope.apps.splice(0), dirs = scope.dirs.splice(0)
-  await Promise.all(apps.map(close))
+  // a failure to close must not keep the folders: they are removed whatever happened to the apps
+  const closing = await Promise.allSettled(apps.map(close))
   for (const dir of dirs) {
     if (keep()) annotate?.(dir)
     else rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
+  const failed = closing.find((r) => r.status === 'rejected')
+  if (failed) throw failed.reason
 }
 
 export const test = base.extend<{ cleanTemp: void }, { cleanWorkerTemp: void }>({
