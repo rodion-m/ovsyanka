@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 test('@everywhere opens a window called Yogurt with the app shell', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   try {
     const page = await app.firstWindow()
@@ -18,7 +16,7 @@ test('@everywhere opens a window called Yogurt with the app shell', async () => 
 })
 
 test('@everywhere shows the Yogurt logo', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   try {
     const page = await app.firstWindow()

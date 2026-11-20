@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -12,7 +11,7 @@ const settingsOf = (dir: string) => JSON.parse(readFileSync(join(dir, 'settings.
 const firstRun = { YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined' }
 
 test('first run asks one thing at a time, then home; the next launch asks nothing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -50,7 +49,7 @@ test('first run asks one thing at a time, then home; the next launch asks nothin
 })
 
 test('"Not now" on every step still reaches home, with open at login left off', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -64,7 +63,7 @@ test('"Not now" on every step still reaches home, with open at login left off', 
 })
 
 test('turned off before: the step opens System Settings instead', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_PERMISSIONS: 'denied', YOGURT_FAKE_CALENDAR: 'granted' })
   try {
     const page = await app.firstWindow()
@@ -84,7 +83,7 @@ test('turned off before: the step opens System Settings instead', async () => {
 })
 
 test('settings: granted permissions offer Manage, with open at login and theme controls', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()
@@ -124,7 +123,7 @@ test('settings: granted permissions offer Manage, with open at login and theme c
 })
 
 test('settings: your name, the Mac\'s full name until changed; cleared, it goes back to that', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_FULL_NAME: 'Dana Reyes' })
   try {
     const page = await app.firstWindow()
@@ -143,7 +142,7 @@ test('settings: your name, the Mac\'s full name until changed; cleared, it goes 
 })
 
 test('music pauses while recording and plays again after, only if it was playing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_MUSIC: '1' })
   try {
     const page = await app.firstWindow()
@@ -157,7 +156,7 @@ test('music pauses while recording and plays again after, only if it was playing
 })
 
 test('menu bar: shows recording, and Yogurt keeps running with its window closed', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()
@@ -185,7 +184,7 @@ test('menu bar: shows recording, and Yogurt keeps running with its window closed
 })
 
 test('the dock icon and a second launch bring back a closed main window with the tray hidden, even while recording', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()
@@ -216,7 +215,7 @@ test('the dock icon and a second launch bring back a closed main window with the
 })
 
 test('the first run never asks about music, even with a player running', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { ...firstRun, YOGURT_FAKE_PLAYER: '1' })
   try {
     const page = await app.firstWindow()
@@ -234,7 +233,7 @@ test('the first run never asks about music, even with a player running', async (
 })
 
 test('quitting while recording plays the music again', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_MUSIC: '1' })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -245,7 +244,7 @@ test('quitting while recording plays the music again', async () => {
 })
 
 test('managed Macs and notifications already asked read plainly in Settings', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_MIC: 'restricted', YOGURT_FAKE_CALENDAR: 'granted' })
   try {
     const page = await app.firstWindow()
@@ -267,7 +266,7 @@ test('managed Macs and notifications already asked read plainly in Settings', as
 })
 
 test('names from calls: optional, asked with the Mac\'s own prompt once, then only System Settings turns it on', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_NOTIFICATIONS: 'granted', YOGURT_FAKE_AX: 'denied' })
   try {
     const page = await app.firstWindow()
@@ -291,7 +290,7 @@ test('names from calls: optional, asked with the Mac\'s own prompt once, then on
 })
 
 test('notifications asked once are not asked again', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_NOTIFICATIONS: 'unknown' })
   try {
     const page = await app.firstWindow()
@@ -304,7 +303,7 @@ test('notifications asked once are not asked again', async () => {
 })
 
 test('Accessibility is rechecked on return from Settings before continuing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir, { YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_AX: 'denied' })
   try {
     const page = await app.firstWindow()
@@ -328,7 +327,7 @@ test('Accessibility is rechecked on return from Settings before continuing', asy
 })
 
 test('appearance: one compact select changes and saves all three choices', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()
@@ -352,7 +351,7 @@ test('appearance: one compact select changes and saves all three choices', async
 })
 
 test('settings permission statuses and actions stay consistent without claiming unknown grants', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()
@@ -403,7 +402,7 @@ test('settings permission statuses and actions stay consistent without claiming 
 })
 
 test('menu bar: next event prepares its note, Ask uses note context, Recent and Settings navigate', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launch(dir)
   try {
     const page = await app.firstWindow()

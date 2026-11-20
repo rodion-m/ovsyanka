@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Meeting, type Store } from '../src/main/store'
 import { hookCallNames, watchIds, type WatchLine } from '../src/main/callNames'
 import { readCall, type AxNode } from '../src/main/callNames/parse'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = [], stores: Store[] = []
 afterEach(() => { stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
@@ -35,7 +35,7 @@ const webexFloatingWindows = (): WatchLine['windows'] => [{ title: 'Webex multit
 const webexLine = (t: number): WatchLine => ({ t, app: 'Cisco-Systems.Spark', windows: webexWindows() })
 
 function setup(o: { app?: string | null; attendees?: Meeting['attendees'] } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-callnames-')); dirs.push(root)
+  const root = tempDir('callnames'); dirs.push(root)
   const store = openStore(join(root, 'yogurt.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Sync', startedAt: 1_000_000, endedAt: null, eventId: null, app: o.app === undefined ? 'Zoom' : o.app, attendees: o.attendees ?? [], state: 'recording' })
   let clock = 1_000_000, nameReads = 0

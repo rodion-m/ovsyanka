@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type Locator } from '@playwright/test'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type Locator, tempDir } from './support/playwright'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const capture = !!process.env.YOGURT_UI_REVIEW
@@ -10,7 +9,7 @@ const names = (icon: Locator) => icon.evaluate(el => [el, ...Array.from(el.query
 
 for (const theme of ['light', 'dark'] as const) test(`sidebar icon scope and motion in ${theme}`, async ({}, testInfo) => {
   test.setTimeout(180000)
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-icons-'))
+  const userData = tempDir('icons')
   writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme }))
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
     ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData,

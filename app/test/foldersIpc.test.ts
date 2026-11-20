@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { hookFolders } from '../src/main/foldersIpc'
+import { tempDir } from './support/tempDir'
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 vi.mock('electron', () => ({ ipcMain: { handle: (channel: string, handler: (...args: unknown[]) => unknown) => handlers.set(channel, handler) } }))
@@ -13,7 +13,7 @@ let dir: string, store: Store
 const changed = vi.fn()
 beforeEach(() => {
   handlers.clear(); changed.mockReset()
-  dir = mkdtempSync(join(tmpdir(), 'yogurt-folders-ipc-'))
+  dir = tempDir('folders-ipc')
   store = openStore(join(dir, 'yogurt.db'))
   hookFolders({ store, changed })
 })

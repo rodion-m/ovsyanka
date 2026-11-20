@@ -1,13 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 const region = (el: Element) => getComputedStyle(el).getPropertyValue('-webkit-app-region')
 
 test('the top strip drags the window on onboarding, the shell and a note', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, YOGURT_FAKE_STEP_MS: '1000' } })
   try {
     const page = await app.firstWindow()
@@ -28,7 +26,7 @@ test('the top strip drags the window on onboarding, the shell and a note', async
 })
 
 test('a minimum window at high zoom preserves Search and Ask without a follow-up shortcut', async () => {
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-zoom-')) } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('zoom') } })
   try {
     const page = await app.firstWindow()
     await expect(page.getByTestId('home')).toBeVisible()

@@ -1,15 +1,15 @@
 import { afterEach, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { openStore, type Store } from '../src/main/store'
 import { Library, migrateMeetingChats } from '../src/main/library/store'
 import { mergeBackup } from '../src/main/backup'
 import { askDestination, attachContext, chipScope, contextKey, mentionAt } from '../src/shared/askContext'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = [], stores: Store[] = []
 const fresh = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-context-')); dirs.push(dir)
+  const dir = tempDir('context'); dirs.push(dir)
   const file = join(dir, 'yogurt.db'), store = openStore(file); stores.push(store)
   return { store, file, library: new Library(store.db) }
 }

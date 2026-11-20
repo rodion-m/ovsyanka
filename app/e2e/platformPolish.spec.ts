@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // @everywhere: Windows and Linux polish (shortcuts with Ctrl, the tray menu). The Mac CI tries them through YOGURT_FAKE_PLATFORM.
 const main = join(import.meta.dirname, '../out/main/index.js')
 const launch = (env: Record<string, string> = {}) =>
-  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')), ...env } })
+  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('e2e'), ...env } })
 const fake = (app: ElectronApplication, name: string, ...args: unknown[]) =>
   app.evaluate((_e, [n, a]) => (globalThis as unknown as { __fake__: Record<string, (...x: unknown[]) => unknown> }).__fake__[n as string](...(a as unknown[])), [name, args] as const)
 

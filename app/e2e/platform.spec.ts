@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // @everywhere: these also run on the Windows and Linux CI. YOGURT_FAKE_PLATFORM lets the Mac try those screens too.
 const main = join(import.meta.dirname, '../out/main/index.js')
 const launch = (env: Record<string, string> = {}) =>
-  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')), ...env } })
+  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('e2e'), ...env } })
 
 for (const platform of ['win32', 'linux']) {
   // Linux reads names from calls through AT-SPI (nothing to ask for, so it reads as on); Windows has none yet

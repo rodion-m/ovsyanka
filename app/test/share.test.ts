@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { rename, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const handlers = new Map<string, (...a: unknown[]) => unknown>()
@@ -20,6 +19,7 @@ vi.mock('node:fs/promises', async (original) => {
 })
 
 import { hookShare } from '../src/main/share'
+import { tempDir } from './support/tempDir'
 
 const meeting = { id: 'm', title: 'Sync', startedAt: 0, endedAt: null, eventId: null, app: null, attendees: [], state: 'done', language: null }
 const store = {
@@ -33,7 +33,7 @@ let dir: string
 
 beforeEach(() => {
   vi.resetAllMocks()
-  dir = mkdtempSync(join(tmpdir(), 'yogurt-share-test-'))
+  dir = tempDir('share-test')
   handlers.clear(); written.length = 0; state.clipboardFails = false; state.dialog = { canceled: false, filePath: join(dir, 'notes.md') }
   store.notes = () => ({ mine: 'my line', enhanced: null, edited: false })
   hookShare({ store: store as never, window: () => undefined })

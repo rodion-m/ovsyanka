@@ -1,17 +1,17 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 const handlers = vi.hoisted(() => new Map<string, (...args: any[]) => any>())
 vi.mock('electron', () => ({ app: { getPreferredSystemLanguages: () => ['en-US'] }, ipcMain: { handle: (name: string, fn: (...args: any[]) => any) => handlers.set(name, fn) }, BrowserWindow: {}, nativeTheme: {} }))
 import { hookPreferences } from '../src/main/preferences'
 import { loadSettings, updateSettings } from '../src/main/settings'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 afterEach(() => { dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true })); handlers.clear(); vi.restoreAllMocks() })
 it('defaults on, persists off across reloads, rejects non-booleans and applies changes immediately', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-menu-pref-')); dirs.push(dir)
+  const dir = tempDir('menu-pref'); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const setTrayVisible = vi.fn()
   const deps = { file, permissions: {} as Parameters<typeof hookPreferences>[0]['permissions'], ask: false, setLogin: vi.fn(), loginOn: () => false, macName: () => 'Dana', relaunch: () => false, setTrayVisible }
@@ -35,7 +35,7 @@ it('defaults on, persists off across reloads, rejects non-booleans and applies c
 
 
 it('keeps recordings by default and persists only a valid retention preference', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-audio-pref-')); dirs.push(dir)
+  const dir = tempDir('audio-pref'); dirs.push(dir)
   const file = join(dir, 'settings.json')
   const deps = { file, permissions: {} as Parameters<typeof hookPreferences>[0]['permissions'], ask: false, setLogin: vi.fn(), loginOn: () => false, macName: () => 'Dana', relaunch: () => false, setTrayVisible: vi.fn() }
   hookPreferences(deps)

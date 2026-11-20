@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { aiSettings } from '../src/shared/ai'
 import { probeOpenRouter } from '../src/main/harness/openrouterTest'
+import { tempDir } from './support/tempDir'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true }))) })
 
 async function root() {
-  const path = await mkdtemp(join(tmpdir(), 'yogurt-stt-probe-'))
+  const path = tempDir('stt-probe')
   roots.push(path)
   return path
 }

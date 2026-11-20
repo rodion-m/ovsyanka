@@ -1,7 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -31,7 +29,7 @@ function aiApp(userData: string) {
 }
 
 test('an AI app on this Mac reads meetings through yogurt-mcp only once Settings allows it, and Settings shows it connected', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-mcp-'))
+  const userData = tempDir('mcp')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   const page = await app.firstWindow()
   const ai = aiApp(userData)

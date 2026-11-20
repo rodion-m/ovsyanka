@@ -1,11 +1,9 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 for (const colorScheme of ['light', 'dark'] as const) test(`transcript fades directly below the tabs without moving text (${colorScheme})`, async ({}, testInfo) => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-transcript-edge-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('transcript-edge'),
   } })
   try {
     const page = await app.firstWindow()

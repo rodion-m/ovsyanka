@@ -1,11 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 async function launch(extra: Record<string, string> = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-ai-settings-'))
+  const userData = tempDir('ai-settings')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_AI_BACKEND: '', YOGURT_USER_DATA: userData, ...extra } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()

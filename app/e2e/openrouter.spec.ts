@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { startOpenRouterServer } from './support/openrouterServer'
 
@@ -58,7 +57,7 @@ async function expectAlignedAiControls(page: Page) {
 
 test('OpenRouter first run saves defaults, offers restart, and transcribes a short recording', async () => {
   const fake = await startOpenRouterServer()
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-openrouter-first-run-'))
+  const userData = tempDir('openrouter-first-run')
   let { app, page } = await launch(fake.url, userData)
   try {
     await configure(page)
@@ -84,7 +83,7 @@ test('OpenRouter first run saves defaults, offers restart, and transcribes a sho
 
 test('captures Russian OpenRouter model list at desktop and narrow widths', async () => {
   const fake = await startOpenRouterServer()
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-openrouter-review-'))
+  const userData = tempDir('openrouter-review')
   const { app, page } = await launch(fake.url, userData, 'ru')
   try {
     mkdirSync(reviewEvidence, { recursive: true })
@@ -100,7 +99,7 @@ test('captures Russian OpenRouter model list at desktop and narrow widths', asyn
 
 test('OpenRouter credits failure shows a banner; after funding, Retry writes transcript lines', async () => {
   const fake = await startOpenRouterServer()
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-openrouter-credits-'))
+  const userData = tempDir('openrouter-credits')
   let { app, page } = await launch(fake.url, userData)
   try {
     await configure(page)
@@ -119,7 +118,7 @@ test('OpenRouter credits failure shows a banner; after funding, Retry writes tra
 
 test('OpenRouter credits failure notice is clear in Russian', async () => {
   const fake = await startOpenRouterServer()
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-openrouter-credits-ru-'))
+  const userData = tempDir('openrouter-credits-ru')
   let { app, page } = await launch(fake.url, userData, 'ru')
   try {
     await configure(page, 'ru')

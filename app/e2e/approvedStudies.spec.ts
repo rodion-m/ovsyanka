@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const before = process.env.YOGURT_UI_REVIEW === 'before'
 const main = join(import.meta.dirname, '../out/main/index.js')
 const launch = (onboarding = false) => electron.launch({ args: [main], env: {
-  ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-approved-studies-')),
+  ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('approved-studies'),
   ...(onboarding ? { YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined' } : {}),
 } })
 

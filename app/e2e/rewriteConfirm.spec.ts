@@ -1,10 +1,8 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 async function launchEdited() {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-rewrite-confirm-'))
+  const userData = tempDir('rewrite-confirm')
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
     ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, YOGURT_FAKE_LLM_MS: '2',
   } })

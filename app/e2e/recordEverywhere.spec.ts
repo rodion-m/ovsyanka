@@ -1,6 +1,4 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // @everywhere: the whole meeting (record, transcript, notes, the recording to play) on every computer the CI has, with
@@ -8,7 +6,7 @@ import { join } from 'node:path'
 const main = join(import.meta.dirname, '../out/main/index.js')
 const platforms = process.platform === 'darwin' ? ['win32', 'linux'] : [process.platform]
 const launch = async (platform: string, env: Record<string, string> = {}) => {
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PLATFORM: platform, YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')), ...env } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PLATFORM: platform, YOGURT_USER_DATA: tempDir('e2e'), ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible({ timeout: 15_000 })
   return { app, page }
@@ -73,7 +71,7 @@ for (const platform of platforms) {
 }
 
 test('a Mac waiting for the notes model says it is still downloading, and how far', async () => {
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')), YOGURT_FAKE_NOTES_MODEL_MS: '16000' } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('e2e'), YOGURT_FAKE_NOTES_MODEL_MS: '16000' } })
   try {
     const page = await app.firstWindow()
     await expect(page.getByTestId('home')).toBeVisible({ timeout: 15_000 })

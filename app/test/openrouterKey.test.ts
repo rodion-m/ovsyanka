@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { createOpenRouterKeyStore, OPENROUTER_KEY_FILE, type OpenRouterKeyFetch, type SafeStorageLike } from '../src/main/harness/openrouterKey'
 import { keyLast4 } from '../src/main/settings'
+import { tempDir } from './support/tempDir'
 
 const KEY = `sk-or-v1-${'0123456789abcdef'.repeat(4)}`
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })) ) })
 
 async function root() {
-  const path = await mkdtemp(join(tmpdir(), 'yogurt-openrouter-key-'))
+  const path = tempDir('openrouter-key')
   roots.push(path)
   return path
 }

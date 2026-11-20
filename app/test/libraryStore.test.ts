@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { Library, libraryTables } from '../src/main/library/store'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh() {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-library-'))
+  const d = tempDir('library')
   dirs.push(d)
   const s = openStore(join(d, 'yogurt.db'))
   stores.push(s)

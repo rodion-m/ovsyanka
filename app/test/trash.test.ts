@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { Library } from '../src/main/library/store'
 import { TRASH_DAYS, trashCutoff } from '../src/shared/trash'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-trash-'))
+  const d = tempDir('trash')
   dirs.push(d)
   const s = openStore(join(d, 'yogurt.db'))
   stores.push(s)

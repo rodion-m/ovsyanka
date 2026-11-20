@@ -1,13 +1,12 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 const zoom = { bundleId: 'us.zoom.xos', name: 'zoom.us' }
 
 async function launch(env: Record<string, string> = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -100,7 +99,7 @@ test('the menu copies the notes as text and HTML, the transcript, and Mac shortc
 })
 
 test('Export as Markdown writes the title, notes and transcript to the file the save step gives', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-export-')), 'out.md')
+  const file = join(tempDir('export'), 'out.md')
   const { app, page } = await launch({ YOGURT_EXPORT_PATH: file })
   try {
     await finished(app, page)
@@ -122,7 +121,7 @@ test('Export as Markdown writes the title, notes and transcript to the file the 
 })
 
 test('while the notes are still being written, copy and export do nothing and say so', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-export-')), 'out.md')
+  const file = join(tempDir('export'), 'out.md')
   const { app, page } = await launch({ YOGURT_EXPORT_PATH: file, YOGURT_FAKE_LLM_MS: '500' })
   try {
     // This app must never touch the clipboard; other apps may use the system clipboard during the test.

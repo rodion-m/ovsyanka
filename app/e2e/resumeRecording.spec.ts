@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -14,7 +13,7 @@ async function launch(profile: string, env: Record<string, string> = {}) {
 
 test('a finished note resumes after reopening, preserves original data, confirms edited Summary, and appends audio', async () => {
   test.setTimeout(90_000)
-  const profile = mkdtempSync(join(tmpdir(), 'yogurt-resume-'))
+  const profile = tempDir('resume')
   let { app, page } = await launch(profile)
   try {
     await page.getByRole('button', { name: 'Start recording', exact: true }).click()
@@ -76,7 +75,7 @@ test('a finished note resumes after reopening, preserves original data, confirms
 })
 
 test('Finish blocks Resume while Summary is processing, then recording can resume', async () => {
-  const profile = mkdtempSync(join(tmpdir(), 'yogurt-resume-writing-'))
+  const profile = tempDir('resume-writing')
   const { app, page } = await launch(profile, { YOGURT_FAKE_LLM_MS: '120' })
   try {
     await page.getByRole('button', { name: 'Start recording', exact: true }).click()
@@ -108,7 +107,7 @@ test('Finish blocks Resume while Summary is processing, then recording can resum
 
 
 test('queued summaries block Resume and unsuccessful or empty summaries release it', async () => {
-  const { app, page } = await launch(mkdtempSync(join(tmpdir(), 'yogurt-summary-states-')))
+  const { app, page } = await launch(tempDir('summary-states'))
   try {
     const id = await app.evaluate(() => (globalThis as unknown as { __fake__: { bigMeeting(n: number): string } }).__fake__.bigMeeting(10))
     await page.evaluate((id) => window.yogurt.nav.go(`/note/${id}`), id)

@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { chmod, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadAgyModels, parseAgyModels, mergeAgyModels } from '../src/main/harness/agyModels'
 import { buildPorchOptions, loadPorchProfiles, parsePorchProfiles } from '../src/main/harness/porchProfiles'
+import { tempDir } from './support/tempDir'
 
 const fixture = (name: string) => readFileSync(join(process.cwd(), 'test/fixtures/cli', name), 'utf8')
 afterEach(() => vi.unstubAllEnvs())
@@ -79,7 +79,7 @@ describe('agy model-list process', () => {
   })
 
   it('scrubs both provider keys from the child environment and reports garbage output', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'yogurt-agy-options-'))
+    const root = tempDir('agy-options')
     const path = join(root, 'agy'), dump = join(root, 'env.json')
     try {
       await writeFile(path, `#!${process.execPath}\nconst fs=require('node:fs'); fs.writeFileSync(process.env.DUMP_PATH, JSON.stringify({gemini:process.env.GEMINI_API_KEY, openrouter:process.env.YOGURT_OPENROUTER_API_KEY})); console.log('garbage');\n`, { mode: 0o700 })
@@ -97,7 +97,7 @@ describe('agy model-list process', () => {
   })
 
   it('turns a failing CLI into the built-in list error', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'yogurt-agy-options-'))
+    const root = tempDir('agy-options')
     const path = join(root, 'agy')
     try {
       await writeFile(path, `#!${process.execPath}\nprocess.exit(7);\n`, { mode: 0o700 }); await chmod(path, 0o700)
@@ -106,7 +106,7 @@ describe('agy model-list process', () => {
   })
 
   it('times out a slow CLI after five seconds', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'yogurt-agy-options-'))
+    const root = tempDir('agy-options')
     const path = join(root, 'agy')
     try {
       await writeFile(path, `#!${process.execPath}\nsetTimeout(() => console.log('too late'), 10000);\n`, { mode: 0o700 }); await chmod(path, 0o700)

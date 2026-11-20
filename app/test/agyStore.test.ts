@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { appendForget, conversationId, forgetConversation, processForgetJournal, removeForget } from '../src/main/harness/agyStore'
+import { tempDir } from './support/tempDir'
 
 const ID = 'b32e1fb5-0eef-4b17-a4b9-d1408fed4f7b'
 const OTHER = '0eef4b17-a4b9-4b17-b32e-1fb5d1408fed'
@@ -12,7 +12,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
   await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })))
 })
-async function tempRoot() { const path = await mkdtemp(join(tmpdir(), 'agy-store-')); roots.push(path); return path }
+async function tempRoot() { const path = tempDir('agy-store'); roots.push(path); return path }
 const event = (value: unknown) => JSON.stringify(value)
 const spawned = () => Date.now() - 60_000
 

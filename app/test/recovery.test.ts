@@ -1,5 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hookTranscription, pendingRecovery, recoverTranscription, resumeTranscriptWaitMs, settleTranscription, stopTranscriptionServer, transcriptFinished, transcriptIncomplete, transcribing } from '../src/main/asr'
@@ -13,12 +12,13 @@ import type { Line } from '../src/main/asr/transcribe'
 import type { Chunk } from '../src/main/asr/chunker'
 import type { Spoken } from '../src/shared/spoken'
 import type { EchoCheck } from '../src/main/asr/echo'
+import { tempDir } from './support/tempDir'
 
 const RATE = 16000
 const pcm = (sec: number) => Float32Array.from({ length: Math.round(sec * RATE) }, (_, i) => 0.3 * Math.sin(i / 10))
 
 let store: Store, meetingsDir: string
-beforeEach(() => { store = openStore(':memory:'); meetingsDir = mkdtempSync(join(tmpdir(), 'yogurt-recovery-')) })
+beforeEach(() => { store = openStore(':memory:'); meetingsDir = tempDir('recovery') })
 afterEach(() => { rmSync(meetingsDir, { recursive: true, force: true }) })
 
 const disposers: Array<() => void> = []
@@ -93,7 +93,7 @@ const spooled = (id: string) => createSpool(spoolDirOf(join(meetingsDir, id))).l
 
 describe('recovering a pending remote transcript', () => {
   it('gives a bad model response a fresh transcriber call before the spool can be blocked', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-output-retry-'))
+    const root = tempDir('output-retry')
     try {
       const spool = createSpool(spoolDirOf(join(root, 'meeting')))
       const source: Chunk = {
@@ -131,7 +131,7 @@ describe('recovering a pending remote transcript', () => {
   })
 
   it('keeps audio after two bad responses and recovers it in the single bounded post-meeting pass', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-output-postpass-'))
+    const root = tempDir('output-postpass')
     try {
       const spool = createSpool(spoolDirOf(join(root, 'meeting')))
       const source: Chunk = { track: 'me', startMs: 0, samples: new Float32Array(Math.round(61.8 * RATE)), clearMs: 2_700,
@@ -158,7 +158,7 @@ describe('recovering a pending remote transcript', () => {
   })
 
   it('blocks a truly permanent input failure on its first logical send', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-permanent-input-'))
+    const root = tempDir('permanent-input')
     try {
       const spool = createSpool(spoolDirOf(join(root, 'meeting')))
       const chunk: Chunk = { track: 'me', startMs: 0, samples: pcm(1), clearMs: 800 }
@@ -178,7 +178,7 @@ describe('recovering a pending remote transcript', () => {
   })
 
   it('does not clear a track warning when a later batch succeeds but an earlier chunk remains spooled', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-problem-spool-'))
+    const root = tempDir('problem-spool')
     try {
       const spool = createSpool(spoolDirOf(join(root, 'meeting')))
       const failed: Chunk = { track: 'them', startMs: 0, samples: pcm(59), clearMs: 1 }

@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { existsSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 async function launch() {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-trash-'))
+  const userData = tempDir('trash')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()

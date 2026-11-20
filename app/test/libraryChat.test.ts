@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { Library } from '../src/main/library/store'
@@ -12,6 +11,7 @@ import { createQueue } from '../src/main/notes/queue'
 import { FakeEngine } from '../src/main/notes/fake'
 import type { Llm } from '../src/main/notes/enhance'
 import type { ConversationView } from '../src/shared/types'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -23,7 +23,7 @@ afterEach(() => {
 const now = new Date(2026, 10, 4, 15, 30).getTime()
 
 async function rig(o: { llm?: Partial<Llm>; queue?: ReturnType<typeof createQueue>; waitsForModel?: () => boolean; warmAllowed?: () => boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-conversations-'))
+  const d = tempDir('conversations')
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
   stores.push(store)

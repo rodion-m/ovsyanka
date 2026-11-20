@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // Each computer's own words (forOs): a Mac keeps its text; Windows and Linux never read "Mac".
 const main = join(import.meta.dirname, '../out/main/index.js')
 const launch = (env: Record<string, string> = {}) =>
-  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')), ...env } })
+  electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('e2e'), ...env } })
 
 const WORDS = {
   win32: { theme: 'Match Windows', login: 'Open Yogurt when Windows starts', tray: 'Show Yogurt in the notification area' },

@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, copyFileSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, copyFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { wrapLinuxBinary } from '../scripts/linux-launcher.cjs'
+import { tempDir } from './support/tempDir'
 
 // The AppImage starts build/linux-launcher.sh as `yogurt`, which picks X11 before Electron starts (#8):
 // an in-app relaunch couldn't mount the AppImage again on Wayland
 function launch(env: Record<string, string>, args: string[] = []): string[] {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-launcher-'))
+  const dir = tempDir('launcher')
   writeFileSync(join(dir, 'yogurt'), '#!/bin/sh\nfor a in "$@"; do echo "$a"; done\n')
   chmodSync(join(dir, 'yogurt'), 0o755)
   wrapLinuxBinary(dir, 'yogurt')
@@ -27,7 +27,7 @@ it.skipIf(process.platform === 'win32')('X11 alone, Wayland without XWayland, or
 })
 
 it.skipIf(process.platform === 'win32')('wrapping twice keeps the real binary', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-launcher-'))
+  const dir = tempDir('launcher')
   copyFileSync('/bin/echo', join(dir, 'yogurt'))
   wrapLinuxBinary(dir, 'yogurt')
   expect(() => wrapLinuxBinary(dir, 'yogurt')).toThrow()

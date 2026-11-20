@@ -1,13 +1,12 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 const zoom = { bundleId: 'us.zoom.xos', name: 'zoom.us' }
 
 async function launch(o: { settings?: object; env?: Record<string, string> } = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   if (o.settings) writeFileSync(join(userData, 'settings.json'), JSON.stringify(o.settings))
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...o.env } })
   const page = await app.firstWindow()

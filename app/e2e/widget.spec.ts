@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -8,7 +7,7 @@ const zoom = { bundleId: 'us.zoom.xos', name: 'zoom.us' }
 type Snap = { visible: boolean; view: { kind: string; note: { text: string } | null; crashed: boolean } | null; notice: { title: string; body: string; meetingId: string } | null; bounds: { x: number; y: number; width: number; height: number } | null; workArea: { x: number; y: number; width: number; height: number } }
 
 async function launch(settings?: object) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   if (settings) writeFileSync(join(userData, 'settings.json'), JSON.stringify(settings))
   // These tests control foreground/background explicitly instead of competing for native focus.
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_BACKGROUND: '1', YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })

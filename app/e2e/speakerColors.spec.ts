@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const names = ['Ada Chen', 'Ben Ortiz', 'Cy Patel', 'Dee Morgan', 'Eli Ross', 'Fay Kim', 'Gia Lee']
 for (const theme of ['light', 'dark'] as const) test(`speaker colours agree across the note and recent preview in ${theme}`, async ({}, info) => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-speaker-colors-'))
+  const userData = tempDir('speaker-colors')
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
     ...process.env, YOGURT_FAKE: '1', YOGURT_BACKGROUND: '1', YOGURT_USER_DATA: userData,
   } })

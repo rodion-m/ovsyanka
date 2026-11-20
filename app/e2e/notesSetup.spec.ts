@@ -1,6 +1,4 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
 import { join } from 'node:path'
 import type { SetupState } from '../src/shared/types'
 
@@ -8,7 +6,7 @@ const ready: SetupState = { phase: 'ready', fraction: 1 }
 const download: SetupState = { ...ready, notesDownloading: true, notesFraction: .27, notesTotalBytes: 5e9, notesEtaSec: 240 }
 const upgrade: SetupState = { ...ready, notesUpgradeDownloading: true, notesUpgradeFraction: .27, notesUpgradeTotalBytes: 14e9, notesUpgradeEtaSec: 240 }
 
-async function launch(root = mkdtempSync(join(tmpdir(), 'yogurt-ai-titlebar-')), notesMs = '0') {
+async function launch(root = tempDir('ai-titlebar'), notesMs = '0') {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
     ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: root, YOGURT_FAKE_NOTES_MODEL_MS: notesMs,
   } })
@@ -378,7 +376,7 @@ test('Settings shows restore progress without a title-bar download and keeps the
 
 test('Settings download, Skip, restart and Remove use the real setup controller', async () => {
   test.setTimeout(60_000)
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-upgrade-controls-'))
+  const root = tempDir('upgrade-controls')
   let { app, page } = await launch(root, '1600')
   try {
     await go(page, '/settings')

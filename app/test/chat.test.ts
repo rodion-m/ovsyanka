@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { ANSWER_TOKENS, ask, chatContext, chatPrompt, excerptHead, EXCERPT_TOKENS, hookChat, warm } from '../src/main/chat'
 import { transcriptText, type Llm } from '../src/main/notes/enhance'
@@ -9,11 +8,12 @@ import { createQueue, type JobKind } from '../src/main/notes/queue'
 import { openStore, type Segment, type Store } from '../src/main/store'
 import type { ChatView } from '../src/shared/types'
 import { cleanAnswer, streamCleaner } from '../src/engine/control'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-chat-'))
+  const d = tempDir('chat')
   dirs.push(d)
   const s = openStore(join(d, 'yogurt.db'))
   stores.push(s)

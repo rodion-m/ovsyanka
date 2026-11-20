@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { finishedParts, hookReadAhead, readAheadAllowed, readInSteps, readAheadText, READ_EVERY_MS, SETTLE_MS, shouldReadAhead, splitLong, stableTurns } from '../src/main/notes/readAhead'
 import { enhancePrompt, summaryHead, summaryPrompt, transcriptText, type Llm } from '../src/main/notes/enhance'
@@ -8,6 +7,7 @@ import { createQueue } from '../src/main/notes/queue'
 import { createNotesModel } from '../src/main/notes/model'
 import type { Engine } from '../src/main/engine'
 import { openStore, type Meeting, type Segment, type Store } from '../src/main/store'
+import { tempDir } from './support/tempDir'
 
 const MIN = 60_000
 const seg = (track: 'me' | 'them', startMs: number, text: string, speaker: string | null = track === 'me' ? 'me' : 'Ann Lee', len = 5000): Segment =>
@@ -111,7 +111,7 @@ describe('hookReadAhead', () => {
   afterEach(() => { stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
 
   function setup(o: { live?: boolean; smallMac?: boolean; backlog?: () => number; contextSize?: number; gate?: Promise<void>; language?: string | null; attendees?: Array<{ name: string; email: string | null }> } = {}) {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-ahead-'))
+    const d = tempDir('ahead')
     dirs.push(d)
     const store = openStore(join(d, 'yogurt.db'))
     stores.push(store)

@@ -1,11 +1,9 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 test('a bottom event opens above its row, tracks scrolling, flips without chatter and dismisses offscreen', async ({}, info) => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-card-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-card'),
   }, ...(process.env.CI ? { recordVideo: { dir: info.outputPath('agenda-motion'), size: { width: 1100, height: 760 } } } : {}) })
   try {
     const page = await app.firstWindow()
@@ -157,7 +155,7 @@ test('a bottom event opens above its row, tracks scrolling, flips without chatte
 
 test('long agenda titles stay on one line and forty attendees expand without moving the card footer', async ({}, info) => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-density-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-density'),
   } })
   try {
     const page = await app.firstWindow()

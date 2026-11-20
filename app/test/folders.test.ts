@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { DatabaseSync } from 'node:sqlite'
 import { mergeBackup } from '../src/main/backup'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-folders-'))
+  const d = tempDir('folders')
   dirs.push(d)
   const s = openStore(join(d, 'yogurt.db'))
   stores.push(s)
@@ -73,7 +73,7 @@ describe('folders', () => {
   })
 
   it('migrates old folders without changing names and safely reads unknown appearances', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-folder-migration-')); dirs.push(d)
+    const d = tempDir('folder-migration'); dirs.push(d)
     const file = join(d, 'yogurt.db'), old = new DatabaseSync(file)
     old.exec("CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL); INSERT INTO folders VALUES ('old', 'Design', 42)")
     old.close()

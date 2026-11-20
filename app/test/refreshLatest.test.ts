@@ -1,15 +1,15 @@
 import { expect, it } from 'vitest'
 import { createHash } from 'node:crypto'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 // @ts-expect-error plain script, no types
 import { refreshLatest } from '../scripts/refresh-latest.mjs'
+import { tempDir } from './support/tempDir'
 
 const sha = (b: Buffer) => createHash('sha512').update(b).digest('base64')
 
 it('after stapling changed the disk image, latest-mac.yml gets its new checksum and size again', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-latest-'))
+  const dir = tempDir('latest')
   writeFileSync(join(dir, 'Yogurt-mac-arm64.zip'), 'zip')
   writeFileSync(join(dir, 'Yogurt-mac-arm64.dmg'), 'dmg, stapled')
   const yml = join(dir, 'latest-mac.yml')

@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { speedKey, type Catalog, type Hardware } from '@yogurt/picker'
@@ -14,6 +13,7 @@ import { notesDownloadVisible, notesUpgradeActive } from '../src/renderer/src/no
 import { createNotesModel } from '../src/main/notes/model'
 import { FakeEngine } from '../src/main/notes/fake'
 import { createQueue } from '../src/main/notes/queue'
+import { tempDir } from './support/tempDir'
 
 const catalog = bundled as unknown as Catalog
 const m1max: Hardware = { os: 'darwin', arch: 'arm64', cpuModel: 'Apple M1 Max', totalRamGB: 32, freeDiskGB: 500, gpu: { kind: 'unified', name: 'Apple M1 Max', vramGB: 24 } }
@@ -35,7 +35,7 @@ function recorder(hold: (url: string) => boolean = () => false) {
 }
 
 function setup(over: Partial<SetupDeps> = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+  const root = tempDir('setup')
   const rec = recorder()
   const deps: SetupDeps = { getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0, 0], ...over }
   const c = new SetupController(deps)
@@ -78,7 +78,7 @@ describe('SetupController', () => {
   })
 
   it('is ready before the recommended notes model finishes, which keeps downloading', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = tempDir('setup')
     const rec = recorder((u) => u === bigUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     await c.start()
@@ -91,7 +91,7 @@ describe('SetupController', () => {
   })
 
   it('is ready as soon as speech and the speaker models are in: the first notes model arrives after, and says so', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = tempDir('setup')
     const rec = recorder((u) => u === starterUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     const arrived: string[] = []
@@ -108,7 +108,7 @@ describe('SetupController', () => {
   })
 
   it('a first notes model that fails to download keeps being tried in the background; ready stays', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = tempDir('setup')
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let fails = 3
     const download: DownloadDeps['download'] = async (u, ...rest) => { if (u === starterUrl && fails-- > 0) throw new Error('fetch failed'); return inner.download(u, ...rest) }
@@ -121,7 +121,7 @@ describe('SetupController', () => {
   })
 
   it('the embedding model (meaning search) comes after the first notes model and before the bigger one; ready never waits for it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = tempDir('setup')
     const rec = recorder((u) => u === embedUrl)
     const c = new SetupController({ getHardware: async () => m1max, getCatalog: async () => catalog, modelsDir: root, download: rec.deps, sha256Override: 'FAKE', retryDelaysMs: [0] })
     const arrived: string[] = []
@@ -139,7 +139,7 @@ describe('SetupController', () => {
   })
 
   it('an embedding model that fails keeps being tried, and the bigger notes model does not wait for it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-setup-'))
+    const root = tempDir('setup')
     const inner = fakeDownloadDeps({ stepMs: 0 })
     let fails = 5
     const asked: string[] = []
@@ -569,7 +569,7 @@ describe('optional better notes model', () => {
 
   it('skips in the gap, persists across launches, and Settings can download it again once', async () => {
     const rec = recorder(u => u === embedUrl)
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-upgrade-'))
+    const root = tempDir('upgrade')
     const prefs = preference(root)
     const { c } = setup({ modelsDir: root, download: rec.deps, upgradePreference: prefs })
     await c.start()
@@ -720,7 +720,7 @@ describe('optional better notes model', () => {
   })
 
   it('Settings removal restores the small model, waits for work and unload, then stays removed after restart', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-upgrade-'))
+    const root = tempDir('upgrade')
     const prefs = preference(root)
     const { c } = setup({ modelsDir: root, upgradePreference: prefs })
     const engine = new FakeEngine()

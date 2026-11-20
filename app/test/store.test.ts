@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { openStore, type Store } from '../src/main/store'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
 function fresh(): Store {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+  const d = tempDir('store')
   dirs.push(d)
   const s = openStore(join(d, 'yogurt.db'))
   stores.push(s)
@@ -118,7 +118,7 @@ describe('store', () => {
   })
 
   it('adds the edited column to a notes table from before it existed', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+    const d = tempDir('store')
     dirs.push(d)
     const old = new DatabaseSync(join(d, 'yogurt.db'))
     old.exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, meeting_id TEXT NOT NULL UNIQUE, mine TEXT NOT NULL DEFAULT '', enhanced TEXT)`)
@@ -164,7 +164,7 @@ describe('store', () => {
   })
 
   it('keeps notes search correct after VACUUM', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-'))
+    const d = tempDir('store')
     dirs.push(d)
     const file = join(d, 'yogurt.db')
     const s = openStore(file)
@@ -307,7 +307,7 @@ describe('round 2: hidden lines', () => {
 
 describe('a database from when voices had letters', () => {
   it('loses the letters (those lines say Them) and the speakers table; names from the call are kept from then on', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+    const d = tempDir('store'); dirs.push(d)
     const file = join(d, 'y.db')
     const first = openStore(file)
     const m = first.createMeeting({ title: 't', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'done' })
@@ -356,7 +356,7 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
   }
   for (const mode of ['from before', 'fresh'] as const) for (const [name, step] of Object.entries(steps)) {
     it(`${mode}: ${name} leaves the search index whole`, () => {
-      const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+      const d = tempDir('store'); dirs.push(d)
       const file = join(d, 'y.db')
       if (mode === 'from before') oldSchema(file)
       const s = openStore(file); stores.push(s)
@@ -387,7 +387,7 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
     expect(() => integrity(s)).not.toThrow()
   })
   it('a database from before: hide and show twice, then delete with a hidden line', () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-store-')); dirs.push(d)
+    const d = tempDir('store'); dirs.push(d)
     const file = join(d, 'y.db'); oldSchema(file)
     const s = openStore(file); stores.push(s)
     const b = s.segments('old1').find((x) => x.track === 'me')!.id
@@ -398,7 +398,7 @@ describe('round 3: the search index and hidden lines, on a fresh database and on
 })
 
 it('persists speaker order across reopening and late attribution, including hidden history', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-colours-')); dirs.push(dir)
+  const dir = tempDir('colours'); dirs.push(dir)
   const file = join(dir, 'yogurt.db')
   const first = openStore(file)
   const m = first.createMeeting({ ...base, startedAt: 1 })
@@ -440,7 +440,7 @@ it('retains confident echoes through storage and the final sweep, and restores t
 })
 
 it('backfills only strong word matches among already hidden historical echoes', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-echo-confidence-')); dirs.push(dir)
+  const dir = tempDir('echo-confidence'); dirs.push(dir)
   const file = join(dir, 'y.db'), s = openStore(file)
   const m = s.createMeeting({ title: 't', startedAt: 1, endedAt: 2, eventId: null, app: null, attendees: [], state: 'done' })
   s.addSegments([
@@ -480,7 +480,7 @@ it('refreshes all linked copies and aliases once, without reviving unlinked note
   expect(s.rememberEvent(event)).toEqual([])
 })
 it('migrates old meetings with nullable snapshot columns and preserves them across reopening', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-snapshot-migration-')); dirs.push(dir)
+  const dir = tempDir('snapshot-migration'); dirs.push(dir)
   const file = join(dir, 'yogurt.db')
   const old = new DatabaseSync(file)
   old.exec(`CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER, event_id TEXT, event_started_at INTEGER, app TEXT, attendees TEXT NOT NULL DEFAULT '[]', state TEXT NOT NULL, language TEXT);

@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 async function launch(env: Record<string, string> = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -418,7 +416,7 @@ test('deleting a folder asks first and keeps its meetings; deleting a meeting ta
 })
 
 test('a backup carries folders and which meetings are in them', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-backup-')), 'Yogurt backup.zip')
+  const file = join(tempDir('backup'), 'Yogurt backup.zip')
   const a = await launch({ YOGURT_BACKUP_PATH: file })
   try {
     await withMeetings(a.app, a.page)

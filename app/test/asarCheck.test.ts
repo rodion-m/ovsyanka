@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createPackage } from '@electron/asar'
 // @ts-expect-error plain script, no types
 import { sourceFolders, checkAsar } from '../scripts/asar-check.mjs'
+import { tempDir } from './support/tempDir'
 
 it('flags source and test folders at the top of the archive, nothing else', () => {
   expect(sourceFolders(['/out', '/out/main/index.js', '/package.json', '/node_modules/node-llama-cpp/src/index.js'])).toEqual([])
@@ -16,7 +16,7 @@ it('flags workspace packages copied into node_modules (vite bundles them; a copy
 })
 
 it('reads a real archive: a clean one passes, one with src in it fails', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-asar-'))
+  const root = tempDir('asar')
   const make = async (name: string, files: string[]) => {
     const dir = join(root, name)
     for (const f of files) { mkdirSync(join(dir, f, '..'), { recursive: true }); writeFileSync(join(dir, f), 'x') }

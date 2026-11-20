@@ -1,11 +1,9 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 test('attendee suggestions rank invitees, keep distinct email identities, and support keyboard and pointer selection', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'attendee-suggestions-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('attendee-suggestions'),
   } })
   try {
     const page = await app.firstWindow()
@@ -64,7 +62,7 @@ test('attendee suggestions rank invitees, keep distinct email identities, and su
 test('auto titles use current attendees after edits while an edited summary stays intact', async () => {
   test.setTimeout(90_000)
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'attendee-titles-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '1', YOGURT_USER_DATA: tempDir('attendee-titles'),
   } })
   try {
     const page = await app.firstWindow()

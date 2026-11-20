@@ -1,4 +1,4 @@
-import { _electron as electron, expect, test } from '@playwright/test'
+import { _electron as electron, expect, test } from './support/playwright'
 import { execFile, spawn } from 'node:child_process'
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

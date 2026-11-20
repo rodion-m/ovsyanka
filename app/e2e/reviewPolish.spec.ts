@@ -1,10 +1,9 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { writeFileSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 async function launch(permissions = false, env: Record<string, string> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-polish-'))
+  const dir = tempDir('polish')
   writeFileSync(join(dir, 'settings.json'), JSON.stringify({ welcomed: true, introSeen: true }))
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
     ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: dir,

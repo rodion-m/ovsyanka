@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { genericTitle, setGenericTitles } from '../src/main/titles'
 import { openStore, type Store } from '../src/main/store'
 import { initMeetings, renameMeeting, startMeeting, stopMeeting } from '../src/main/meeting'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -63,7 +63,7 @@ describe('where a title came from', () => {
     expect(store.meeting(m.id)).toMatchObject({ title: 'Pricing with Dana', titleSource: 'auto' })
   })
   it("a database from before titles had a source gets one: generic titles generic (even an event's), other events calendar, the rest theirs", () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-titles-')); dirs.push(d)
+    const d = tempDir('titles'); dirs.push(d)
     const file = join(d, 'yogurt.db')
     const old = new DatabaseSync(file)
     old.exec(`CREATE TABLE meetings (id TEXT PRIMARY KEY, title TEXT NOT NULL, started_at INTEGER NOT NULL, ended_at INTEGER, event_id TEXT, app TEXT, attendees TEXT NOT NULL DEFAULT '[]', state TEXT NOT NULL, language TEXT);

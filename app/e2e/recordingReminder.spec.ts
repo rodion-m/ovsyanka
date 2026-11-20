@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 for (const theme of ['light', 'dark'] as const) test(`standard recording reminder toast in ${theme}, once per recording`, async ({}, info) => {
   test.setTimeout(180_000)
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-reminder-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('reminder'),
   } })
   try {
     const page = await app.firstWindow()

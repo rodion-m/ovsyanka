@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Meeting, type Store } from '../src/main/store'
 import { hookNotes, NOTES_MAX } from '../src/main/notes'
 import { createQueue } from '../src/main/notes/queue'
 import type { Llm } from '../src/main/notes/enhance'
 import type { NoteView } from '../src/shared/types'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -17,7 +17,7 @@ afterEach(() => {
 const wait = (ms = 5) => new Promise((r) => setTimeout(r, ms))
 
 function setup(o: { me?: string; named?: () => Promise<void>; namesWaitMs?: number; transcriptWaitMs?: number; reply?: string | ((prompt: string) => string); during?: () => void; load?: Promise<void>; title?: string; recording?: () => boolean; smallMac?: boolean; showLoading?: boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-notes-'))
+  const d = tempDir('notes')
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
   stores.push(store)

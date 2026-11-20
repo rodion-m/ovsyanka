@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { existsSync, mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 async function launch(env: Record<string, string>) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -16,7 +15,7 @@ const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T
   app.evaluate((_e, [fn, arg]) => (globalThis as unknown as Record<string, Record<string, (a?: unknown) => unknown>>).__fake__[fn as string](arg), [fn, arg] as const) as Promise<T>
 
 test('every meeting goes to one file and into a fresh Yogurt, with notes, transcript, audio and search; twice adds nothing', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-backup-')), 'Yogurt backup.zip')
+  const file = join(tempDir('backup'), 'Yogurt backup.zip')
   const a = await launch({ YOGURT_BACKUP_PATH: file })
   let id: string
   try {
@@ -69,7 +68,7 @@ test('every meeting goes to one file and into a fresh Yogurt, with notes, transc
 
 // the zip itself differs by computer (ditto on a Mac, JavaScript elsewhere): the round trip must hold on each
 test('@everywhere a backup restores into a fresh Yogurt on this computer, recordings too', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt backup ü-')), 'Yogurt backup.zip')
+  const file = join(tempDir('yogurt backup ü'), 'Yogurt backup.zip')
   const a = await launch({ YOGURT_BACKUP_PATH: file })
   let id: string
   try {
@@ -88,7 +87,7 @@ test('@everywhere a backup restores into a fresh Yogurt on this computer, record
 })
 
 test('import waits while a meeting records, and an unreadable file reports a retryable failure', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-backup-'))
+  const dir = tempDir('backup')
   const { app, page } = await launch({ YOGURT_BACKUP_PATH: join(dir, 'missing.zip') })
   try {
     await page.getByTestId('settings-open').click()

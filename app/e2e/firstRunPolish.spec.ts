@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 const before = process.env.YOGURT_UI_REVIEW === 'before'
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 test('download progress keeps its geometry as percentages and phases change', async ({}, info) => {
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-download-layout-')), YOGURT_FAKE_STEP_MS: '60000' } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('download-layout'), YOGURT_FAKE_STEP_MS: '60000' } })
   try {
     const page = await app.firstWindow()
     await expect(page.getByTestId('setup-ready')).toBeVisible()
@@ -33,7 +32,7 @@ test('download progress keeps its geometry as percentages and phases change', as
 })
 
 test('first-run notification stands alone and help stays in a bounded disclosure', async ({}, info) => {
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-first-run-polish-')) } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_USER_DATA: tempDir('first-run-polish') } })
   try {
     const page = await app.firstWindow()
     await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -74,7 +73,7 @@ test('first-run notification stands alone and help stays in a bounded disclosure
 
 test('the notification title stays inside its column at 720px in Finnish', async ({}, info) => {
   test.skip(before, 'The compact notification is only in the current build.')
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_SYSTEM_LANGUAGES: 'fi', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-notice-finnish-')) } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_SYSTEM_LANGUAGES: 'fi', YOGURT_USER_DATA: tempDir('notice-finnish') } })
   try {
     const page = await app.firstWindow()
     await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -103,7 +102,7 @@ test('the notification title stays inside its column at 720px in Finnish', async
 
 test('hiding the checklist ignores repeat clicks and permission reads from before Hide or Undo', async () => {
   test.skip(before, 'Checklist Undo is only in the current build.')
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-checklist-race-'))
+  const dir = tempDir('checklist-race')
   writeFileSync(join(dir, 'settings.json'), JSON.stringify({ welcomed: true }))
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_USER_DATA: dir } })
   try {
@@ -158,7 +157,7 @@ test('hiding the checklist ignores repeat clicks and permission reads from befor
 
 test('permission help starts collapsed and uses the same secondary action in onboarding and Settings', async ({}, info) => {
   test.skip(before, 'The revised help is only in the current build.')
-  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_CALENDAR: 'granted', YOGURT_FAKE_NOTIFICATIONS: 'granted', YOGURT_FAKE_AX: 'denied', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-help-review-')) } })
+  const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_CALENDAR: 'granted', YOGURT_FAKE_NOTIFICATIONS: 'granted', YOGURT_FAKE_AX: 'denied', YOGURT_USER_DATA: tempDir('help-review') } })
   try {
     const page = await app.firstWindow()
     await page.emulateMedia({ reducedMotion: 'reduce' })

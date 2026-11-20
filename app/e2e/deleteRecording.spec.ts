@@ -1,11 +1,10 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 async function launch(env: Record<string, string> = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-audio-delete-'))
+  const userData = tempDir('audio-delete')
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -92,7 +91,7 @@ test('turning retention off deletes only after saved transcript and summary and 
 })
 
 test('@everywhere a backup with deleted audio restores text without recreating recordings', async () => {
-  const file = join(mkdtempSync(join(tmpdir(), 'yogurt-audio-backup-')), 'backup.zip')
+  const file = join(tempDir('audio-backup'), 'backup.zip')
   const a = await launch({ YOGURT_BACKUP_PATH: file })
   let id: string
   try {

@@ -1,13 +1,13 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Capture, captureArgs, foldersToJoin, hookCapture, recordingBusy, recordingFinished, recordingPaused, recordingSettled, rejoinInterrupted, setRecordingPaused, settleRecording, encodeFrame, FrameParser, type CaptureOpts, type CaptureProc, type Frame } from '../src/main/capture'
 import { fakeAudioDuration, fakeCaptureProc, joinFakeParts } from '../src/main/fakeCapture'
 import { fakeMicList, setFakeMics } from '../src/main/fake'
 import { openStore } from '../src/main/store'
+import { tempDir } from './support/tempDir'
 
 const pcm = (track: 'me' | 'them', ms: number, xs: number[]): Frame => ({ t: 'pcm', track, ms, samples: Float32Array.from(xs) })
 
@@ -158,7 +158,7 @@ describe('fake capture', () => {
   afterEach(() => { if (dir) rmSync(dir, { recursive: true, force: true }) })
 
   it('pause emits no new PCM; resuming retains the existing meeting timeline', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'yogurt-cap-pause-'))
+    dir = tempDir('cap-pause')
     const c = new Capture(fakeCaptureProc(dir))
     const frames: number[] = []
     c.on('pcm', (_track, ms) => frames.push(ms))
@@ -176,7 +176,7 @@ describe('fake capture', () => {
   })
 
   it('append parts preserve the complete original PCM prefix and carry forward timeline after reopening', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'yogurt-cap-append-'))
+    dir = tempDir('cap-append')
     const first = new Capture(fakeCaptureProc(dir))
     await new Promise((r) => setTimeout(r, 350)); await first.stop()
     const original = readFileSync(join(dir, 'me.wav')), startMs = fakeAudioDuration(dir)
@@ -197,7 +197,7 @@ describe('fake capture', () => {
   })
 
   it('records from the chosen fake mic, switches without stopping, and falls back to Auto when it goes away', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'yogurt-cap-mic-'))
+    dir = tempDir('cap-mic')
     setFakeMics(null)
     const c = new Capture(fakeCaptureProc(dir, 0, { mic: 'fake-yeti' }))
     const mics: unknown[] = [], warns: string[] = [], frames: number[] = []
@@ -225,7 +225,7 @@ describe('fake capture', () => {
   })
 
   it('a remembered fake mic that is not here records with Auto, quietly', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'yogurt-cap-mic-'))
+    dir = tempDir('cap-mic')
     setFakeMics(null)
     const c = new Capture(fakeCaptureProc(dir, 0, { mic: 'unplugged' }))
     const mics: unknown[] = [], warns: string[] = []
@@ -237,7 +237,7 @@ describe('fake capture', () => {
   })
 
   it('plays both fixture tracks at real-time speed, and stops', async () => {
-    dir = mkdtempSync(join(tmpdir(), 'yogurt-cap-'))
+    dir = tempDir('cap')
     const c = new Capture(fakeCaptureProc(dir))
     const got: { track: string; ms: number; n: number }[] = []
     c.on('pcm', (track, ms, samples) => got.push({ track, ms, n: samples.length }))
@@ -255,7 +255,7 @@ describe('fake capture', () => {
 
 describe('after a crash', () => {
   it('the meeting row is stopped on the next start and its segments remain', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'yogurt-db-'))
+    const dir = tempDir('db')
     try {
       const file = join(dir, 'yogurt.db')
       const s1 = openStore(file)
@@ -511,7 +511,7 @@ describe('quitting while a recording is being finished', () => {
 })
 
 describe('joining parts left behind by a quit', () => {
-  const root = () => mkdtempSync(join(tmpdir(), 'yogurt-parts-'))
+  const root = () => tempDir('parts')
   it('picks only meeting folders that still have part files', () => {
     const r = root()
     try {
@@ -566,7 +566,7 @@ describe('joining parts left behind by a quit', () => {
 
 describe('waiting for a recording with a cap', () => {
   it('stops waiting after the cap, so what exists can be served', async () => {
-    const r = mkdtempSync(join(tmpdir(), 'yogurt-parts-'))
+    const r = tempDir('parts')
     try {
       mkdirSync(join(r, 'slow')); writeFileSync(join(r, 'slow', 'part.1.json'), '{}')
       void rejoinInterrupted(r, () => new Promise<void>(() => {}))

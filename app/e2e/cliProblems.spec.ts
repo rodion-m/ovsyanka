@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -9,7 +8,7 @@ const recoveryEvidence = '/Users/rodio/.local/state/coordinator-mode/journals/yo
 const zoom = { bundleId: 'us.zoom.xos', name: 'zoom.us' }
 
 async function launch(locale: 'en' | 'ru', failure: 'cli-failed' | 'cli-missing' | 'bad-output' | 'bad-output-once', backend: 'agy' | 'porch' = 'agy') {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-cli-problems-'))
+  const userData = tempDir('cli-problems')
   writeFileSync(join(userData, 'settings.json'), JSON.stringify({ language: locale, ai: { backend } }))
   const app = await electron.launch({ args: [main], env: {
     ...process.env, YOGURT_BACKGROUND: '1', YOGURT_FAKE: '1', YOGURT_AI_BACKEND: '', YOGURT_FAKE_CLI_FAILURE: failure,

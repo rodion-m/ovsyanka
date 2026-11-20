@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 test('first run: progress while the models arrive, then the home screen', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   // slow enough to see the bar (only the speech model is waited for)
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, YOGURT_FAKE_STEP_MS: '500' } })
   try {
@@ -27,7 +26,7 @@ test('first run: progress while the models arrive, then the home screen', async 
 })
 
 test('with fake downloads setup finishes by itself, and the second launch goes straight to home', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const env = { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData }
   for (let i = 0; i < 2; i++) {
     const app = await electron.launch({ args: [main], env })
@@ -39,7 +38,7 @@ test('with fake downloads setup finishes by itself, and the second launch goes s
 })
 
 test('first run records as soon as speech and speakers are in; notes say they are getting ready, then write themselves once the notes model lands', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   // the notes model takes its time: everything else is quick; it lands well after the meeting and the question, however slow the machine
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, YOGURT_FAKE_NOTES_MODEL_MS: '40000' } })
   try {
@@ -76,7 +75,7 @@ const firstRun = { YOGURT_FAKE_PERMISSIONS: 'unknown', YOGURT_FAKE_CALENDAR: 'no
 const focus = (page: Page) => page.evaluate(() => window.dispatchEvent(new Event('focus')))
 
 test('a slow start shows the launch screen until Yogurt is ready, then goes', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await launchWith(userData, { YOGURT_FAKE_BOOT_MS: '2000' })
   try {
     const page = await app.firstWindow()
@@ -88,7 +87,7 @@ test('a slow start shows the launch screen until Yogurt is ready, then goes', as
 })
 
 test('a quick start goes straight to home, with the launch screen gone', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   const app = await launchWith(userData)
   try {
     const page = await app.firstWindow()
@@ -98,7 +97,7 @@ test('a quick start goes straight to home, with the launch screen gone', async (
 })
 
 test('the welcome says what Yogurt is on one screen, and Get started goes on to the permissions', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -123,7 +122,7 @@ test('the welcome says what Yogurt is on one screen, and Get started goes on to 
 })
 
 test('every screen uses the same buttons: Allow and Not now are the same height and sit in the same place on every step', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -153,7 +152,7 @@ test('every screen uses the same buttons: Allow and Not now are the same height 
 })
 
 test('every permission step leads with what it gives, Allow asks the Mac, and Accessibility goes through System Settings and back', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -200,7 +199,7 @@ test('every permission step leads with what it gives, Allow asks the Mac, and Ac
 })
 
 test('turned off before: the step says so, opens System Settings with the guide, notices it on return, and can reopen Yogurt', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, { YOGURT_FAKE_PERMISSIONS: 'denied', YOGURT_FAKE_CALENDAR: 'granted' })
   try {
     const page = await app.firstWindow()
@@ -233,7 +232,7 @@ test('turned off before: the step says so, opens System Settings with the guide,
 })
 
 test('"Not now" everywhere: home lists what is missing, essentials first, and can be put away until something new goes missing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, firstRun)
   try {
     const page = await app.firstWindow()
@@ -314,7 +313,7 @@ test('"Not now" everywhere: home lists what is missing, essentials first, and ca
 })
 
 test('starting a recording without the mic says so under the note, with a button that turns it on; one never asked is asked then', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   // the mic was turned off; call audio was put off in the first run
   const app = await launchWith(dir, { YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_MIC: 'denied' })
   try {
@@ -340,7 +339,7 @@ test('starting a recording without the mic says so under the note, with a button
 })
 
 test('a "no" at the Mac\'s prompt when recording starts says so too', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const dir = tempDir('e2e')
   const app = await launchWith(dir, { YOGURT_FAKE_PERMISSIONS: 'granted', YOGURT_FAKE_ANSWER: 'deny' })
   try {
     const page = await app.firstWindow()

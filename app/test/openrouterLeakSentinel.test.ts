@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { aiSettings } from '../src/shared/ai'
 import { hookAiPreferences } from '../src/main/harness/ipc'
 import { OpenRouterKeyStore, type OpenRouterKeyFetch } from '../src/main/harness/openrouterKey'
@@ -10,6 +9,7 @@ import { exportBackup } from '../src/main/backup'
 import { unpack } from '../src/main/zip'
 import { logToFile } from '../src/main/log'
 import { createOpenRouter } from '../src/main/harness/openrouter'
+import { tempDir } from './support/tempDir'
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => handlers.set(name, fn) } }))
@@ -45,7 +45,7 @@ afterEach(async () => {
 
 describe('OpenRouter credential leak sentinel', () => {
   it('checks save, 401, header-echoing 500, adapter diagnostics, main.log, backup and encrypted files', async () => {
-    userData = await mkdtemp(join(tmpdir(), 'yogurt-openrouter-leak-'))
+    userData = tempDir('openrouter-leak')
     const dir = userData
     const safeStorage = {
       isEncryptionAvailable: () => true,

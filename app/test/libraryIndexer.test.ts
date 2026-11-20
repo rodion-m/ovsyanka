@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { Library } from '../src/main/library/store'
@@ -8,6 +7,7 @@ import { createEmbedder } from '../src/main/library/embedder'
 import { createIndexer } from '../src/main/library/indexer'
 import { createQueue } from '../src/main/notes/queue'
 import { FakeEngine } from '../src/main/notes/fake'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 function rig(o: { embedPath?: string; recording?: () => boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-indexer-'))
+  const d = tempDir('indexer')
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
   stores.push(store)

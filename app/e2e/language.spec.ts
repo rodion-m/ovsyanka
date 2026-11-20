@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
 
 /** system: the Mac's languages, as the Mac lists them */
-async function launch(system: string, userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))) {
+async function launch(system: string, userData = tempDir('e2e')) {
   const app = await electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, YOGURT_SYSTEM_LANGUAGES: system } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()

@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 test('glass is limited to chrome, with solid reading surfaces and a reduced-transparency fallback', async ({}, info) => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-glass-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('glass'),
   } })
   try {
     const page = await app.firstWindow()
@@ -52,7 +51,7 @@ test('glass is limited to chrome, with solid reading surfaces and a reduced-tran
           evidence.wallpaper = photo ?? 'not available'
           let image = ''
           if (photo) {
-            const png = join(mkdtempSync(join(tmpdir(), 'yogurt-backdrop-')), 'wallpaper.png')
+            const png = join(tempDir('backdrop'), 'wallpaper.png')
             execFileSync('/usr/bin/sips', ['-Z', '1200', '-s', 'format', 'png', join(desktop, photo), '--out', png])
             image = `data:image/png;base64,${readFileSync(png).toString('base64')}`
           }

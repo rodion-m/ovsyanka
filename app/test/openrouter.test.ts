@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { tmpdir } from 'node:os'
 import { aiSettings, type AiProblemUpdate, type AiSettings } from '../src/shared/ai'
 import { classifyOpenRouterError, createOpenRouter, type OpenRouterLogEntry } from '../src/main/harness/openrouter'
 import { HarnessError } from '../src/main/harness/process'
@@ -13,6 +12,7 @@ import { createSpool, spoolDirOf } from '../src/main/asr/spool'
 import { createPipeline } from '../src/main/asr/pipeline'
 import { wavBytes } from '../src/main/asr/transcribe'
 import type { Chunk } from '../src/main/asr/chunker'
+import { tempDir } from './support/tempDir'
 
 const KEY = `sk-or-v1-${'abcdef0123456789'.repeat(4)}`
 const LIVE_FIXTURES = join(process.cwd(), 'test/fixtures/openrouter/live')
@@ -20,7 +20,7 @@ const roots: string[] = []
 afterEach(async () => { vi.useRealTimers(); vi.restoreAllMocks(); await Promise.all(roots.splice(0).map(path => rm(path, { recursive: true, force: true })) ) })
 
 async function root() {
-  const path = await mkdtemp(join(tmpdir(), 'yogurt-openrouter-'))
+  const path = tempDir('openrouter')
   roots.push(path)
   return path
 }

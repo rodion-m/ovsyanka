@@ -1,12 +1,12 @@
 import { createServer } from 'node:http'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { ChecksumError, ensureFile, fetchResumable, fileNameFor, isVerified, partialDownloadGB, retryStalled, safeRelPath, type DownloadDeps } from '../src/main/downloader'
+import { tempDir } from './support/tempDir'
 
 const URL = 'https://huggingface.co/x/y/resolve/main/model-Q4.gguf'
-const dir = () => mkdtempSync(join(tmpdir(), 'yogurt-dl-'))
+const dir = () => tempDir('dl')
 
 function deps(over: Partial<DownloadDeps> = {}): DownloadDeps {
   return {

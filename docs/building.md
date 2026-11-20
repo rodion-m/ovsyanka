@@ -30,6 +30,8 @@ pnpm -C app test   # unit tests
 pnpm -C app e2e    # builds, then drives the app with Playwright in fake mode
 ```
 
+Tests take profiles and scratch folders from `tempDir(name)` (`app/test/support/tempDir.ts` for unit tests, `app/e2e/support/playwright.ts` for e2e specs, which also import `test`, `expect` and `_electron` from there). Each folder is `yogurt-<name>-XXXXXX` in the system temp folder and is removed when its test ends; an e2e test's apps are closed first, also after a failure or timeout. `YOGURT_KEEP_TEMP=1` keeps them for debugging: e2e lists them on the test's annotations, unit tests print them. `test/tempDirGuard.test.ts` fails when a test makes a temp folder another way.
+
 ## Build an installer
 
 ```sh

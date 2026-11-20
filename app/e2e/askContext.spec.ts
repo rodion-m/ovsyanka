@@ -1,12 +1,10 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // CI only: this Mac's local E2E guard remains in force.
 test('Ask shares meeting history and drafts, and Command-J starts the right context', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-ask-context-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('ask-context'),
   } })
   try {
     const page = await app.firstWindow()
@@ -58,7 +56,7 @@ test('Ask shares meeting history and drafts, and Command-J starts the right cont
 
 test('the note panel and full conversation expose Rename and a single Delete confirmation', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '10', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-ask-actions-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '10', YOGURT_USER_DATA: tempDir('ask-actions'),
   } })
   try {
     const page = await app.firstWindow()
@@ -114,7 +112,7 @@ test('the note panel and full conversation expose Rename and a single Delete con
 
 test('Ask has soft thread edges, compact bubbles, and expands the same reading position', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '10', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-ask-edges-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '10', YOGURT_USER_DATA: tempDir('ask-edges'),
   } })
   try {
     const page = await app.firstWindow()
@@ -171,7 +169,7 @@ test('Ask has soft thread edges, compact bubbles, and expands the same reading p
 
 test('Ask anchors context growth and retains picker results between searches', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-ask-layout-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('ask-layout'),
   } })
   try {
     const page = await app.firstWindow()

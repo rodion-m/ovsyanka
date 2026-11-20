@@ -1,11 +1,9 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 for (const theme of ['light', 'dark'] as const) test(`split metadata popovers stay separate in a short note (${theme})`, async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-e2e-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('e2e'),
   } })
   try {
     const page = await app.firstWindow()

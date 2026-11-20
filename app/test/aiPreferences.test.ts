@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { aiSettings, type AiPreferences, type AiSettings } from '../src/shared/ai'
 import { configuredAi, consumeOpenRouterKey, loadSettings, updateSettings } from '../src/main/settings'
 import { hookAiPreferences } from '../src/main/harness/ipc'
 import { checkHarness } from '../src/main/harness/index'
+import { tempDir } from './support/tempDir'
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 vi.mock('electron', () => ({ ipcMain: { handle: (name: string, fn: (...args: unknown[]) => unknown) => handlers.set(name, fn) } }))
@@ -17,7 +17,7 @@ const restart = vi.fn(() => true)
 const check = vi.fn(async (_settings: AiSettings) => ({ ok: true, message: 'Available executable' }))
 beforeEach(() => {
   handlers.clear(); vi.clearAllMocks()
-  dir = mkdtempSync(join(tmpdir(), 'yogurt-ai-preferences-'))
+  dir = tempDir('ai-preferences')
   file = join(dir, 'settings.json')
   active = aiSettings({ backend: 'local' })
   hookAiPreferences({ file, active, restart, check, env: {} })

@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest'
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHelperRunner } from '../src/main/calendar'
+import { tempDir } from './support/tempDir'
 
 /** a stand-in helper: answers at once, or waits (like a permission question nobody answered) */
 function fakeHelper() {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-helper-'))
+  const dir = tempDir('helper')
   const file = join(dir, 'yogurt-mac')
   writeFileSync(file, '#!/bin/sh\nif [ "$1" = wait ]; then exec sleep 60; fi\necho \'{"ok":true}\'\n')
   chmodSync(file, 0o755)

@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { helperCopyPath, installHelper, launchCommand, mcpAddress, startedHidden } from '../src/main/mcp/paths'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 afterEach(() => { dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-mcp-paths-')); dirs.push(d); return d }
+const tmp = () => { const d = tempDir('mcp-paths'); dirs.push(d); return d }
 
 describe('where AI apps reach Yogurt', () => {
   it('is the socket in the profile folder on a Mac, as it always was', () => {

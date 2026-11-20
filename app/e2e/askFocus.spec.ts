@@ -1,6 +1,4 @@
-import { _electron as electron, expect, test, type Locator, type Page } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type Locator, type Page, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -35,7 +33,7 @@ async function keepsFocus(page: Page, prefix: string) {
 // pieces slow enough that a slow machine still sees an answer while it is being written
 async function launch(name: string) {
   const app = await electron.launch({ args: [main], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '300', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), `yogurt-${name}-`)),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_LLM_MS: '300', YOGURT_USER_DATA: tempDir(name),
   } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()

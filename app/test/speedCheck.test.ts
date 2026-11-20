@@ -1,13 +1,13 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { fakeMeasure, measureSpeed, readWav, speedClipPath, speedStore } from '../src/main/asr/speedCheck'
 import { wavBytes } from '../src/main/asr/transcribe'
 import type { WhisperServer } from '../src/main/asr/server'
+import { tempDir } from './support/tempDir'
 
-const dir = () => mkdtempSync(join(tmpdir(), 'yogurt-speed-'))
+const dir = () => tempDir('speed')
 
 describe('the speed check (Windows and Linux)', () => {
   it('ships a 15 s clip of speech, 16 kHz mono', () => {

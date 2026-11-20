@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { execFile, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { crc32, deflateRawSync } from 'node:zlib'
-import { closeSync, createWriteStream, mkdirSync, openSync, writeSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { closeSync, createWriteStream, mkdirSync, openSync, writeSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import yazl from 'yazl'
 import { pack, packPortable, unpack, unpackPortable } from '../src/main/zip'
+import { tempDir } from './support/tempDir'
 
 vi.mock('node:child_process', async (original) => {
   const actual = await original<typeof import('node:child_process')>()
@@ -16,7 +16,7 @@ vi.mock('node:child_process', async (original) => {
 beforeEach(() => vi.resetAllMocks())
 
 const dirs: string[] = []
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-zip-')); dirs.push(d); return d }
+const tmp = () => { const d = tempDir('zip'); dirs.push(d); return d }
 afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })))
 
 /** every file under dir, as relative paths with / */

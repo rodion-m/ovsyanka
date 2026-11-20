@@ -1,13 +1,12 @@
 import { selectNoteVersion } from './noteVersion'
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 async function launch(env: Record<string, string> = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-autosave-'))
+  const userData = tempDir('autosave')
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData, ...env } })
   const page = await app.firstWindow()
   await expect(page.getByTestId('home')).toBeVisible()
@@ -160,7 +159,7 @@ test('closing retains the renderer and last keystroke; failed quit returns to no
 })
 
 test('backup refuses unsaved text without replacing the previous archive; retry exports the exact latest note', async () => {
-  const out = join(mkdtempSync(join(tmpdir(), 'yogurt-autosave-backup-')), 'backup.zip')
+  const out = join(tempDir('autosave-backup'), 'backup.zip')
   const { app, page, db, id } = await launch({ YOGURT_BACKUP_PATH: out })
   try {
     await selectNoteVersion(page, 'mine')
@@ -183,7 +182,7 @@ test('backup refuses unsaved text without replacing the previous archive; retry 
     await page.keyboard.press('Meta+,')
     await page.getByTestId('backup-export').click()
     await expect(page.getByTestId('backup-said')).toContainText('Exported 1 meeting')
-    const unpacked = mkdtempSync(join(tmpdir(), 'yogurt-autosave-unpacked-'))
+    const unpacked = tempDir('autosave-unpacked')
     execFileSync('/usr/bin/ditto', ['-x', '-k', out, unpacked])
     const snapshot = new DatabaseSync(join(unpacked, 'yogurt.db'), { readOnly: true })
     try { expect(snapshot.prepare('SELECT mine FROM notes WHERE meeting_id = ?').get(id)).toMatchObject({ mine: latest }) }
@@ -266,7 +265,7 @@ test('an older save view arriving during new typing cannot replace the visible e
 })
 
 test('backup flushes a renderer-only draft after transport failure before invoking the export handler', async () => {
-  const out = join(mkdtempSync(join(tmpdir(), 'yogurt-transport-backup-')), 'backup.zip')
+  const out = join(tempDir('transport-backup'), 'backup.zip')
   const { app, page, db, id } = await launch({ YOGURT_BACKUP_PATH: out })
   try {
     expect((await page.evaluate(() => window.yogurt.backup.export())).ok).toBe(true)
@@ -306,7 +305,7 @@ test('backup flushes a renderer-only draft after transport failure before invoki
     await page.getByTestId('backup-export').click()
     await expect(page.getByTestId('backup-said')).toContainText('Exported 1 meeting')
     expect(await app.evaluate(() => (globalThis as unknown as { __backupCalls: number }).__backupCalls)).toBe(1)
-    const unpacked = mkdtempSync(join(tmpdir(), 'yogurt-transport-unpacked-'))
+    const unpacked = tempDir('transport-unpacked')
     execFileSync('/usr/bin/ditto', ['-x', '-k', out, unpacked])
     const snapshot = new DatabaseSync(join(unpacked, 'yogurt.db'), { readOnly: true })
     try { expect(snapshot.prepare('SELECT mine FROM notes WHERE meeting_id = ?').get(id)).toMatchObject({ mine: latest }) }

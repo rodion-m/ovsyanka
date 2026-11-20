@@ -1,12 +1,12 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { audioExts, createAudioHandler, parseRange, trackFile } from '../src/main/audio'
+import { tempDir } from './support/tempDir'
 
 const ID = '3f2b8c1e-7d4a-4c9b-9e1f-0a1b2c3d4e5f'
 function setup(o: { known?: (id: string) => boolean; ready?: () => Promise<void> } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+  const root = tempDir('audio')
   const dirOf = (id: string) => join(root, 'meetings', id)
   mkdirSync(dirOf(ID), { recursive: true })
   writeFileSync(join(dirOf(ID), 'me.m4a'), Buffer.from('0123456789'))
@@ -79,7 +79,7 @@ describe('the yogurt-audio protocol', () => {
     expect((await p).status).toBe(200)
   })
   it('says not found for a track that was never written', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = tempDir('audio')
     const handle = createAudioHandler({ dirOf: (id) => join(root, id), known: () => true, ready: async () => {}, exts: ['m4a'] })
     expect((await get(handle, `yogurt-audio://${ID}/me`)).status).toBe(404)
   })
@@ -93,7 +93,7 @@ describe('recordings from either kind of computer', () => {
     expect(audioExts('darwin', true)).toEqual(['wav'])
   })
   it('serves an Ogg recording as audio/ogg, and a Mac backup\'s m4a beside it', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = tempDir('audio')
     mkdirSync(join(root, ID))
     writeFileSync(join(root, ID, 'me.ogg'), 'OggS-me')
     writeFileSync(join(root, ID, 'them.m4a'), 'mac-them')
@@ -109,7 +109,7 @@ describe('recordings from either kind of computer', () => {
 
 describe('a meeting restored from another computer', () => {
   it('a Mac plays a Windows or Linux meeting (Ogg Opus), and still prefers its own m4a', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'yogurt-audio-'))
+    const root = tempDir('audio')
     mkdirSync(join(root, ID))
     writeFileSync(join(root, ID, 'me.ogg'), 'OggS-pc')
     writeFileSync(join(root, ID, 'them.ogg'), 'OggS-pc-them')

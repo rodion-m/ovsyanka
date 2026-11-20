@@ -1,16 +1,17 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { availableParallelism, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWhisperServer, killStale, recoverer } from '../src/main/asr/server'
 import { createTranscriber } from '../src/main/asr/transcribe'
+import { tempDir } from './support/tempDir'
 
 /**
  * a stand-in for the whisper-server program: answers GET / on --host/--port once it has "loaded".
  * modes: what each launch does with a request to /inference (the last one repeats): ok, crash (exits), wedge (never answers).
  */
 function fakeBinary(loadMs = 0, modes: string[] = ['ok']) {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-ws-'))
+  const dir = tempDir('ws')
   const js = join(dir, 'ws.js')
   writeFileSync(join(dir, 'modes'), modes.join('\n'))
   writeFileSync(js, `
@@ -94,7 +95,7 @@ describe.skipIf(process.platform === 'win32')('whisper server', () => {
   })
 
   it('fails when the program exits before it answers', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'yogurt-ws-'))
+    const dir = tempDir('ws')
     const bin = join(dir, 'whisper-server')
     writeFileSync(bin, '#!/bin/sh\nexit 3\n'); chmodSync(bin, 0o755)
     await expect(make(bin).url()).rejects.toThrow(/exited/)
@@ -258,7 +259,7 @@ describe('pid file', () => {
     const killed: number[] = []
     return { killed, deps: { name: (pid: number) => names[pid] ?? null, kill: (pid: number) => { killed.push(pid) } } }
   }
-  const pidFile = () => join(mkdtempSync(join(tmpdir(), 'yogurt-pid-')), 'whisper-server.pid')
+  const pidFile = () => join(tempDir('pid'), 'whisper-server.pid')
 
   it('kills a left-over whisper-server and removes the file', () => {
     const f = pidFile(); writeFileSync(f, '4242')

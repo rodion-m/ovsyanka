@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { openStore, type Store } from '../src/main/store'
@@ -9,6 +8,7 @@ import { BACKUP_FORMAT, backupExcluded, carriedTables, checkManifest, exportBack
 import { Library } from '../src/main/library/store'
 import { pack, packPortable, unpack, unpackPortable } from '../src/main/zip'
 import { SPOOL_DIR } from '../src/main/asr/spool'
+import { tempDir } from './support/tempDir'
 
 vi.mock('../src/main/zip', async (original) => {
   const actual = await original<typeof import('../src/main/zip')>()
@@ -22,7 +22,7 @@ vi.mock('node:fs/promises', async (original) => {
 const dirs: string[] = []
 const stores: Store[] = []
 beforeEach(() => vi.resetAllMocks())
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-backup-')); dirs.push(d); return d }
+const tmp = () => { const d = tempDir('backup'); dirs.push(d); return d }
 function fresh(): Store {
   const s = openStore(join(tmp(), 'yogurt.db'))
   stores.push(s)

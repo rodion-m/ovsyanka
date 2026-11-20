@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { Library } from '../src/main/library/store'
@@ -9,6 +8,7 @@ import { createIndexer } from '../src/main/library/indexer'
 import { retrieve } from '../src/main/library/retrieve'
 import { toVector } from '../src/main/library/vectors'
 import { createQueue } from '../src/main/notes/queue'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -26,7 +26,7 @@ const meaning = (t: string) => /pric|cost|dollar|money|cheap|expensive/i.test(t.
   : /launch|live|release|ship/i.test(t.replace(/^.*\| (?:query|text): /, '')) ? [0, 1, 0] : [0, 0, 1]
 
 async function rig(o: { embeds?: boolean } = {}) {
-  const d = mkdtempSync(join(tmpdir(), 'yogurt-retrieve-'))
+  const d = tempDir('retrieve')
   dirs.push(d)
   const store = openStore(join(d, 'yogurt.db'))
   stores.push(store)
@@ -103,7 +103,7 @@ describe('gathering across meetings', () => {
 
 describe('speed', () => {
   it('a library of a thousand meeting hours is searched in under 200 ms', async () => {
-    const d = mkdtempSync(join(tmpdir(), 'yogurt-retrieve-'))
+    const d = tempDir('retrieve')
     dirs.push(d)
     const store = openStore(join(d, 'yogurt.db'))
     stores.push(store)

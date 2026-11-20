@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // @everywhere: the setup speed check of Windows and Linux (fake timings, YOGURT_FAKE_RTF). The Mac CI tries them through YOGURT_FAKE_PLATFORM.
 const main = join(import.meta.dirname, '../out/main/index.js')
 const launch = (env: Record<string, string>) => {
-  const profile = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const profile = tempDir('e2e')
   return { profile, app: electron.launch({ args: [main], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: profile, ...env } }) }
 }
 const stored = (profile: string) => JSON.parse(readFileSync(join(profile, 'speech-speed.json'), 'utf8'))

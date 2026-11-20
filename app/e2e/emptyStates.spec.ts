@@ -1,12 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const before = process.env.YOGURT_UI_REVIEW === 'before'
 for (const theme of ['light', 'dark'] as const) for (const width of [1200, 720]) {
   test(`quiet empty states below their headers at ${width} in ${theme}`, async ({}, info) => {
-    const userData = mkdtempSync(join(tmpdir(), 'yogurt-empty-'))
+    const userData = tempDir('empty')
     writeFileSync(join(userData, 'settings.json'), JSON.stringify({ theme }))
     const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
       ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData,

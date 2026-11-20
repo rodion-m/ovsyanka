@@ -1,5 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -14,6 +13,7 @@ import {
   type OpenRouterModelsCache,
 } from '../src/main/harness/openrouterModels'
 import { normalizeOpenRouterResponse } from '../src/shared/aiCatalog'
+import { tempDir } from './support/tempDir'
 
 type JsonBody = { data: unknown[] }
 const textBody = JSON.parse(await readFile(new URL('./fixtures/openrouter/models-2026-11-18.json', import.meta.url), 'utf8')) as JsonBody
@@ -29,7 +29,7 @@ afterEach(async () => {
 })
 
 async function root(): Promise<string> {
-  const value = await mkdtemp(join(tmpdir(), 'yogurt-openrouter-models-'))
+  const value = tempDir('openrouter-models')
   roots.push(value)
   return value
 }

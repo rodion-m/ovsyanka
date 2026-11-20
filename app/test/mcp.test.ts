@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { connect } from 'node:net'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { createMcp, MCP_TOOLS, type Mcp } from '../src/main/mcp/server'
 import { serveMcp } from '../src/main/mcp/socket'
 import { mcpAddress } from '../src/main/mcp/paths'
 import { randomBytes } from 'node:crypto'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const stores: Store[] = []
@@ -15,7 +15,7 @@ afterEach(() => {
   stores.splice(0).forEach((s) => s.close())
   dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true }))
 })
-const tmp = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-mcp-')); dirs.push(d); return d }
+const tmp = () => { const d = tempDir('mcp'); dirs.push(d); return d }
 
 function setup(o: { enabled?: boolean; platform?: string } = {}) {
   const dir = tmp()

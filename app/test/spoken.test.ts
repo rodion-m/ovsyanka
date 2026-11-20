@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SPOKEN, spokenOf, whisperLanguage } from '../src/shared/spoken'
@@ -8,10 +7,11 @@ import { loadSettings, spokenSetting, updateSettings } from '../src/main/setting
 const handlers = vi.hoisted(() => new Map<string, (...args: any[]) => any>())
 vi.mock('electron', () => ({ app: { getPreferredSystemLanguages: () => ['en-US'] }, ipcMain: { handle: (name: string, fn: (...args: any[]) => any) => handlers.set(name, fn) }, BrowserWindow: {}, nativeTheme: {} }))
 import { hookPreferences } from '../src/main/preferences'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
 const settingsFile = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-spoken-'))
+  const dir = tempDir('spoken')
   dirs.push(dir)
   return join(dir, 'settings.json')
 }

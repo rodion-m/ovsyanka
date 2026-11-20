@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, linkSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { keepsRecording, loadSettings, updateSettings } from '../src/main/settings'
@@ -8,11 +7,12 @@ import { deleteRecording } from '../src/main/deleteRecording'
 import { trackFile, createAudioHandler } from '../src/main/audio'
 import { hookNotes } from '../src/main/notes'
 import { createQueue } from '../src/main/notes/queue'
+import { tempDir } from './support/tempDir'
 
 const roots: string[] = [], stores: Store[] = []
 afterEach(() => { vi.useRealTimers(); stores.splice(0).forEach(s => s.close()); roots.splice(0).forEach(d => rmSync(d, { recursive: true, force: true })) })
 function setup({ transcript = true, summary = true } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-recording-')); roots.push(root)
+  const root = tempDir('recording'); roots.push(root)
   const store = openStore(join(root, 'yogurt.db')); stores.push(store)
   const m = store.createMeeting({ title: 'Launch', startedAt: 1, endedAt: 2000, eventId: null, app: null, state: 'done', attendees: [{ name: 'Ann', email: 'ann@example.com' }] })
   if (transcript) store.addSegments([{ meetingId: m.id, track: 'them', startMs: 0, endMs: 1000, text: 'Launch on Tuesday', speaker: 'Ann' }])

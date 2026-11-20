@@ -1,6 +1,5 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const main = join(import.meta.dirname, '../out/main/index.js')
@@ -8,7 +7,7 @@ const zoom = { bundleId: 'us.zoom.xos', name: 'zoom.us' }
 
 /** askFirst: "Finish recording when the call ends" off, so the end of a call asks (autoStop.spec.ts has it on) */
 async function launch(o: { askFirst?: boolean; background?: boolean } = {}) {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-e2e-'))
+  const userData = tempDir('e2e')
   if (o.askFirst) writeFileSync(join(userData, 'settings.json'), JSON.stringify({ stopWhenCallEnds: false }))
   const app = await electron.launch({ args: [main], env: { ...process.env, ...(o.background ? { YOGURT_BACKGROUND: '1' } : {}), YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   const page = await app.firstWindow()

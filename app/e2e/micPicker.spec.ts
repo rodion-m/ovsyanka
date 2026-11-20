@@ -1,13 +1,12 @@
-import { _electron as electron, expect, test, type ElectronApplication } from '@playwright/test'
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, tempDir } from './support/playwright'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const fake = <T>(app: ElectronApplication, fn: string, arg?: unknown): Promise<T> =>
   app.evaluate((_e, [fn, arg]) => (globalThis as unknown as Record<string, Record<string, (a?: unknown) => unknown>>).__fake__[fn as string](arg), [fn, arg] as const) as Promise<T>
 
 test('the mic picker lists the mics, switches the live recording, remembers the choice and falls back to Auto', async () => {
-  const userData = mkdtempSync(join(tmpdir(), 'yogurt-mic-'))
+  const userData = tempDir('mic')
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: { ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: userData } })
   try {
     const page = await app.firstWindow()

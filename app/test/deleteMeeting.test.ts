@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openStore, type Store } from '../src/main/store'
 import { deleteMeeting } from '../src/main/deleteMeeting'
 import { isId } from '../src/main/ipcArgs'
+import { tempDir } from './support/tempDir'
 
 vi.mock('node:fs/promises', async (original) => {
   const actual = await original<typeof import('node:fs/promises')>()
@@ -17,7 +17,7 @@ const stores: Store[] = []
 afterEach(() => { vi.useRealTimers(); stores.splice(0).forEach((s) => s.close()); dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })) })
 
 function setup() {
-  const root = mkdtempSync(join(tmpdir(), 'yogurt-delete-'))
+  const root = tempDir('delete')
   dirs.push(root)
   const store = openStore(join(root, 'yogurt.db'))
   stores.push(store)

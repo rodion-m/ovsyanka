@@ -1,12 +1,12 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createSpool, meetingsWithSpool, SPOOL_DIR, spoolDirOf, spoolRounds, SPOOL_ROUND_MS, type SpooledEntry } from '../src/main/asr/spool'
 import type { Chunk } from '../src/main/asr/chunker'
+import { tempDir } from './support/tempDir'
 
 const dirs: string[] = []
-const dir = () => { const d = mkdtempSync(join(tmpdir(), 'yogurt-spool-')); dirs.push(d); return d }
+const dir = () => { const d = tempDir('spool'); dirs.push(d); return d }
 afterEach(() => { while (dirs.length) rmSync(dirs.pop()!, { recursive: true, force: true }) })
 
 const chunk = (track: 'me' | 'them', startMs: number, samples: Float32Array, clearMs?: number): Chunk =>

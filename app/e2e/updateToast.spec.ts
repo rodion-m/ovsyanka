@@ -1,13 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 // a version "downloaded" at launch; the corner waits AFTER_MS (a day in a real install) before offering Restart
 const AFTER_MS = 1500
 async function launch() {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-update-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('update'),
     YOGURT_FAKE_UPDATE: '9.9.9', YOGURT_FAKE_UPDATE_AFTER_MS: String(AFTER_MS),
   } })
   const page = await app.firstWindow()

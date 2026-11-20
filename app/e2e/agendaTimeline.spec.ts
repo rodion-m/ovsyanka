@@ -1,11 +1,9 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 test('a full agenda starts at the next event and gives the list priority while details open on demand', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-timeline-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-timeline'),
   } })
   try {
     const page = await app.firstWindow()
@@ -74,7 +72,7 @@ test('a full agenda starts at the next event and gives the list priority while d
 
 test('granting calendar access initializes the timeline after events arrive, including after the last event', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-first-grant-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_FAKE_CALENDAR: 'notDetermined', YOGURT_USER_DATA: tempDir('agenda-first-grant'),
   } })
   try {
     const page = await app.firstWindow()
@@ -103,7 +101,7 @@ test('granting calendar access initializes the timeline after events arrive, inc
 
 test('a solo timed block can be prepared and then recorded from its agenda details', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'agenda-solo-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-solo'),
   } })
   try {
     const page = await app.firstWindow()

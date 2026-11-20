@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { loadSettings, saveSettings } from '../src/main/settings'
+import { tempDir } from './support/tempDir'
 
 const native = vi.hoisted(() => ({ supported: true, requirement: '', reads: 0 }))
 const notices: (EventEmitter & { show: ReturnType<typeof vi.fn> })[] = []
@@ -21,7 +21,7 @@ const review = local.replace('so.yogurt.app', 'local.yogurt.native-review')
 const otherSigner = local.replace(/1/g, '2')
 const dirs: string[] = []
 function rig() {
-  const dir = mkdtempSync(join(tmpdir(), 'yogurt-notification-test-')); dirs.push(dir)
+  const dir = tempDir('notification-test'); dirs.push(dir)
   const path = join(dir, 'settings.json')
   native.requirement = `Executable=/build/Yogurt.app/Contents/MacOS/Yogurt\n${local}\n`
   return { path, permission: createNotificationPermission(path) }

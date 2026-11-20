@@ -1,13 +1,11 @@
-import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, tempDir } from './support/playwright'
 import { join } from 'node:path'
 
 const before = process.env.YOGURT_UI_REVIEW === 'before'
 
 test('Ask starters hide without moving the landing layout', async ({}, info) => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-chat-entrance-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('chat-entrance'),
   } })
   try {
     const page = await app.firstWindow()

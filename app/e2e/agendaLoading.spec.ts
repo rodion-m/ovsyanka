@@ -1,6 +1,4 @@
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { _electron as electron, expect, test, type ElectronApplication, type Page, tempDir } from './support/playwright'
 import { join } from 'node:path'
 import { selectUpcomingAgendaDay } from './agendaDate'
 
@@ -21,7 +19,7 @@ async function seedAgendaAtNoon(app: ElectronApplication, page: Page) {
 
 test('agenda keeps cached days immediate, deduplicates pending reads and shows two quiet skeletons only for uncached days', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-loading-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-loading'),
   } })
   try {
     const page = await app.firstWindow()
@@ -72,7 +70,7 @@ test('agenda keeps cached days immediate, deduplicates pending reads and shows t
 
 test('a granted response started before access was revoked cannot refill the calendar cache', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-revoked-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-revoked'),
   } })
   try {
     const page = await app.firstWindow()
@@ -106,7 +104,7 @@ test('a granted response started before access was revoked cannot refill the cal
 
 test('agenda uses each date once while preserving Today and Tomorrow labels', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-date-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-date'),
   } })
   try {
     const page = await app.firstWindow()
@@ -128,7 +126,7 @@ test('agenda uses each date once while preserving Today and Tomorrow labels', as
 
 test('the compact calendar keeps its original type and geometry with a bright today in both themes', async () => {
   const app = await electron.launch({ args: [join(import.meta.dirname, '../out/main/index.js')], env: {
-    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: mkdtempSync(join(tmpdir(), 'yogurt-agenda-states-')),
+    ...process.env, YOGURT_FAKE: '1', YOGURT_USER_DATA: tempDir('agenda-states'),
   } })
   try {
     const page = await app.firstWindow()
