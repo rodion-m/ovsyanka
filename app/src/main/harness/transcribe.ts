@@ -188,7 +188,7 @@ export function parseTranscriptDetailed(text: string, duration: number, options:
   const tooManyDropped = diagnostics.dropped > maxDropped
   const tooMuchDroppedText = totalTextChars > 0 && droppedTextChars / totalTextChars > 0.1
   const globalTimelineError = tailPast || denseOutput || tooManyInversions || tooManyDropped || tooMuchDroppedText
-  const firstAttemptDamaged = options.salvage === false && (diagnostics.dropped > 0 || diagnostics.clamped > 0)
+  const firstAttemptDamaged = options.salvage === false && diagnostics.dropped > 0
   if ((diagnostics.dropped && !segments.length) || globalTimelineError || firstAttemptDamaged) {
     const code = timestampErrors ? 'bad-timestamps' : 'bad-response'
     fail(code, code === 'bad-timestamps' ? 'The remote AI returned timestamps outside the recording.' : 'The remote AI returned an invalid transcript segment.')

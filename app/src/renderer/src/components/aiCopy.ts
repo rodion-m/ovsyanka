@@ -137,6 +137,13 @@ const en = {
   problemCliBadResponse: '{cli} returned a response Yogurt couldn’t read. Your audio is kept. After the meeting, press Retry in the note.',
   problemTranscriptOutput: 'The model returned a transcript Yogurt could not read. Your audio is kept; Yogurt will try again after the meeting.',
   problemTranscriptRetry: 'The transcript is incomplete. Your audio is kept. Press Retry in the note to try again.',
+  problemCliMissingStopped: 'Yogurt couldn’t start {cli}. Check that it is installed and that its path is set in AI settings. Your audio is kept.',
+  problemCliFailedStopped: '{cli} couldn’t process this part. Check in Terminal that you are signed in and have quota left. Your audio is kept.',
+  problemCliConfigStopped: 'The selected Porch profile cannot transcribe audio. Choose another profile in AI settings. Your audio is kept.',
+  problemCliTimeoutStopped: '{cli} did not respond in time. You can increase the timeout in advanced AI settings. Your audio is kept.',
+  problemCliBadResponseStopped: '{cli} returned a response Yogurt couldn’t read. Your audio is kept.',
+  problemTranscriptOutputStopped: 'The model returned a transcript Yogurt could not read. Your audio is kept.',
+  problemTranscriptRetryStopped: 'The transcript is incomplete. Your audio is kept.',
   problemTranscriptAuto: 'The transcript is incomplete. Your audio is kept; Yogurt will retry automatically when it opens again.',
   problemTranscriptAction: 'The transcript is incomplete. Your audio is kept. Fix AI settings; Yogurt will retry when they take effect. If it remains incomplete, press Retry in the note.',
   problemTranscriptEdited: 'The transcript was extended. Your edited notes were left unchanged.',
@@ -277,6 +284,13 @@ export const aiRussianCopy: Record<keyof typeof en, string> = {
   problemCliBadResponse: '{cli} вернул ответ, который Yogurt не смог прочитать. Аудио сохранено. После встречи нажмите Повторить в заметке.',
   problemTranscriptOutput: 'Модель вернула расшифровку, которую Yogurt не смог прочитать. Аудио сохранено; после встречи Yogurt попробует ещё раз.',
   problemTranscriptRetry: 'Расшифровка неполная. Аудио сохранено. Нажмите «Повторить» в заметке, чтобы попробовать ещё раз.',
+  problemCliMissingStopped: 'Yogurt не смог запустить {cli}. Проверьте, что программа установлена и путь к ней указан в настройках ИИ. Аудио сохранено.',
+  problemCliFailedStopped: '{cli} не смог обработать эту часть. Проверьте в Терминале, что вы вошли в аккаунт и квота не исчерпана. Аудио сохранено.',
+  problemCliConfigStopped: 'Выбранный профиль Porch не подходит для расшифровки аудио. Выберите другой профиль в настройках ИИ. Аудио сохранено.',
+  problemCliTimeoutStopped: '{cli} не ответил вовремя. Тайм-аут можно увеличить в дополнительных настройках ИИ. Аудио сохранено.',
+  problemCliBadResponseStopped: '{cli} вернул ответ, который Yogurt не смог прочитать. Аудио сохранено.',
+  problemTranscriptOutputStopped: 'Модель вернула расшифровку, которую Yogurt не смог прочитать. Аудио сохранено.',
+  problemTranscriptRetryStopped: 'Расшифровка неполная. Аудио сохранено.',
   problemTranscriptAuto: 'Расшифровка неполная. Аудио сохранено; Yogurt автоматически повторит попытку при следующем запуске.',
   problemTranscriptAction: 'Расшифровка неполная. Аудио сохранено. Исправьте настройки ИИ; Yogurt повторит попытку после их применения. Если расшифровка останется неполной, нажмите «Повторить» в заметке.',
   problemTranscriptEdited: 'Расшифровка дополнена. Ваши изменения в заметках сохранены.',
@@ -297,19 +311,23 @@ const problemTextKeys: Record<AiProblemCode, AiCopyKey> = {
   'local-audio': 'problemLocalAudio', 'cli-missing': 'problemCliMissing', 'cli-failed': 'problemCliFailed', 'cli-config': 'problemCliConfig',
 }
 
-/** The short, actionable transcription warning shown under the live note. */
-export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli, backend?: AiBackend): string {
+/** The short transcription warning shown under a live note; stopped notes leave next steps to the pending banner. */
+export function aiProblemText(code: AiProblemCode, model?: string, locale = language(), cli?: AiCli, backend?: AiBackend, afterMeeting = false): string {
   let text: string
-  if (AI_PROBLEM_CLASS[code] === 'output') {
+  if (afterMeeting && code === 'bad-response' && cli) text = aiTextF('problemCliBadResponseStopped', { cli }, locale)
+  else if (AI_PROBLEM_CLASS[code] === 'output') {
     const selectedBackend = backend ?? (cli === 'agy' ? 'agy' : cli === 'Porch' ? 'porch' : 'openrouter')
     const action = AI_FAILURE_POLICY.output.liveCopy[selectedBackend]
-    text = aiText(action === 'retry' ? 'problemTranscriptRetry' : 'problemTranscriptOutput', locale)
+    const key = afterMeeting
+      ? action === 'retry' ? 'problemTranscriptRetryStopped' : 'problemTranscriptOutputStopped'
+      : action === 'retry' ? 'problemTranscriptRetry' : 'problemTranscriptOutput'
+    text = aiText(key, locale)
   }
-  else if (code === 'cli-missing') text = aiTextF('problemCliMissing', { cli: cli || 'agy' }, locale)
-  else if (code === 'cli-failed') text = aiTextF('problemCliFailed', { cli: cli || 'agy' }, locale)
-  else if (code === 'cli-config') text = aiText('problemCliConfig', locale)
-  else if (code === 'timeout' && cli) text = aiTextF('problemCliTimeout', { cli }, locale)
-  else if (code === 'bad-response' && cli) text = aiTextF('problemCliBadResponse', { cli }, locale)
+  else if (code === 'cli-missing') text = aiTextF(afterMeeting ? 'problemCliMissingStopped' : 'problemCliMissing', { cli: cli || 'agy' }, locale)
+  else if (code === 'cli-failed') text = aiTextF(afterMeeting ? 'problemCliFailedStopped' : 'problemCliFailed', { cli: cli || 'agy' }, locale)
+  else if (code === 'cli-config') text = aiText(afterMeeting ? 'problemCliConfigStopped' : 'problemCliConfig', locale)
+  else if (code === 'timeout' && cli) text = aiTextF(afterMeeting ? 'problemCliTimeoutStopped' : 'problemCliTimeout', { cli }, locale)
+  else if (code === 'bad-response' && cli) text = aiTextF(afterMeeting ? 'problemCliBadResponseStopped' : 'problemCliBadResponse', { cli }, locale)
   else {
     const key = problemTextKeys[code]
     text = key === 'problemModelGone' || key === 'problemNoProvider'

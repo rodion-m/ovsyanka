@@ -151,6 +151,17 @@ describe('transcript validation', () => {
     expect(await quietTranscriber({ ...clear, clearMs: 19_999 })).toEqual([])
     expect(calls).toHaveLength(1)
   })
+  it('keeps a within-tolerance overshoot from the first response without another provider call', async () => {
+    const tempDir = await directory(), calls: AudioRequest[] = []
+    const transcriber = createHarnessTranscriber({ settings: DEFAULT_AI_SETTINGS, tempDir, signal: new AbortController().signal,
+      transcribe: async request => {
+        calls.push(request)
+        return JSON.stringify({ language: 'en', segments: [{ start: 59, end: 61.5, text: 'last phrase' }] })
+      } }, callbacks())
+    const result = await transcriber({ track: 'me', startMs: 0, samples: new Float32Array(60 * RATE) })
+    expect(calls).toHaveLength(1)
+    expect(result).toEqual([{ track: 'me', startMs: 59_000, endMs: 60_000, text: 'last phrase' }])
+  })
   it('salvages one impossible segment and a slight overshoot only after a fresh model response', async () => {
     const tempDir = await directory(), calls: AudioRequest[] = []
     const valid = Array.from({ length: 26 }, (_, i) => ({ start: i * 2, end: i * 2 + 0.5, text: `анонимная реплика ${i}` }))
@@ -936,13 +947,13 @@ describe.skipIf(isWindows)('pinned Porch internal adapter', () => {
     expect(result).toBeInstanceOf(Error); expect(String(result)).not.toContain('PRIVATE AUDIO ERROR')
     expect(cb.onLanguage).not.toHaveBeenCalled(); expect(await readdir(fixture.tempDir)).toEqual([])
   })
-  it('asks Porch for a fresh response before clamping a bounded timestamp overshoot', async () => {
+  it('clamps a bounded timestamp overshoot without asking Porch for another response', async () => {
     const fixture = await porchFixture({ response: '{"segments":[{"start":-0.1,"end":1,"text":"anonymous phrase"}]}' })
     const lines = await fixture.harness.transcriber(callbacks())(chunk())
     expect(lines).toEqual([{ track: 'them', startMs: 12_000, endMs: 13_000, text: 'anonymous phrase' }])
     const calls = await fixture.porchCalls()
-    expect(calls.filter(call => call.args[0] === '--mode')).toHaveLength(2)
-    expect(calls.filter(call => call.args[0] === 'media' && call.args[1] === 'capabilities')).toHaveLength(2)
+    expect(calls.filter(call => call.args[0] === '--mode')).toHaveLength(1)
+    expect(calls.filter(call => call.args[0] === 'media' && call.args[1] === 'capabilities')).toHaveLength(1)
   })
   it('rejects an audio-looking profile absent from machine-readable audio capabilities, and retries after configuration is repaired', async () => {
     const fixture = await porchFixture({ capabilities: { transcribe: ['another-profile'], 'image.describe': ['agy-gemini-3.8-flash'] } })

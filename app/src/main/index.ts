@@ -638,8 +638,8 @@ app.whenReady().then(() => {
       tell({ t: 'ai-problem', problem: event })
     },
     ...(harness ? { transcriberFactory: harness.transcriber, quickReads: false,
-      batchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 100 : 5 * 60_000,
-      firstBatchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 50 : 60_000,
+      batchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 100 : 5 * 60_000,
+      firstBatchMs: isFake() && ['cli-failed', 'cli-missing', 'bad-output', 'bad-output-once'].includes(process.env.YOGURT_FAKE_CLI_FAILURE ?? '') ? 50 : 60_000,
       maxQueuedMs: 15 * 60_000 } : {}),
     meetingDir: (id) => join(userDataDir(), 'meetings', id),
     // English, Russian or multiple languages, read on each chunk so the footer's picker counts at once

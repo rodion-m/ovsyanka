@@ -228,6 +228,27 @@ it('chooses transcription help text by error class in Russian and English', () =
   expect(transcriptPendingText({ code: 'bad-response', backend: 'openrouter', attempts: 0, blocked: true }, 'ru')).toContain('Нажмите «Повторить»')
 })
 
+it('keeps stopped-note notices informative without after-meeting promises or Retry instructions in both locales', () => {
+  const cases = [
+    ['cli-failed', 'agy', 'agy'], ['timeout', 'agy', 'agy'], ['cli-missing', 'agy', 'agy'],
+    ['cli-config', 'Porch', 'porch'], ['bad-response', 'agy', 'agy'], ['bad-response', undefined, 'agy'],
+    ['bad-response', undefined, 'openrouter'],
+  ] as const
+  for (const locale of ['en', 'ru'] as const) {
+    for (const [code, cli, backend] of cases) {
+      const copy = aiProblemText(code, undefined, locale, cli, backend, true)
+      expect(copy).toMatch(locale === 'en' ? /Your audio is kept\./ : /Аудио сохранено\./)
+      expect(copy).not.toMatch(locale === 'en' ? /after the meeting|retry/i : /после встречи|повторить|автоматически/iu)
+    }
+    expect(aiProblemText('cli-failed', undefined, locale, 'agy', 'agy', true))
+      .toContain(locale === 'en' ? 'couldn’t process this part' : 'не смог обработать эту часть')
+    expect(aiProblemText('bad-response', undefined, locale, undefined, 'agy', true))
+      .toContain(locale === 'en' ? 'model returned a transcript' : 'Модель вернула расшифровку')
+    expect(aiProblemText('bad-response', undefined, locale, 'agy', 'agy', true))
+      .toContain(locale === 'en' ? 'agy returned a response' : 'agy вернул ответ')
+  }
+})
+
 describe('provider-aware onboarding privacy', () => {
   it('keeps the original local promise only in local mode', () => {
     expect(screenCopy('welcome', false).text).toContain('nothing leaves your Mac')

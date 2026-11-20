@@ -143,7 +143,7 @@ export const fakeNow = () => Date.now() + skew
  *   main()                        whether the main window was brought forward, is visible, and its route
  *   warn(code)                    the audio helper warns (no-mic, no-system-audio)
  *   cliFailure(code?)             fake CLI transcription failure; clear it to let Retry return fixture text
- *                                 bad-output-once returns one malformed transcript, then valid fixture output
+ *                                 bad-output returns malformed output; bad-output-once returns one malformed response, then valid output
  *   crashCapture()                kill the audio helper as if it crashed
  *   manyMeetings(n)               n finished meetings over the past months, with notes (home and search)
  *   calendarEvents(list | null)   the calendar has these events (null: the usual two)
